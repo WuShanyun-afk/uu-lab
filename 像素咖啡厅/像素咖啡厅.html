@@ -143,6 +143,25 @@
     .btn{font-size:12px;padding:7px 1px}
     .btn small{font-size:9px}
   }
+
+  /* ---------- 手机横屏：面板收成抽屉，画面吃满整个屏幕 ---------- */
+  #drawerBtn{display:none}
+  body.landscape #drawerBtn{display:inline-block}
+  body.landscape{padding:4px}
+  body.landscape #app{
+    max-width:none!important;width:100%;height:100%;
+    align-items:center;justify-content:center;gap:4px;
+  }
+  body.landscape #topbar{align-self:stretch;font-size:11px;gap:5px;padding:4px 6px}
+  body.landscape .chip{padding:3px 6px}
+  body.landscape #screen{align-self:center}
+  body.landscape #panel{
+    position:fixed;right:0;top:0;bottom:0;width:min(320px,68vw);
+    background:rgba(21,15,20,.98);border-left:2px solid #8a6247;
+    padding:10px;overflow-y:auto;z-index:30;
+    transform:translateX(103%);transition:transform .18s ease-out;
+  }
+  body.landscape #panel.open{transform:none}
 </style>
 </head>
 <body>
@@ -154,6 +173,7 @@
     <span class="chip">💰 <b id="moneyL">200</b></span>
     <span class="chip good">⭐ 口碑 <b id="repL">30</b></span>
     <span class="sp"></span>
+    <span class="chip" id="drawerBtn">⚙ 面板</span>
     <span class="chip" id="menuBtn">📖 菜单</span>
     <span class="chip" id="fsBtn">⛶ 放大</span>
     <span class="chip" id="speedBtn">▶ 1×</span>
@@ -1131,6 +1151,9 @@ function canvasPos(e) {
   return { x: (t.clientX - r.left) / r.width * W, y: (t.clientY - r.top) / r.height * H };
 }
 function onCanvas(e) {
+  /* 横屏抽屉开着的话，第一下先收抽屉 */
+  const pn = $('panel');
+  if (pn && pn.classList && pn.classList.contains('open')) { pn.classList.remove('open'); return; }
   const p = canvasPos(e);
   let hit = null;
   for (const g of G.guests) {
@@ -1141,6 +1164,12 @@ function onCanvas(e) {
 }
 CV.addEventListener('pointerdown', onCanvas);
 CV.style.touchAction = 'manipulation';
+
+/* 横屏抽屉：面板收放 */
+$('drawerBtn').addEventListener('click', function () {
+  const p = $('panel');
+  if (p && p.classList) p.classList.toggle('open');
+});
 
 /* 放大按钮（全屏） */
 $('fsBtn').addEventListener('click', function () {
@@ -1414,10 +1443,21 @@ function loop(now) {
 function fitScreen() {
   const app = $('app');
   if (!app || !window.innerWidth) return;
-  const tb = $('topbar'), pn = $('panel');
-  const chrome = ((tb && tb.offsetHeight) || 0) + ((pn && pn.offsetHeight) || 0) + 26;
-  const availH = Math.max(120, window.innerHeight - chrome);
-  const availW = Math.max(240, window.innerWidth - 26);
+  /* 手机横屏：面板改成抽屉，不再占版面，画面就能吃满整块屏幕 */
+  const compact = window.innerWidth > window.innerHeight && window.innerHeight <= 620;
+  if (document.body && document.body.classList) document.body.classList.toggle('landscape', compact);
+
+  const tb = $('topbar');
+  let availW, availH;
+  if (compact) {
+    availW = Math.max(240, window.innerWidth - 14);
+    availH = Math.max(120, window.innerHeight - (((tb && tb.offsetHeight) || 26) + 16));
+  } else {
+    const pn = $('panel');
+    const chrome = ((tb && tb.offsetHeight) || 0) + ((pn && pn.offsetHeight) || 0) + 26;
+    availW = Math.max(240, window.innerWidth - 26);
+    availH = Math.max(120, window.innerHeight - chrome);
+  }
   const raw = Math.min(availW / W, availH / H);
   /* 差不太多就凑整数倍（像素才齐）；差太多就铺满，宁可大也别缩成邮票 */
   let s = raw;
@@ -1428,7 +1468,7 @@ function fitScreen() {
   const cw = Math.round(W * s), ch = Math.round(H * s);
   CV.style.width = cw + 'px';
   CV.style.height = ch + 'px';
-  app.style.maxWidth = (cw + 4) + 'px';
+  app.style.maxWidth = compact ? 'none' : (cw + 4) + 'px';
   const tst = $('toast');
   if (tst) tst.style.fontSize = Math.max(12, Math.round(3.4 * s)) + 'px';
 }
