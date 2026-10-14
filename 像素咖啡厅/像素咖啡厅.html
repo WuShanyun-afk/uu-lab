@@ -1,0 +1,1410 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>像素咖啡厅 · Pixel Café</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%}
+  body{
+    background:#150f14;
+    color:#f2e4cf;
+    font-family:"Courier New",ui-monospace,"PingFang SC","Microsoft YaHei",monospace;
+    display:flex;align-items:center;justify-content:center;
+    padding:8px;overflow:hidden;
+  }
+  #app{width:100%;max-width:760px;display:flex;flex-direction:column;gap:6px}
+
+  /* ---------- 顶栏 ---------- */
+  #topbar{
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    background:#241a24;border:2px solid #4a3040;padding:6px 8px;
+    font-size:12px;line-height:1;
+  }
+  #topbar .logo{color:#f2c14e;font-weight:bold;letter-spacing:1px}
+  #topbar .sp{flex:1}
+  .chip{background:#150f14;border:1px solid #4a3040;padding:4px 7px;white-space:nowrap}
+  .chip b{color:#f2c14e;font-weight:bold}
+  .chip.warn b{color:#e06a6a}
+  .chip.good b{color:#8fd18f}
+  #speedBtn{cursor:pointer;user-select:none;color:#c9b8a8}
+  #speedBtn:hover{border-color:#8a6247;color:#f2c14e}
+
+  /* ---------- 画面 ---------- */
+  #screen{position:relative;border:2px solid #4a3040;background:#0b0810;line-height:0}
+  #cv{
+    display:block;width:100%;height:auto;
+    image-rendering:pixelated;image-rendering:crisp-edges;
+    -ms-interpolation-mode:nearest-neighbor;
+  }
+  #toast{
+    position:absolute;left:50%;bottom:8%;transform:translateX(-50%);
+    background:#150f14;border:2px solid #8a6247;color:#f2e4cf;
+    padding:5px 10px;font-size:12px;line-height:1.4;
+    opacity:0;transition:opacity .18s;pointer-events:none;white-space:nowrap;
+  }
+  #toast.on{opacity:1}
+
+  /* ---------- 操作面板 ---------- */
+  #panel{display:flex;flex-direction:column;gap:5px}
+  .row{display:flex;gap:5px;align-items:stretch}
+  .lbl{font-size:11px;color:#8a7a6a;display:flex;align-items:center;padding:0 4px;white-space:nowrap}
+
+  .btn{
+    flex:1;background:#241a24;border:2px solid #4a3040;color:#f2e4cf;
+    font-family:inherit;font-size:13px;padding:8px 2px;cursor:pointer;
+    text-align:center;user-select:none;line-height:1.15;
+    transition:background .1s,border-color .1s,transform .06s;
+  }
+  .btn small{display:block;font-size:10px;color:#8a7a6a;margin-top:3px}
+  .btn:hover:not(.off):not(:disabled){background:#332530;border-color:#8a6247}
+  .btn:active:not(.off){transform:translateY(1px)}
+  .btn.on{background:#8a6247;border-color:#d8b183;color:#150f14;font-weight:bold}
+  .btn.on small{color:#3a2a1e}
+  .btn.off,.btn:disabled{opacity:.35;cursor:not-allowed}
+  .btn.lock small{color:#c96a6a}
+
+  #tray{flex:1;display:flex;gap:5px;align-items:center;
+        background:#150f14;border:2px solid #4a3040;padding:5px;min-height:44px}
+  .slot{
+    width:38px;height:34px;border:2px dashed #3a2a3a;display:flex;
+    align-items:center;justify-content:center;font-size:11px;color:#5a4a4a;
+    position:relative;cursor:default;
+  }
+  .slot.has{border-style:solid;border-color:#8a6247;cursor:pointer}
+  .slot .cupic{width:22px;height:24px;position:relative}
+  .slot .nm{position:absolute;bottom:-1px;left:0;right:0;font-size:9px;color:#d8b183;
+            text-align:center;line-height:1;text-shadow:0 0 2px #000}
+  .slot .x{position:absolute;top:-6px;right:-6px;font-size:10px;color:#e06a6a;display:none}
+  .slot.has:hover .x{display:block}
+
+  /* ---------- 弹窗 ---------- */
+  #overlay{
+    position:absolute;inset:0;background:rgba(11,8,16,.86);
+    display:none;align-items:center;justify-content:center;padding:10px;
+    line-height:1.5;font-size:12px;overflow:auto;
+  }
+  #overlay.on{display:flex}
+  #sheet{
+    background:#241a24;border:2px solid #8a6247;padding:12px;
+    width:100%;max-width:420px;
+  }
+  #sheet h2{margin:0 0 8px;font-size:14px;color:#f2c14e;letter-spacing:1px}
+  #sheet .kv{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px dotted #3a2a3a}
+  #sheet .kv b{color:#f2c14e}
+  #sheet .sec{margin:10px 0 5px;font-size:11px;color:#8a7a6a;letter-spacing:1px}
+  .upg{display:flex;gap:6px;align-items:center;background:#150f14;border:1px solid #4a3040;
+       padding:5px 7px;margin-bottom:4px}
+  .upg .t{flex:1}
+  .upg .t i{display:block;font-style:normal;font-size:10px;color:#8a7a6a;margin-top:2px}
+  .upg button{background:#332530;border:2px solid #8a6247;color:#f2e4cf;font-family:inherit;
+              font-size:11px;padding:5px 9px;cursor:pointer;white-space:nowrap}
+  .upg button:hover:not(:disabled){background:#8a6247;color:#150f14}
+  .upg button:disabled{opacity:.35;cursor:not-allowed}
+  #sheet .go{display:block;width:100%;margin-top:10px;background:#8a6247;border:2px solid #d8b183;
+             color:#150f14;font-family:inherit;font-size:14px;font-weight:bold;padding:10px;cursor:pointer}
+  #sheet .go:hover{background:#d8b183}
+
+  /* ---------- 菜单 / 配方页 ---------- */
+  #menuOv{
+    position:absolute;inset:0;background:rgba(11,8,16,.92);display:none;
+    align-items:flex-start;justify-content:center;padding:10px;overflow:auto;
+    font-size:12px;line-height:1.5;
+  }
+  #menuOv.on{display:flex}
+  #menuSheet{background:#241a24;border:2px solid #8a6247;padding:12px;width:100%;max-width:460px}
+  #menuSheet h2{margin:0 0 8px;font-size:14px;color:#f2c14e;letter-spacing:1px}
+  #menuSheet .sec{margin:10px 0 5px;font-size:11px;color:#8a7a6a;letter-spacing:1px}
+  .stockline{display:flex;gap:10px;flex-wrap:wrap;background:#150f14;
+             border:1px solid #4a3040;padding:6px 8px;font-size:11px}
+  .stockline span{white-space:nowrap}
+  .stockline b{color:#f2c14e}
+  .stockline i,.rec .ing i{display:inline-block;width:8px;height:8px;
+             border:1px solid #4a3040;margin-right:4px;vertical-align:middle}
+  .rec{display:flex;gap:8px;align-items:center;background:#150f14;
+       border:1px solid #4a3040;padding:6px 8px;margin-bottom:4px}
+  .rec.lock{opacity:.45}
+  .rec .ic{flex:0 0 26px;height:26px;border:1px solid #4a3040;position:relative}
+  .rec .cup2{position:absolute;inset:4px 7px;border:1px solid #6b4a3a}
+  .rec .nm{flex:1;font-size:12.5px;line-height:1.45}
+  .rec .nm b{display:block;color:#f2c14e;font-size:10.5px;font-weight:normal}
+  .rec .ing{font-size:10px;color:#a09080;text-align:right;line-height:1.7;white-space:nowrap}
+  .rec .ing i{width:7px;height:7px;margin-right:3px}
+  .rec .can{flex:0 0 66px;text-align:right;font-size:10px;color:#8a7a6a}
+  #menuSheet .go{display:block;width:100%;margin-top:10px;background:#8a6247;
+    border:2px solid #d8b183;color:#150f14;font-family:inherit;font-size:14px;
+    font-weight:bold;padding:10px;cursor:pointer}
+  #menuSheet .go:hover{background:#d8b183}
+
+  @media (max-width:520px){
+    #topbar{font-size:11px;gap:5px;padding:5px 6px}
+    .chip{padding:3px 5px}
+    .btn{font-size:12px;padding:7px 1px}
+    .btn small{font-size:9px}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <span class="logo">☕ 像素咖啡厅</span>
+    <span class="chip">第 <b id="dayL">1</b> 天</span>
+    <span class="chip">🕗 <b id="clockL">08:00</b></span>
+    <span class="chip">💰 <b id="moneyL">200</b></span>
+    <span class="chip good">⭐ 口碑 <b id="repL">30</b></span>
+    <span class="sp"></span>
+    <span class="chip" id="menuBtn">📖 菜单</span>
+    <span class="chip" id="speedBtn">▶ 1×</span>
+  </div>
+
+  <div id="screen">
+    <canvas id="cv" width="320" height="180"></canvas>
+    <div id="toast"></div>
+    <div id="overlay"><div id="sheet"></div></div>
+    <div id="menuOv"><div id="menuSheet"></div></div>
+  </div>
+
+  <div id="panel">
+    <div class="row">
+      <span class="lbl">出杯口</span>
+      <div id="tray"></div>
+    </div>
+    <div class="row" id="drinkRow"></div>
+    <div class="row">
+      <div class="row" id="sizeRow" style="flex:3"></div>
+      <div class="row" id="tempRow" style="flex:2"></div>
+    </div>
+    <div class="row">
+      <div id="stockRow" class="lbl" style="flex:1;justify-content:space-around"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* =========================================================================
+   像素咖啡厅 · Pixel Café
+   一个自包含的像素风咖啡厅模拟经营小游戏
+   —— 画布只有 320×180，所有画面都是 fillRect 拼出来的真·像素画
+   ========================================================================= */
+
+/* ---------------------------------------------------------------
+   0. 基础
+   --------------------------------------------------------------- */
+const CV = document.getElementById('cv');
+const ctx = CV.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+const W = 320, H = 180;
+
+/* 画一个像素块 */
+function px(x, y, w, h, c) {
+  if (w <= 0 || h <= 0) return;
+  ctx.fillStyle = c;
+  ctx.fillRect(x | 0, y | 0, Math.max(1, w | 0), Math.max(1, h | 0));
+}
+
+/* 画一行点阵：dither(x,y,w,h,c,step) 隔像素点，用来做像素风渐变 */
+function dither(x, y, w, h, c, step) {
+  step = step || 2;
+  ctx.fillStyle = c;
+  for (let j = 0; j < h; j++) {
+    for (let i = (j % step); i < w; i += step) ctx.fillRect((x + i) | 0, (y + j) | 0, 1, 1);
+  }
+}
+
+/* ---------------------------------------------------------------
+   1. 调色板（暖木 + 霓虹，32 色以内）
+   --------------------------------------------------------------- */
+const C = {
+  ink:      '#150f14',
+  wallHi:   '#3a2a33',
+  wallLo:   '#2b1f28',
+  tile:     '#d8b183',
+  tileDk:   '#b08052',
+  woodDk:   '#6b4a3a',
+  wood:     '#8a6247',
+  woodHi:   '#b08052',
+  woodLt:   '#d8b183',
+  floor:    '#8a6247',
+  floorDk:  '#6b4a3a',
+  cream:    '#f2e4cf',
+  white:    '#ffffff',
+  shade:    '#c9b8a8',
+  neon:     '#f2c14e',
+  neonRed:  '#d94f4f',
+  sky1:     '#4a8fbf',
+  sky2:     '#8fbfe0',
+  dusk1:    '#e8a06a',
+  dusk2:    '#c96a6a',
+  night:    '#2a2440',
+  night2:   '#3a3458',
+  star:     '#f7f2d8',
+  green:    '#5a8a5a',
+  greenDk:  '#3f6b46',
+  metal:    '#b8b8c0',
+  metalDk:  '#7a7a86',
+  glass:    '#cfe4ef',
+  coffee:   '#7a4a2a',
+  milk:     '#f7ecdc',
+  matcha:   '#8fae7e',
+  caramel:  '#c08b4f',
+  pink:     '#e8a0a8',
+  red:      '#c94f4f',
+};
+
+/* ---------------------------------------------------------------
+   2. 猫的点阵精灵（14×14）
+      颜色靠调色板替换，所以一只猫 = 一份数据 + N 套颜色
+   --------------------------------------------------------------- */
+const SPR = {};
+
+SPR.catSit = [
+  "...o......o...",
+  "..oo......oo..",
+  "..opo....opo..",
+  "..oooooooooo..",
+  "..oooooooooo..",
+  "..ookkoookko..",
+  "..ookkoookko..",
+  "..ooooppoooo..",
+  "..oooooooooo..",
+  "...oooooooo..d",
+  "..ooowwwwooo.d",
+  "..ooowwwwooo.d",
+  "..ooowwwwoood.",
+  "....oo..oo....",
+];
+
+SPR.catWalk1 = [
+  "...o......o...",
+  "..oo......oo..",
+  "..opo....opo..",
+  "..oooooooooo..",
+  "..oooooooooo..",
+  "..ookkoookko..",
+  "..ookkoookko..",
+  "..ooooppoooo..",
+  "..oooooooooo..",
+  "...oooooooo..d",
+  "..ooowwwwooo.d",
+  "..ooowwwwooo.d",
+  "..ooowwwwoood.",
+  "....oo..oo....",
+];
+
+SPR.catWalk2 = [
+  "...o......o...",
+  "..oo......oo..",
+  "..opo....opo..",
+  "..oooooooooo..",
+  "..oooooooooo..",
+  "..ookkoookko..",
+  "..ookkoookko..",
+  "..ooooppoooo..",
+  "..oooooooooo..",
+  "...oooooooo.d.",
+  "..ooowwwwooo.d",
+  "..ooowwwwoood.",
+  "..ooowwwwoood.",
+  "..oo......oo..",
+];
+
+/* 把点阵画到画布上：同色连续像素合并成一个 fillRect，省性能 */
+function blit(rows, x, y, pal, flip) {
+  for (let j = 0; j < rows.length; j++) {
+    const row = rows[j];
+    let i = 0;
+    while (i < row.length) {
+      const ch = row[i];
+      if (ch === '.' || ch === ' ') { i++; continue; }
+      let k = i;
+      while (k + 1 < row.length && row[k + 1] === ch) k++;
+      const col = pal[ch];
+      if (col) {
+        const wRun = k - i + 1;
+        const dx = flip ? x + row.length - 1 - k : x + i;
+        px(dx, y + j, wRun, 1, col);
+      }
+      i = k + 1;
+    }
+  }
+}
+
+/* 猫的配色表 */
+const FURS = [
+  { n: '橘猫',   o: '#e08a3c', d: '#b8641f', p: '#e8a0a8', k: '#2b1a12', w: '#fff6e8' },
+  { n: '黑猫',   o: '#3a3a44', d: '#26262e', p: '#c98f9a', k: '#111118', w: '#5a5a66' },
+  { n: '白猫',   o: '#f2ece2', d: '#cfc4b4', p: '#e8b3bb', k: '#2b1a12', w: '#ffffff' },
+  { n: '灰猫',   o: '#9aa0aa', d: '#767c86', p: '#e8a0a8', k: '#2b1a12', w: '#e6e8ec' },
+  { n: '奶牛猫', o: '#f2ece2', d: '#3a3a44', p: '#e8b3bb', k: '#2b1a12', w: '#ffffff' },
+  { n: '三花',   o: '#e8c88a', d: '#e08a3c', p: '#e8a0a8', k: '#2b1a12', w: '#fff6e8' },
+];
+
+/* 一只猫怎么画：给定配色、位置、姿势 */
+function drawCat(x, y, fur, pose, flip) {
+  const pal = { o: fur.o, d: fur.d, p: fur.p, k: fur.k, w: fur.w, e: C.ink };
+  if (pose === 'sit')        blit(SPR.catSit, x, y, pal, flip);
+  else if (pose === 'walk2') blit(SPR.catWalk2, x, y, pal, flip);
+  else                       blit(SPR.catWalk1, x, y, pal, flip);
+}
+
+/* ---------------------------------------------------------------
+   3. 场景（全部由 fillRect 拼）
+   --------------------------------------------------------------- */
+/* 天空随时间变：早上蓝 → 正午亮 → 黄昏橙 → 夜里紫 */
+function skyPalette(min) {
+  const h = min / 60;
+  if (h < 10.5) return { a: C.sky1, b: C.sky2, star: false };
+  if (h < 16)   return { a: C.sky2, b: '#d8ecf7', star: false };
+  if (h < 18.5) return { a: C.dusk1, b: C.dusk2, star: false };
+  if (h < 19.5) return { a: '#8a5a7a', b: C.night, star: true };
+  return { a: C.night, b: C.night2, star: true };
+}
+
+let sceneTime = 0;   /* 给灯光闪烁用 */
+
+function drawScene(min) {
+  /* ---- 墙 ---- */
+  px(0, 0, W, 88, C.wallHi);
+  px(0, 54, W, 34, C.wallLo);
+  px(0, 52, W, 2, C.woodDk);
+  /* 踢脚线 */
+  px(0, 84, W, 4, C.woodDk);
+
+  /* ---- 窗（右侧偏左，能看见天）---- */
+  const sky = skyPalette(min);
+  const wx = 34, wy = 12, ww = 74, wh = 40;
+  px(wx - 3, wy - 3, ww + 6, wh + 6, C.woodDk);
+  /* 天空：两段色带 + 一行抖色过渡，像素风的"渐变"就该这么干 */
+  const seam = Math.round(wh * 0.42);
+  px(wx, wy, ww, seam, sky.a);
+  dither(wx, wy + seam, ww, 2, sky.b, 2);
+  px(wx, wy + seam + 2, ww, wh - seam - 2, sky.b);
+  if (sky.star) {
+    px(wx + 10, wy + 7, 1, 1, C.star); px(wx + 24, wy + 13, 1, 1, C.star);
+    px(wx + 52, wy + 6, 1, 1, C.star); px(wx + 63, wy + 18, 1, 1, C.star);
+    px(wx + 58, wy + 8, 5, 5, C.star); px(wx + 60, wy + 6, 1, 1, C.star);
+  } else {
+    /* 云 */
+    px(wx + 12, wy + 9, 16, 3, C.cream);
+    px(wx + 16, wy + 7, 9, 2, C.cream);
+    px(wx + 46, wy + 20, 14, 3, C.cream);
+    px(wx + 50, wy + 18, 7, 2, C.cream);
+  }
+  px(wx + ww / 2 - 1, wy, 2, wh, C.woodDk);
+  px(wx, wy + wh / 2 - 1, ww, 2, C.woodDk);
+  /* 窗台小盆栽 */
+  px(wx + 3, wy + wh + 3, 12, 5, C.woodHi);
+  px(wx + 6, wy + wh - 3, 2, 7, C.greenDk);
+  px(wx + 4, wy + wh - 6, 7, 4, C.green);
+  px(wx + 12, wy + wh - 8, 6, 4, C.green);
+  /* 窗帘 */
+  px(wx - 3, wy - 3, 6, wh + 9, C.neonRed);
+  px(wx + ww - 3, wy - 3, 6, wh + 9, C.neonRed);
+
+  /* ---- 菜单黑板 ---- */
+  const mx = 114, my = 10, mw = 64, mh = 42;
+  px(mx - 3, my - 3, mw + 6, mh + 6, C.woodHi);
+  px(mx, my, mw, mh, '#241a24');
+  px(mx + 6, my + 5, 34, 2, C.neon);
+  for (let r = 0; r < 4; r++) {
+    px(mx + 6, my + 13 + r * 7, 20 + (r % 2) * 8, 1, C.shade);
+    px(mx + 50, my + 13 + r * 7, 9, 1, C.neon);
+  }
+
+  /* ---- 架子 + 杯子 ---- */
+  const sx = 214, sy = 16, sw = 48;
+  px(sx, sy + 18, sw, 3, C.woodHi);
+  for (let i = 0; i < 4; i++) {
+    const cx = sx + 5 + i * 12;
+    px(cx, sy + 12, 7, 6, C.cream);
+    px(cx + 1, sy + 10, 5, 2, C.shade);
+    px(cx + 7, sy + 13, 2, 3, C.cream);
+  }
+  px(sx + 4, sy + 30, 10, 8, C.green);
+  px(sx + 6, sy + 38, 6, 4, C.woodHi);
+
+  /* ---- 吊灯（挂在黑板和架子之间，别去压人家的菜单）---- */
+  const lx = 194;
+  px(lx - 1, 0, 2, 9, C.metalDk);
+  const flick = Math.sin(sceneTime * 9) * 0.5 + 0.5;
+  if (flick > 0.2) {                                        /* 光晕先铺在墙上 */
+    for (let r = 0; r < 7; r++) {
+      const half = 3 + r * 2;
+      dither(lx - half, 15 + r, half * 2, 1, C.neon, 3);
+    }
+  }
+  px(lx - 7, 9, 14, 3, C.metalDk);
+  px(lx - 9, 12, 18, 3, C.woodHi);
+  px(lx - 7, 15, 14, 2, C.neon);
+  px(lx - 7, 17, 14, 1, '#f7e6a8');
+
+  /* ---- 门 ---- */
+  const dx = 276, dy = 26, dw = 36, dh = 62;
+  px(dx - 3, dy - 3, dw + 6, dh + 3, C.woodDk);
+  px(dx, dy, dw, dh, C.wood);
+  px(dx + 4, dy + 5, dw - 8, 22, C.glass);
+  px(dx + 4, dy + 5, dw - 8, 2, '#e8f2f8');
+  px(dx + 7, dy + 9, 2, 14, '#ffffff');
+  px(dx + 11, dy + 9, 1, 14, '#ffffff');
+  px(dx + 4, dy + 33, dw - 8, 2, C.woodDk);
+  px(dx + 26, dy + 40, 4, 4, C.neon);
+  /* OPEN 灯牌 */
+  const openOn = true;
+  px(dx + 5, dy - 12, 26, 9, openOn ? C.neonRed : '#4a2a2a');
+  px(dx + 8, dy - 9, 20, 3, openOn ? C.cream : '#6a4a4a');
+
+  /* ---- 吧台 ---- */
+  const cy = 88;
+  px(0, cy, W, 6, C.tile);            /* 台面 88~94 */
+  px(0, cy, W, 2, '#e8cfa8');
+  px(0, cy + 6, W, 18, C.woodDk);     /* 台身 94~112 */
+  for (let i = 4; i < W; i += 40) {   /* 一块一块嵌板 */
+    px(i, cy + 9, 34, 11, C.wood);
+    px(i, cy + 9, 34, 1, C.woodHi);
+    px(i, cy + 9, 1, 11, C.woodHi);
+    px(i + 33, cy + 9, 1, 11, '#5c3c2c');
+    px(i, cy + 19, 34, 1, '#5c3c2c');
+  }
+  px(0, cy + 22, W, 2, C.neonRed);    /* 台沿霓虹灯带 110~112 */
+
+  /* ---- 咖啡机 ---- */
+  const ex = 18, ey = 54;
+  px(ex, ey, 44, 34, C.metalDk);
+  px(ex + 2, ey + 2, 40, 20, C.metal);
+  px(ex + 4, ey + 4, 16, 8, C.ink);          /* 屏幕 */
+  px(ex + 6, ey + 6, 5, 1, C.green);
+  px(ex + 6, ey + 8, 9, 1, C.green);
+  px(ex + 24, ey + 4, 14, 4, C.metalDk);
+  px(ex + 24, ey + 10, 14, 8, C.metalDk);
+  px(ex + 26, ey + 24, 8, 4, C.metalDk);      /* 出液口 */
+  px(ex + 34, ey + 24, 8, 4, C.metalDk);
+  px(ex, ey + 24, 44, 4, C.metal);
+  px(ex + 4, ey + 28, 36, 6, C.ink);          /* 接水盘 */
+
+  /* ---- 收银机 ---- */
+  px(150, 74, 24, 14, C.metalDk);
+  px(152, 76, 20, 6, C.ink);
+  px(154, 78, 16, 2, C.neon);
+  px(152, 84, 20, 3, C.metal);
+
+  /* ---- 蛋糕柜 ---- */
+  px(184, 72, 42, 16, C.glass);
+  px(184, 72, 42, 1, '#e8f2f8');
+  px(186, 74, 1, 12, '#ffffff');
+  px(184, 86, 42, 2, C.metalDk);
+  for (let i = 0; i < 3; i++) {
+    px(189 + i * 13, 80, 9, 6, [C.pink, C.caramel, C.matcha][i]);
+    px(189 + i * 13, 78, 9, 2, C.cream);
+  }
+
+  /* ---- 地板：横向木板，越近越宽，做出一点纵深 ---- */
+  px(0, 112, W, H - 112, C.floor);
+  let fy = 112, fh = 6;
+  while (fy < H) {
+    px(0, fy, W, 1, '#5c3c2c');                 /* 板缝 */
+    px(0, fy + 1, W, 1, C.woodHi);              /* 缝下高光 */
+    for (let i = 0; i < W; i += 24)             /* 木纹 */
+      px(i + (fy % 13), fy + 2, 9, 1, '#7a5540');
+    fy += fh;
+    fh = Math.min(16, fh + 2);
+  }
+
+  /* ---- 地毯 ---- */
+  px(96, 166, 128, 14, C.neonRed);
+  px(100, 169, 120, 8, '#a03a3a');
+
+  return { sky: sky, counterY: cy };
+}
+/* =========================================================================
+   PART 2 · 数据 + 模拟 + 画面
+   ========================================================================= */
+
+/* ---------------------------------------------------------------
+   4. 配置与数据
+   --------------------------------------------------------------- */
+const CFG = {
+  DAY_START: 8 * 60,
+  DAY_END: 20 * 60,
+  MIN_PER_SEC: 3,        /* 1 真实秒 = 3 游戏分钟 → 一天 240 秒 */
+  START_MONEY: 200,
+  BASE_RENT: 100,
+  RENT_STEP: 35,
+  BASE_TRAFFIC: 13,      /* 基础客流间隔（秒） */
+  BASE_PATIENCE: 34,     /* 基础耐心（秒） */
+  TRAY_MAX: 3,
+  SEAT_Y: 136,
+  WALK_Y: 162,
+  TABLE_Y: 148,
+  BUBBLE_Y: 112,
+  DOOR_X: 294,
+  TABLE_X: [30, 74, 118, 162, 206, 250],
+};
+
+const DRINKS = [
+  { id: 'americano',  n: '美式',   short: '美', c: '#7a4a2a', foam: '#c9a68f', price: 16, time: 3.2, need: { bean: 1, cup: 1 }, unlock: 0 },
+  { id: 'latte',      n: '拿铁',   short: '拿', c: '#e0a860', foam: '#f7ecdc', price: 20, time: 3.8, need: { bean: 1, milk: 1, cup: 1 }, unlock: 0 },
+  { id: 'cappuccino', n: '卡布',   short: '卡', c: '#b98d5f', foam: '#fdf6ea', price: 22, time: 4.0, need: { bean: 1, milk: 1, cup: 1 }, unlock: 0 },
+  { id: 'mocha',      n: '摩卡',   short: '摩', c: '#5a3220', foam: '#e8d0b8', price: 25, time: 4.6, need: { bean: 1, milk: 1, syrup: 1, cup: 1 }, unlock: 160 },
+  { id: 'matcha',     n: '抹茶',   short: '抹', c: '#8fae7e', foam: '#e6f0dc', price: 24, time: 4.4, need: { milk: 1, syrup: 1, cup: 1 }, unlock: 180 },
+  { id: 'caramel',    n: '焦糖',   short: '焦', c: '#c08b4f', foam: '#f6e2c4', price: 27, time: 4.8, need: { bean: 1, milk: 1, syrup: 1, cup: 1 }, unlock: 220 },
+];
+const SIZES = [{ n: '小', d: -3, t: -0.6 }, { n: '中', d: 0, t: 0 }, { n: '大', d: 4, t: 0.9 }];
+const TEMPS = [{ n: '热', d: 0, t: 0 }, { n: '冰', d: 2, t: 0.5 }];
+const GOODS = {
+  bean:  { n: '咖啡豆', p: 3, c: '#7a4a2a' },
+  milk:  { n: '牛奶',   p: 2, c: '#f7ecdc' },
+  syrup: { n: '糖浆',   p: 4, c: '#c08b4f' },
+  cup:   { n: '纸杯',   p: 1, c: '#f2e4cf' },
+};
+const UPGRADES = [
+  { id: 'machine', n: '咖啡机', max: 3, cost: [180, 420],
+    desc: l => '同时出 ' + l + ' 杯 · 出杯更快' },
+  { id: 'seat', n: '座位', max: 3, cost: [150, 320, 520],
+    desc: l => '同时接待 ' + (3 + l) + ' 位客人' },
+  { id: 'staff', n: '店员猫', max: 1, cost: [400],
+    desc: () => '每 9 秒自动帮你做一杯' },
+  { id: 'sofa', n: '软沙发', max: 3, cost: [140, 260, 420],
+    desc: l => '客人耐心 +' + (l * 12) + '%' },
+  { id: 'sign', n: '霓虹招牌', max: 3, cost: [180, 300, 480],
+    desc: l => '客流 +' + (l * 20) + '%' },
+];
+
+const NAMES = ['小林', '阿May', '格子衫男生', '抱书的女学生', '戴耳机的姑娘', '隔壁阿姨',
+  '赶稿的作家', '刚下课的学弟', '常来的老先生', '扎马尾的女孩', '送快递的', '楼下奶茶妹'];
+
+function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
+function ri(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
+function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+/* ---------------------------------------------------------------
+   5. 游戏状态
+   --------------------------------------------------------------- */
+function freshGame() {
+  return {
+    day: 1, min: CFG.DAY_START, money: CFG.START_MONEY, rep: 30,
+    stock: { bean: 24, milk: 24, syrup: 12, cup: 36 },
+    lv: { machine: 1, seat: 0, staff: 0, sofa: 0, sign: 0 },
+    unlocked: { americano: true, latte: true, cappuccino: true, mocha: false, matcha: false, caramel: false },
+    cups: [], brewing: [], guests: [], tables: [],
+    phase: 'open', speed: 1, paused: false, menuOpen: false,
+    staffT: 9, spawnT: 3,
+    served: 0, good: 0, revenue: 0, tips: 0, angry: 0,
+    sell: 0, rent: 0, net: 0,
+    pick: { drink: 'latte', size: 1, temp: 0 },
+    sel: -1,
+  };
+}
+let G = freshGame();
+
+function tableCount() { return 3 + G.lv.seat; }
+
+/* ---------------------------------------------------------------
+   6. 模拟
+   --------------------------------------------------------------- */
+function spawnInterval() {
+  let v = CFG.BASE_TRAFFIC * (1 - G.rep / 250) / (1 + 0.2 * G.lv.sign);
+  return clamp(v, 4.5, 20);
+}
+function patienceMax() {
+  return CFG.BASE_PATIENCE * (1 + 0.12 * G.lv.sofa);
+}
+function brewTime(drink, size, temp) {
+  const base = drink.time + SIZES[size].t + TEMPS[temp].t;
+  return base / (1 + 0.18 * (G.lv.machine - 1));
+}
+function stockEnough(drink) {
+  for (const k in drink.need) if ((G.stock[k] || 0) < drink.need[k]) return k;
+  return null;
+}
+function freeTable() {
+  for (let i = 0; i < tableCount(); i++) if (!G.tables[i]) return i;
+  return -1;
+}
+function makeOrder() {
+  const pool = DRINKS.filter(d => G.unlocked[d.id]);
+  const drink = pick(pool);
+  return { drink: drink, size: ri(0, 2), temp: Math.random() < 0.45 ? 1 : 0 };
+}
+function trySpawn() {
+  const slot = freeTable();
+  if (slot < 0) return;
+  const o = makeOrder();
+  G.tables[slot] = true;
+  G.guests.push({
+    id: ++spawnSeq, slot: slot,
+    fur: pick(FURS), name: pick(NAMES),
+    drink: o.drink, size: o.size, temp: o.temp,
+    x: CFG.DOOR_X, y: CFG.WALK_Y, tx: CFG.TABLE_X[slot], seatY: CFG.SEAT_Y,
+    state: 'walk', anim: 0, patience: patienceMax(), patienceMax: patienceMax(),
+    wait: 0, pay: 0,
+  });
+}
+let spawnSeq = 0;
+
+function tick(dt) {
+  sceneTime += dt;
+  if (G.phase === 'shop' || G.paused || G.menuOpen) return;
+
+  /* 时间 */
+  if (G.phase === 'open') {
+    G.min += dt * CFG.MIN_PER_SEC * G.speed;
+    if (G.min >= CFG.DAY_END) {
+      G.min = CFG.DAY_END;
+      G.phase = 'closing';
+      toast('打烊时间到，送走最后一位客人…');
+    }
+  }
+
+  /* 咖啡机出杯 */
+  for (let i = G.brewing.length - 1; i >= 0; i--) {
+    const b = G.brewing[i];
+    b.left -= dt * G.speed;
+    if (b.left <= 0) {
+      if (G.cups.length < CFG.TRAY_MAX) {
+        G.cups.push({ drink: b.drink, size: b.size, temp: b.temp });
+        G.brewing.splice(i, 1);
+        sfx('ready');
+      }
+    }
+  }
+
+  /* 店员猫自动做单 */
+  if (G.lv.staff > 0 && G.phase !== 'shop') {
+    G.staffT -= dt * G.speed;
+    if (G.staffT <= 0) { G.staffT = 9; autoBrew(); }
+  }
+
+  /* 客流 */
+  if (G.phase === 'open') {
+    G.spawnT -= dt * G.speed;
+    if (G.spawnT <= 0) { G.spawnT = spawnInterval(); trySpawn(); }
+  }
+
+  /* 客人 */
+  for (let i = G.guests.length - 1; i >= 0; i--) {
+    const g = G.guests[i];
+    if (g.state === 'walk') {
+      const d = g.tx - g.x;
+      if (Math.abs(d) < 2) { g.x = g.tx; g.y = g.seatY; g.state = 'sit'; }
+      else { g.x += Math.sign(d) * 34 * dt * G.speed; g.anim += dt * G.speed; }
+    } else if (g.state === 'sit') {
+      g.patience -= dt * G.speed;
+      if (g.patience <= 0) {
+        g.patience = 0; g.state = 'leaving'; g.y = CFG.WALK_Y;
+        G.rep = clamp(G.rep - 3, 0, 100);
+        G.angry++;
+        releaseTable(g);
+        toast('有人等太久，走了 😿');
+        sfx('bad');
+      }
+    } else if (g.state === 'happy') {
+      g.wait -= dt;
+      if (g.wait <= 0) { g.state = 'leaving'; g.y = CFG.WALK_Y; }
+    } else if (g.state === 'leaving') {
+      g.x += 42 * dt * G.speed;
+      g.anim += dt * G.speed;
+      if (g.x > 312) { G.guests.splice(i, 1); }
+    }
+  }
+
+  /* 打烊后客人走完 → 进结算 */
+  if (G.phase === 'closing' && G.guests.length === 0) {
+    G.phase = 'shop';
+    endDay();
+  }
+}
+
+function releaseTable(g) {
+  if (g.slot >= 0) G.tables[g.slot] = false;
+  g.slot = -1;
+}
+
+/* 点击客人 → 送上一杯对得上的 */
+function serveGuest(g) {
+  if (g.state !== 'sit') return false;
+  let idx = -1;
+  for (let i = 0; i < G.cups.length; i++) {
+    const c = G.cups[i];
+    if (c.drink.id === g.drink.id && c.size === g.size && c.temp === g.temp) { idx = i; break; }
+  }
+  if (idx < 0) {
+    if (G.cups.length === 0) toast('还没做好呢，先点下面的咖啡 🍺');
+    else toast('出杯口那几杯都不是 TA 点的…');
+    sfx('nope');
+    return false;
+  }
+  G.cups.splice(idx, 1);
+  const left = g.patience / g.patienceMax;
+  const price = Math.max(4, g.drink.price + SIZES[g.size].d + TEMPS[g.temp].d);
+  const tip = Math.round(left * 8);
+  const total = price + tip;
+  G.money += total; G.revenue += price; G.tips += tip;
+  G.served++;
+  if (left > 0.35) { G.rep = clamp(G.rep + 1, 0, 100); G.good++; }
+  g.pay = total;
+  g.state = 'happy'; g.wait = 1.1;
+  releaseTable(g);
+  sfx('coin');
+  toast('+' + total + ' 元' + (tip > 0 ? '（小费 ' + tip + '）' : '') + ' 😻');
+  return true;
+}
+
+/* 开始做一杯 */
+function startBrew(drink, size, temp, silent) {
+  if (!G.unlocked[drink.id]) { if (!silent) toast('这个还没解锁，结算时买菜单 📋'); return false; }
+  if (G.brewing.length >= G.lv.machine) { if (!silent) toast('咖啡机满了，等一杯出来 ☕'); return false; }
+  const lack = stockEnough(drink);
+  if (lack) { if (!silent) toast(GOODS[lack].n + ' 不够了，明天补货 📦'); return false; }
+  if (G.cups.length + G.brewing.length >= CFG.TRAY_MAX + G.lv.machine) { if (!silent) toast('出杯口堆满了'); return false; }
+  for (const k in drink.need) G.stock[k] -= drink.need[k];
+  const t = brewTime(drink, size, temp);
+  G.brewing.push({ drink: drink, size: size, temp: temp, left: t, total: t });
+  if (!silent) sfx('brew');
+  return true;
+}
+
+/* 店员猫：挑一位等最久的客人，照单做一杯 */
+function autoBrew() {
+  const waiting = G.guests.filter(g => g.state === 'sit');
+  if (!waiting.length) return;
+  waiting.sort((a, b) => a.patience - b.patience);
+  for (const g of waiting) {
+    const already = G.cups.some(c => c.drink.id === g.drink.id && c.size === g.size && c.temp === g.temp)
+      || G.brewing.some(c => c.drink.id === g.drink.id && c.size === g.size && c.temp === g.temp);
+    if (already) continue;
+    if (startBrew(g.drink, g.size, g.temp, true)) { toast('店员猫帮你做了一杯 🐈'); return; }
+  }
+}
+
+/* ---------------------------------------------------------------
+   7. 画面：动态部分
+   --------------------------------------------------------------- */
+function drawCupIcon(x, y, drink, temp) {
+  if (temp === 1) {                        /* 冰饮：透明杯 + 吸管 */
+    px(x + 1, y + 3, 8, 9, C.glass);
+    px(x + 1, y + 3, 8, 1, '#e8f2f8');
+    px(x + 2, y + 6, 6, 5, drink.c);
+    px(x + 2, y + 6, 6, 1, drink.foam);
+    px(x + 6, y, 2, 4, '#e06a6a');
+  } else {                                  /* 热饮：马克杯 + 热气 */
+    px(x + 3, y, 1, 2, C.shade);
+    px(x + 6, y - 1, 1, 3, C.shade);
+    px(x + 1, y + 3, 8, 9, C.cream);
+    px(x + 2, y + 6, 6, 5, drink.c);
+    px(x + 2, y + 6, 6, 1, drink.foam);
+    px(x + 9, y + 5, 2, 3, C.cream);
+  }
+}
+
+function drawTables() {
+  const n = tableCount();
+  for (let i = 0; i < n; i++) {
+    /* 已经送完但还没走的客人，桌子也算占着，免得桌上突然冒出杯子 */
+    const busy = !!G.tables[i] ||
+      G.guests.some(g => g.slot === i && (g.state === 'sit' || g.state === 'happy'));
+    drawOneTable(CFG.TABLE_X[i], busy);
+  }
+}
+
+/* 一张小圆桌：桌面 + 桌布 + 两条腿 + 横撑；空着的时候桌上摆点小东西 */
+function drawOneTable(cx, occupied) {
+  const ty = CFG.TABLE_Y;
+  px(cx - 9, ty + 5, 3, 12, C.woodDk);
+  px(cx + 6, ty + 5, 3, 12, C.woodDk);
+  px(cx - 10, ty + 15, 20, 2, C.woodDk);
+  px(cx - 13, ty, 26, 5, C.woodHi);
+  px(cx - 13, ty, 26, 1, C.woodLt);
+  px(cx - 13, ty + 4, 26, 1, '#5c3c2c');
+  px(cx - 9, ty, 18, 2, C.cream);
+  if (!occupied) {
+    px(cx - 5, ty - 4, 4, 4, C.cream);      /* 空杯子 */
+    px(cx - 6, ty - 1, 6, 1, C.cream);
+    px(cx + 3, ty - 3, 4, 3, C.green);      /* 小盆栽 */
+    px(cx + 4, ty - 1, 2, 1, C.woodHi);
+  }
+}
+
+function drawGuest(g) {
+  let pose = 'sit';
+  if (g.state === 'walk' || g.state === 'leaving') {
+    pose = (Math.floor(g.anim * 6) % 2) ? 'walk1' : 'walk2';
+  }
+  let y = g.y;
+  if (pose !== 'sit') y = g.y - ((Math.floor(g.anim * 6) % 2) ? 1 : 0);
+  drawCat(g.x - 7, y, g.fur, pose, g.state === 'leaving');
+}
+
+function drawBubble(g) {
+  const x = g.x - 13, y = CFG.BUBBLE_Y;
+  /* 气泡本体 26×18 */
+  px(x + 1, y, 24, 18, C.cream);
+  px(x, y + 1, 26, 16, C.cream);
+  px(x + 2, y + 18, 4, 2, C.cream);
+  px(x, y, 26, 1, C.white);
+  px(x, y + 17, 26, 1, C.shade);
+  px(x + 1, y + 18, 2, 2, C.shade);
+  /* 点的是什么（热的是马克杯，冰的是带吸管的透明杯） */
+  drawCupIcon(x + 2, y + 1, g.drink, g.temp);
+  /* 杯型：三个小方块，亮几个就是几号杯 */
+  for (let i = 0; i < 3; i++) px(x + 14 + i * 4, y + 2, 3, 3, i <= g.size ? C.wood : '#e0d4c0');
+  /* 冷热 */
+  if (g.temp === 1) { px(x + 14, y + 7, 3, 3, C.sky2); px(x + 18, y + 7, 3, 3, C.sky2); }
+  else { px(x + 14, y + 7, 2, 2, '#e08a3c'); px(x + 18, y + 6, 2, 3, '#e08a3c'); }
+  /* 耐心条 */
+  const w = 22, p = clamp(g.patience / g.patienceMax, 0, 1);
+  px(x + 2, y + 14, w, 3, '#d8c8b4');
+  px(x + 2, y + 14, Math.round(w * p), 3, p > 0.55 ? C.green : (p > 0.25 ? C.neon : C.neonRed));
+}
+
+function drawBarista() {
+  const b = { o: '#9aa0aa', d: '#767c86', p: '#e8a0a8', k: '#2b1a12', w: '#e6e8ec' };
+  const busy = G.brewing.length > 0;
+  const bob = busy ? (Math.floor(sceneTime * 8) % 2) : 0;
+  blit(SPR.catSit, 108, 74 - bob, b, false);
+  /* 围裙：只盖下半身，别把猫糊没了 */
+  px(111, 82 - bob, 8, 5, C.neonRed);
+  px(112, 83 - bob, 6, 3, C.cream);
+}
+
+function drawMachine() {
+  const ex = 18, ey = 54;
+  /* 屏幕上的进度 */
+  const slot = G.brewing[0];
+  px(ex + 4, ey + 4, 16, 8, C.ink);
+  if (slot) {
+    const p = 1 - slot.left / slot.total;
+    px(ex + 5, ey + 6, Math.round(14 * clamp(p, 0, 1)), 3, C.green);
+    /* 正在接的杯子 */
+    px(ex + 28, ey + 28, 8, 5, C.cream);
+    px(ex + 29, ey + 29, 6, Math.max(0, Math.round(3 * clamp(p, 0, 1))), slot.drink.c);
+    if ((sceneTime * 6) % 1 < 0.5) px(ex + 30, ey + 26, 1, 2, C.shade);
+  } else {
+    px(ex + 5, ey + 6, 6, 1, C.green);
+    px(ex + 5, ey + 9, 10, 1, C.green);
+  }
+  /* 多杯槽的指示灯 */
+  for (let i = 0; i < G.lv.machine; i++) {
+    const on = i < G.brewing.length;
+    px(ex + 24 + i * 5, ey + 4, 3, 3, on ? C.neon : '#4a4a54');
+  }
+}
+
+function drawTray() {
+  /* 吧台上的出杯口 */
+  px(64, 84, 44, 4, C.metalDk);
+  px(66, 80, 40, 4, '#5a5a66');
+  for (let i = 0; i < G.cups.length; i++) {
+    drawCupIcon(66 + i * 13, 76, G.cups[i].drink, G.cups[i].temp);
+  }
+}
+
+function drawAll() {
+  drawScene(G.min);
+  drawTray();
+  drawMachine();
+  drawBarista();
+  drawTables();
+  /* 客人：先画人再画桌，桌子会挡住腿，看着像"坐在桌后" */
+  const order = G.guests.slice().sort((a, b) => a.y - b.y);
+  for (const g of order) {
+    drawGuest(g);
+    if (g.slot >= 0 && (g.state === 'sit' || g.state === 'happy')) {
+      drawOneTable(CFG.TABLE_X[g.slot], true);
+    }
+  }
+  for (const g of G.guests) if (g.state === 'sit') drawBubble(g);
+  /* 打烊提示 */
+  if (G.phase === 'closing') {
+    px(112, 4, 96, 11, C.ink);
+    px(113, 5, 94, 9, C.neonRed);
+    px(118, 8, 84, 3, C.cream);
+  }
+}
+/* =========================================================================
+   PART 3 · 界面 / 输入 / 音效 / 存档 / 主循环
+   ========================================================================= */
+
+/* ---------------------------------------------------------------
+   8. 音效（Web Audio 现场合成，零音频文件）
+   --------------------------------------------------------------- */
+const Sfx = (function () {
+  let ac = null, on = true;
+  function ctxAudio() {
+    if (!on) return null;
+    try {
+      if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+      if (ac.state === 'suspended') ac.resume();
+      return ac;
+    } catch (e) { return null; }
+  }
+  function tone(f, dur, type, vol, slideTo, delay) {
+    const c = ctxAudio(); if (!c) return;
+    const t0 = c.currentTime + (delay || 0);
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type || 'sine';
+    o.frequency.setValueAtTime(f, t0);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+    g.gain.setValueAtTime(vol || 0.2, t0);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    o.connect(g); g.connect(c.destination);
+    o.start(t0); o.stop(t0 + dur + 0.02);
+  }
+  function hiss(dur, vol) {
+    const c = ctxAudio(); if (!c) return;
+    const n = Math.floor(c.sampleRate * dur);
+    const buf = c.createBuffer(1, n, c.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const src = c.createBufferSource(); src.buffer = buf;
+    const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1400; f.Q.value = 0.8;
+    const g = c.createGain(); g.gain.value = vol || 0.12;
+    src.connect(f); f.connect(g); g.connect(c.destination);
+    src.start();
+  }
+  const bank = {
+    ready: function () { tone(880, 0.07, 'sine', 0.25); tone(1320, 0.1, 'sine', 0.2, null, 0.07); },
+    coin:  function () { tone(1046, 0.06, 'square', 0.14); tone(1568, 0.11, 'square', 0.12, null, 0.06); },
+    bad:   function () { tone(320, 0.2, 'sawtooth', 0.14, 150); },
+    nope:  function () { tone(190, 0.09, 'square', 0.1); },
+    brew:  function () { hiss(0.3, 0.1); },
+  };
+  return {
+    play: function (n) { try { (bank[n] || function () { })(); } catch (e) { } },
+    toggle: function () { on = !on; return on; },
+  };
+})();
+function sfx(n) { Sfx.play(n); }
+
+/* ---------------------------------------------------------------
+   9. 界面
+   --------------------------------------------------------------- */
+const $ = function (id) { return document.getElementById(id); };
+let toastLife = 0;
+function toast(msg) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.add('on');
+  toastLife = 2.2;
+}
+
+const drinkRow = $('drinkRow'), sizeRow = $('sizeRow'), tempRow = $('tempRow'),
+  trayEl = $('tray'), stockRow = $('stockRow');
+
+function buildControls() {
+  drinkRow.innerHTML = '';
+  DRINKS.forEach(function (d) {
+    const b = document.createElement('button');
+    b.className = 'btn';
+    b.dataset.drink = d.id;
+    b.innerHTML = d.n + '<small>' + d.price + ' 元</small>';
+    b.addEventListener('click', function () { startBrew(d, G.pick.size, G.pick.temp); });
+    drinkRow.appendChild(b);
+  });
+  sizeRow.innerHTML = '';
+  SIZES.forEach(function (s, i) {
+    const b = document.createElement('button');
+    b.className = 'btn';
+    b.dataset.size = i;
+    b.innerHTML = s.n + '杯<small>' + (s.d >= 0 ? '+' : '') + s.d + '元</small>';
+    b.addEventListener('click', function () { G.pick.size = i; uiTick(true); });
+    sizeRow.appendChild(b);
+  });
+  tempRow.innerHTML = '';
+  TEMPS.forEach(function (t, i) {
+    const b = document.createElement('button');
+    b.className = 'btn';
+    b.dataset.temp = i;
+    b.innerHTML = t.n + '<small>' + (t.d > 0 ? '+2元' : '0元') + '</small>';
+    b.addEventListener('click', function () { G.pick.temp = i; uiTick(true); });
+    tempRow.appendChild(b);
+  });
+}
+
+function buildTray() {
+  trayEl.innerHTML = '';
+  for (let i = 0; i < CFG.TRAY_MAX; i++) {
+    const s = document.createElement('div');
+    s.className = 'slot';
+    s.dataset.slot = i;
+    s.innerHTML = '<div class="cupic"></div><div class="nm"></div><div class="x">✕</div>';
+    s.addEventListener('click', function () {
+      const idx = +this.dataset.slot;
+      if (idx < G.cups.length) {
+        const c = G.cups.splice(idx, 1)[0];
+        toast('倒掉了那杯 ' + c.drink.n);
+        sfx('nope');
+        uiTick(true);
+      }
+    });
+    trayEl.appendChild(s);
+  }
+}
+
+let lastSig = '';
+function uiTick(force) {
+  const sig = [G.money, G.rep, Math.floor(G.min), G.day, G.phase, G.speed,
+    G.cups.map(c => c.drink.id + c.size + c.temp).join('|'),
+    G.brewing.map(b => b.drink.id + Math.round(b.left * 10)).join('|'),
+    G.pick.drink, G.pick.size, G.pick.temp,
+    G.stock.bean, G.stock.milk, G.stock.syrup, G.stock.cup].join(',');
+  if (!force && sig === lastSig) return;
+  lastSig = sig;
+
+  $('dayL').textContent = G.day;
+  $('clockL').textContent = pad2(Math.floor(G.min / 60)) + ':' + pad2(Math.floor(G.min % 60));
+  $('moneyL').textContent = Math.round(G.money);
+  $('repL').textContent = Math.round(G.rep);
+  $('speedBtn').textContent = (G.paused ? '⏸' : '▶') + ' ' + G.speed + '×';
+
+  /* 咖啡按钮 */
+  Array.prototype.forEach.call(drinkRow.children, function (b) {
+    const d = DRINKS.find(x => x.id === b.dataset.drink);
+    const locked = !G.unlocked[d.id];
+    b.classList.toggle('off', locked);
+    b.classList.toggle('lock', locked);
+    b.classList.toggle('on', G.brewing.some(x => x.drink.id === d.id));
+    b.innerHTML = (locked ? '🔒 ' : '') + d.n + '<small>' + (locked ? d.unlock + ' 元解锁' : d.price + ' 元') + '</small>';
+  });
+  Array.prototype.forEach.call(sizeRow.children, function (b) {
+    b.classList.toggle('on', +b.dataset.size === G.pick.size);
+  });
+  Array.prototype.forEach.call(tempRow.children, function (b) {
+    b.classList.toggle('on', +b.dataset.temp === G.pick.temp);
+  });
+
+  /* 出杯口 */
+  Array.prototype.forEach.call(trayEl.children, function (s, i) {
+    const c = G.cups[i];
+    s.classList.toggle('has', !!c);
+    const ic = s.querySelector('.cupic'), nm = s.querySelector('.nm');
+    if (c) {
+      ic.style.background = 'linear-gradient(#0000 0 34%,' + c.drink.c + ' 34% 100%)';
+      ic.style.borderColor = '#6b4a3a';
+      ic.style.boxShadow = 'inset 0 4px 0 ' + c.drink.foam;
+      ic.style.opacity = 1;
+      nm.textContent = c.drink.short + '·' + SIZES[c.size].n + '·' + TEMPS[c.temp].n;
+    } else {
+      ic.style.background = 'transparent';
+      ic.style.borderColor = 'transparent';
+      ic.style.boxShadow = 'none';
+      nm.textContent = '';
+    }
+  });
+
+  /* 库存 */
+  stockRow.innerHTML = Object.keys(GOODS).map(function (k) {
+    return '<span>' + GOODS[k].n + ' <b style="color:' +
+      (G.stock[k] <= 3 ? '#e06a6a' : '#d8b183') + '">' + G.stock[k] + '</b></span>';
+  }).join('');
+
+  /* 打烊时禁用 */
+  const closed = G.phase !== 'open';
+  Array.prototype.forEach.call(drinkRow.children, function (b) { b.disabled = closed; });
+}
+
+/* ---------------------------------------------------------------
+   10. 点击画面上的客人
+   --------------------------------------------------------------- */
+function canvasPos(e) {
+  const r = CV.getBoundingClientRect();
+  const t = e.touches ? e.touches[0] : e;
+  return { x: (t.clientX - r.left) / r.width * W, y: (t.clientY - r.top) / r.height * H };
+}
+function onCanvas(e) {
+  const p = canvasPos(e);
+  let hit = null;
+  for (const g of G.guests) {
+    if (g.state !== 'sit') continue;
+    if (p.x >= g.x - 10 && p.x <= g.x + 10 && p.y >= CFG.BUBBLE_Y && p.y <= CFG.SEAT_Y + 16) hit = g;
+  }
+  if (hit) { e.preventDefault(); serveGuest(hit); uiTick(true); }
+}
+CV.addEventListener('pointerdown', onCanvas);
+CV.style.touchAction = 'manipulation';
+
+/* 速度按钮 */
+$('speedBtn').addEventListener('click', function () {
+  if (G.paused) { G.paused = false; }
+  else if (G.speed === 1) { G.speed = 2; }
+  else if (G.speed === 2) { G.speed = 4; }
+  else { G.paused = true; }
+  uiTick(true);
+});
+
+/* ---------------------------------------------------------------
+   10.5 菜单 / 配方页
+   --------------------------------------------------------------- */
+function canMake(d) {
+  let n = Infinity;
+  for (const k in d.need) n = Math.min(n, Math.floor((G.stock[k] || 0) / d.need[k]));
+  return n === Infinity ? 0 : n;
+}
+
+function renderMenu() {
+  const sh = $('menuSheet');
+  const stockLine = Object.keys(GOODS).map(function (k) {
+    return '<span><i style="background:' + GOODS[k].c + '"></i>' + GOODS[k].n +
+      ' <b>' + (G.stock[k] || 0) + '</b></span>';
+  }).join('');
+
+  const rows = DRINKS.map(function (d) {
+    const locked = !G.unlocked[d.id];
+    const can = canMake(d);
+    const ing = Object.keys(d.need).map(function (k) {
+      return '<span><i style="background:' + GOODS[k].c + '"></i>' +
+        GOODS[k].n + ' ×' + d.need[k] + '</span>';
+    }).join('<br>');
+    const t = brewTime(d, 1, 0).toFixed(1);
+    const right = locked ? '🔒 ' + d.unlock + ' 元'
+      : (can > 0 ? '还能做 ' + can + ' 杯' : '原料不够');
+    return '<div class="rec' + (locked ? ' lock' : '') + '">' +
+      '<div class="ic"><div class="cup2" style="background:linear-gradient(#0000 0 34%,' +
+      d.c + ' 34% 100%);box-shadow:inset 0 4px 0 ' + d.foam + '"></div></div>' +
+      '<div class="nm">' + d.n + '<b>' + d.price + ' 元 · 出杯 ' + t + ' 秒</b></div>' +
+      '<div class="ing">' + ing + '</div>' +
+      '<div class="can">' + right + '</div>' +
+      '</div>';
+  }).join('');
+
+  sh.innerHTML =
+    '<h2>📖 菜单 · 配方</h2>' +
+    '<div class="sec">现在手上有多少原料</div>' +
+    '<div class="stockline">' + stockLine + '</div>' +
+    '<div class="sec">每做一杯要扣什么（按中杯热饮算）</div>' + rows +
+    '<div class="sec">小贴士</div>' +
+    '<div style="color:#8a7a6a;line-height:1.9">' +
+    '· 杯型只改价格和出杯时间：小杯 −3 元，大杯 +4 元<br>' +
+    '· 冰饮 +2 元，出杯慢一点点<br>' +
+    '· 打烊结算里能补货、能解锁带 🔒 的菜单<br>' +
+    '· 原料 10 个一份，豆 3 元 / 奶 2 元 / 糖浆 4 元 / 杯子 1 元' +
+    '</div>' +
+    '<button class="go" id="menuClose">知道啦</button>';
+  $('menuClose').addEventListener('click', closeMenu);
+}
+
+function openMenu() {
+  renderMenu();
+  $('menuOv').classList.add('on');
+  G.menuOpen = true;
+}
+function closeMenu() {
+  $('menuOv').classList.remove('on');
+  G.menuOpen = false;
+}
+$('menuBtn').addEventListener('click', openMenu);
+$('menuOv').addEventListener('click', function (e) { if (e.target === this) closeMenu(); });
+
+/* ---------------------------------------------------------------
+   11. 日结 + 商店
+   --------------------------------------------------------------- */
+function endDay() {
+  G.rent = CFG.BASE_RENT + (G.day - 1) * CFG.RENT_STEP;
+  G.money -= G.rent;
+  G.net = G.revenue + G.tips - G.rent;
+  sfx('coin');
+  saveGame();
+  openShop();
+}
+
+function openShop() {
+  const ov = $('overlay'), sh = $('sheet');
+  if (G.money < 0) {
+    sh.innerHTML =
+      '<h2>💀 关门大吉</h2>' +
+      '<div class="kv"><span>撑到</span><b>第 ' + G.day + ' 天</b></div>' +
+      '<div class="kv"><span>总营业额</span><b>' + Math.round(G.revenue) + ' 元</b></div>' +
+      '<div class="kv"><span>欠房租</span><b style="color:#e06a6a">' + Math.round(-G.money) + ' 元</b></div>' +
+      '<div class="sec">咖啡厅的故事到这里了。不过——重新开一家也不是不行。</div>' +
+      '<button class="go" id="restart">🔄 重新开店</button>';
+    ov.classList.add('on');
+    $('restart').addEventListener('click', function () {
+      G = freshGame();
+      ov.classList.remove('on');
+      buildControls(); buildTray(); uiTick(true);
+    });
+    return;
+  }
+
+  function upgRows() {
+    return UPGRADES.map(function (u) {
+      const lv = G.lv[u.id];
+      const maxed = lv >= u.max;
+      const cost = maxed ? 0 : u.cost[lv];
+      const afford = !maxed && G.money >= cost;
+      return '<div class="upg"><div class="t">' + u.n +
+        ' <b style="color:#f2c14e">Lv' + lv + (maxed ? '（满）' : '') + '</b>' +
+        '<i>' + u.desc(Math.max(1, lv + 1)) + '</i></div>' +
+        (maxed ? '' : '<button data-upg="' + u.id + '"' + (afford ? '' : ' disabled') + '>' + cost + ' 元</button>') +
+        '</div>';
+    }).join('');
+  }
+  function menuRows() {
+    const locked = DRINKS.filter(d => !G.unlocked[d.id]);
+    if (!locked.length) return '<div class="sec">菜单：六款全部解锁 ✨</div>';
+    return '<div class="sec">菜单解锁</div>' + locked.map(function (d) {
+      const afford = G.money >= d.unlock;
+      return '<div class="upg"><div class="t">' + d.n + ' <b style="color:#f2c14e">' + d.price + ' 元/杯</b>' +
+        '<i>原料：' + Object.keys(d.need).map(k => GOODS[k].n + '×' + d.need[k]).join(' · ') + '</i></div>' +
+        '<button data-menu="' + d.id + '"' + (afford ? '' : ' disabled') + '>' + d.unlock + ' 元</button></div>';
+    }).join('');
+  }
+  function goodsRows() {
+    return '<div class="sec">补货（每份 10 个）</div>' + Object.keys(GOODS).map(function (k) {
+      const cost = GOODS[k].p * 10;
+      const afford = G.money >= cost;
+      return '<div class="upg"><div class="t">' + GOODS[k].n +
+        ' <b style="color:#f2c14e">' + G.stock[k] + '</b><i>单价 ' + GOODS[k].p + ' 元</i></div>' +
+        '<button data-buy="' + k + '"' + (afford ? '' : ' disabled') + '>+10 · ' + cost + ' 元</button></div>';
+    }).join('') +
+      '<div class="upg"><div class="t">一键补满<i>把每样都补到 40（钱不够就尽量买）</i></div>' +
+      '<button data-fill="1">补满</button></div>';
+  }
+
+  function render() {
+    sh.innerHTML =
+      '<h2>🌙 第 ' + G.day + ' 天 · 打烊结算</h2>' +
+      '<div class="kv"><span>卖出的咖啡</span><b>' + G.served + ' 杯</b></div>' +
+      '<div class="kv"><span>好评</span><b>' + G.good + ' 杯</b></div>' +
+      '<div class="kv"><span>气走的客人</span><b' + (G.angry ? ' style="color:#e06a6a"' : '') + '>' + G.angry + ' 位</b></div>' +
+      '<div class="kv"><span>营业额</span><b>+' + Math.round(G.revenue) + '</b></div>' +
+      '<div class="kv"><span>小费</span><b>+' + Math.round(G.tips) + '</b></div>' +
+      '<div class="kv"><span>房租</span><b style="color:#e06a6a">-' + G.rent + '</b></div>' +
+      '<div class="kv"><span>今日净赚</span><b>' + (G.net >= 0 ? '+' : '') + Math.round(G.net) + '</b></div>' +
+      '<div class="kv"><span>手上现金</span><b>' + Math.round(G.money) + ' 元</b></div>' +
+      '<div class="sec">口碑 ' + Math.round(G.rep) + ' · 明天房租 ' +
+      (CFG.BASE_RENT + G.day * CFG.RENT_STEP) + ' 元 · 拿不准配方就点上面的 📖 菜单</div>' +
+      goodsRows() +
+      '<div class="sec">升级设备</div>' + upgRows() +
+      menuRows() +
+      '<button class="go" id="nextDay">☀️ 开始第 ' + (G.day + 1) + ' 天</button>';
+    bindShop();
+  }
+
+  function bindShop() {
+    sh.querySelectorAll('[data-buy]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        const k = b.dataset.buy, cost = GOODS[k].p * 10;
+        if (G.money < cost) return;
+        G.money -= cost; G.stock[k] += 10; sfx('coin'); render();
+      });
+    });
+    sh.querySelectorAll('[data-upg]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        const u = UPGRADES.find(x => x.id === b.dataset.upg);
+        const cost = u.cost[G.lv[u.id]];
+        if (G.money < cost) return;
+        G.money -= cost; G.lv[u.id]++; sfx('coin'); render();
+      });
+    });
+    sh.querySelectorAll('[data-menu]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        const d = DRINKS.find(x => x.id === b.dataset.menu);
+        if (G.money < d.unlock) return;
+        G.money -= d.unlock; G.unlocked[d.id] = true; sfx('coin'); render();
+      });
+    });
+    const fill = sh.querySelector('[data-fill]');
+    if (fill) fill.addEventListener('click', function () {
+      Object.keys(GOODS).forEach(function (k) {
+        while (G.stock[k] < 40 && G.money >= GOODS[k].p) { G.money -= GOODS[k].p; G.stock[k]++; }
+      });
+      sfx('coin'); render();
+    });
+    const nx = sh.querySelector('#nextDay');
+    if (nx) nx.addEventListener('click', function () { startDay(); });
+  }
+
+  render();
+  $('overlay').classList.add('on');
+}
+
+function startDay() {
+  G.day++;
+  G.min = CFG.DAY_START;
+  G.phase = 'open';
+  G.served = 0; G.good = 0; G.angry = 0; G.revenue = 0; G.tips = 0;
+  G.cups = []; G.brewing = [];
+  G.guests = [];
+  G.tables = [];
+  G.spawnT = 4; G.staffT = 9;
+  G.paused = false;
+  $('overlay').classList.remove('on');
+  uiTick(true);
+  toast('第 ' + G.day + ' 天开门营业 ☀️');
+}
+
+/* ---------------------------------------------------------------
+   12. 存档
+   --------------------------------------------------------------- */
+const SAVE_KEY = 'pixelCafeSave';
+function saveGame() {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      day: G.day, money: G.money, rep: G.rep, stock: G.stock, lv: G.lv,
+      unlocked: G.unlocked, revenue: G.revenue, tips: G.tips, served: G.served,
+      good: G.good, angry: G.angry,
+    }));
+  } catch (e) { }
+}
+function loadGame() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+    if (!s || !s.day) return false;
+    G = freshGame();
+    G.day = s.day; G.money = s.money; G.rep = s.rep;
+    if (s.stock) G.stock = s.stock;
+    if (s.lv) G.lv = s.lv;
+    if (s.unlocked) G.unlocked = s.unlocked;
+    return true;
+  } catch (e) { return false; }
+}
+
+/* ---------------------------------------------------------------
+   13. 主循环
+   --------------------------------------------------------------- */
+let last = 0;
+function loop(now) {
+  if (!last) last = now;
+  const dt = Math.min((now - last) / 1000, 0.05);
+  last = now;
+
+  tick(dt);
+  drawAll();
+
+  if (toastLife > 0) {
+    toastLife -= dt;
+    if (toastLife <= 0) $('toast').classList.remove('on');
+  }
+  uiTick(false);
+  requestAnimationFrame(loop);
+}
+
+function boot() {
+  buildControls();
+  buildTray();
+  if (loadGame()) toast('欢迎回来，第 ' + G.day + ' 天 ☕');
+  else toast('点客人头上的气泡把咖啡送过去 ☕ 配方看上面的「📖 菜单」');
+  uiTick(true);
+  requestAnimationFrame(loop);
+}
+
+if (typeof window !== 'undefined' && document.getElementById('cv')) boot();
+
+/* 给无头测试留个口子 */
+if (typeof window !== 'undefined') {
+  window.PixelCafe = {
+    get G() { return G; }, set G(v) { G = v; },
+    CFG: CFG, DRINKS: DRINKS, SIZES: SIZES, TEMPS: TEMPS, GOODS: GOODS, UPGRADES: UPGRADES,
+    tick: tick, startBrew: startBrew, serveGuest: serveGuest, autoBrew: autoBrew,
+    spawnInterval: spawnInterval, brewTime: brewTime, freshGame: freshGame,
+    startDay: startDay, tableCount: tableCount, uiTick: uiTick, patienceMax: patienceMax,
+    openMenu: openMenu, closeMenu: closeMenu, canMake: canMake,
+  };
+}
+</script>
+</body>
+</html>
