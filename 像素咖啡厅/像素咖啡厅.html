@@ -14,7 +14,7 @@
     display:flex;align-items:center;justify-content:center;
     padding:8px;overflow:hidden;
   }
-  #app{width:100%;max-width:760px;display:flex;flex-direction:column;gap:6px}
+  #app{width:100%;max-width:760px;display:flex;flex-direction:column;gap:6px;margin:0 auto}
 
   /* ---------- 顶栏 ---------- */
   #topbar{
@@ -155,6 +155,7 @@
     <span class="chip good">⭐ 口碑 <b id="repL">30</b></span>
     <span class="sp"></span>
     <span class="chip" id="menuBtn">📖 菜单</span>
+    <span class="chip" id="fsBtn">⛶ 放大</span>
     <span class="chip" id="speedBtn">▶ 1×</span>
   </div>
 
@@ -732,9 +733,17 @@ function serveGuest(g) {
     if (c.drink.id === g.drink.id && c.size === g.size && c.temp === g.temp) { idx = i; break; }
   }
   if (idx < 0) {
-    if (G.cups.length === 0) toast('还没做好呢，先点下面的咖啡 🍺');
-    else toast('出杯口那几杯都不是 TA 点的…');
-    sfx('nope');
+    /* 出杯口没有对得上的 → 直接照单开工，一键接单 */
+    const why = brewBlockReason(g.drink);
+    if (why) { toast(why); sfx('nope'); return false; }
+    if (G.brewing.some(c => c.drink.id === g.drink.id && c.size === g.size && c.temp === g.temp)) {
+      toast('这杯正在做，再等一会儿 ⏳');
+      sfx('nope');
+      return false;
+    }
+    startBrew(g.drink, g.size, g.temp, true);
+    sfx('brew');
+    toast('接单 ' + SIZES[g.size].n + TEMPS[g.temp].n + g.drink.n + '，做好再点 TA ☕');
     return false;
   }
   G.cups.splice(idx, 1);
@@ -753,13 +762,20 @@ function serveGuest(g) {
   return true;
 }
 
+/* 现在做不了这杯的原因；能做就返回 null */
+function brewBlockReason(drink) {
+  if (!G.unlocked[drink.id]) return '这个还没解锁，结算时买菜单 📋';
+  if (G.brewing.length >= G.lv.machine) return '咖啡机满了，等一杯出来 ☕';
+  const lack = stockEnough(drink);
+  if (lack) return GOODS[lack].n + ' 不够了，明天补货 📦';
+  if (G.cups.length + G.brewing.length >= CFG.TRAY_MAX + G.lv.machine) return '出杯口堆满了';
+  return null;
+}
+
 /* 开始做一杯 */
 function startBrew(drink, size, temp, silent) {
-  if (!G.unlocked[drink.id]) { if (!silent) toast('这个还没解锁，结算时买菜单 📋'); return false; }
-  if (G.brewing.length >= G.lv.machine) { if (!silent) toast('咖啡机满了，等一杯出来 ☕'); return false; }
-  const lack = stockEnough(drink);
-  if (lack) { if (!silent) toast(GOODS[lack].n + ' 不够了，明天补货 📦'); return false; }
-  if (G.cups.length + G.brewing.length >= CFG.TRAY_MAX + G.lv.machine) { if (!silent) toast('出杯口堆满了'); return false; }
+  const why = brewBlockReason(drink);
+  if (why) { if (!silent) toast(why); return false; }
   for (const k in drink.need) G.stock[k] -= drink.need[k];
   const t = brewTime(drink, size, temp);
   G.brewing.push({ drink: drink, size: size, temp: temp, left: t, total: t });
@@ -1126,6 +1142,15 @@ function onCanvas(e) {
 CV.addEventListener('pointerdown', onCanvas);
 CV.style.touchAction = 'manipulation';
 
+/* 放大按钮（全屏） */
+$('fsBtn').addEventListener('click', function () {
+  if (document.fullscreenElement) {
+    if (document.exitFullscreen) document.exitFullscreen();
+  } else if (document.documentElement.requestFullscreen) {
+    document.documentElement.requestFullscreen();
+  }
+});
+
 /* 速度按钮 */
 $('speedBtn').addEventListener('click', function () {
   if (G.paused) { G.paused = false; }
@@ -1383,11 +1408,44 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 
+/* ---------------------------------------------------------------
+   11.5 画面尺寸：能放多大放多大，且尽量取整数倍
+   --------------------------------------------------------------- */
+function fitScreen() {
+  const app = $('app');
+  if (!app || !window.innerWidth) return;
+  const tb = $('topbar'), pn = $('panel');
+  const chrome = ((tb && tb.offsetHeight) || 0) + ((pn && pn.offsetHeight) || 0) + 26;
+  const availH = Math.max(120, window.innerHeight - chrome);
+  const availW = Math.max(240, window.innerWidth - 26);
+  const raw = Math.min(availW / W, availH / H);
+  /* 差不太多就凑整数倍（像素才齐）；差太多就铺满，宁可大也别缩成邮票 */
+  let s = raw;
+  const fl = Math.floor(raw);
+  if (fl >= 2 && fl / raw >= 0.83) s = fl;
+  if (s > 6) s = 6;
+  if (s < 0.7) s = 0.7;
+  const cw = Math.round(W * s), ch = Math.round(H * s);
+  CV.style.width = cw + 'px';
+  CV.style.height = ch + 'px';
+  app.style.maxWidth = (cw + 4) + 'px';
+  const tst = $('toast');
+  if (tst) tst.style.fontSize = Math.max(12, Math.round(3.4 * s)) + 'px';
+}
+/* 量一次再量一次：改宽度会让下面的按钮换行，高度得重新算 */
+function refit() { fitScreen(); requestAnimationFrame(fitScreen); }
+if (typeof window !== 'undefined' && window.addEventListener) {
+  window.addEventListener('resize', refit);
+  window.addEventListener('orientationchange', refit);
+  document.addEventListener('fullscreenchange', refit);
+}
+
 function boot() {
   buildControls();
   buildTray();
+  refit();
   if (loadGame()) toast('欢迎回来，第 ' + G.day + ' 天 ☕');
-  else toast('点客人头上的气泡把咖啡送过去 ☕ 配方看上面的「📖 菜单」');
+  else toast('点客人就能送咖啡，没现成的会自动帮你接单 ☕ 配方看「📖 菜单」');
   uiTick(true);
   requestAnimationFrame(loop);
 }
