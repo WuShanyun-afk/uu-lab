@@ -1,0 +1,6 @@
+id,name,price,kind
+milk,牛奶,100,animal
+milk_large,大罐牛奶,200,animal
+egg,鸡蛋,50,animal
+gold_egg,金蛋,150,animal
+feed,干草饲料,20,consumable

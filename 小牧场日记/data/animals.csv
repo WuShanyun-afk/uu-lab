@@ -1,0 +1,3 @@
+id,name,kind,price,product,product_min,product_max,product_high,high_chance,feed_freq,mature_days,timed
+cow,奶牛,livestock,800,milk,1,2,milk_large,0.0,2,7,1
+chicken,鸡,poultry,200,egg,1,1,gold_egg,0.15,1,3,0
