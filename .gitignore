@@ -6,8 +6,19 @@ _uu/环境档案.md
 # 本地预览脚本：里面写死了别人的仓库路径，不适合公开。
 看作品.bat
 
+# DNS 垫片：某次 raw.githubusercontent.com 被投毒时的临时自救补丁，本机专属。
+_uu/shim/
+
 # 系统垃圾
 Thumbs.db
 desktop.ini
 .DS_Store
 *.tmp
+
+# —— Godot 引擎缓存 ——
+# .godot/ 是导入缓存 + UID 映射，每台机器重新生成，绝不进版本库
+**/.godot/
+
+# —— Python 缓存 ——
+**/__pycache__/
+*.pyc

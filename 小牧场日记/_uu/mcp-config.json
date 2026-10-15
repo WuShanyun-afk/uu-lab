@@ -1,0 +1,78 @@
+{
+  "_comment": "小牧场日记 — MCP 配置。把 mcpServers 里的内容并进 Kelivo / 任意 MCP 客户端的配置。替换 REPLACE_ME。",
+  "_verified_on": "2026-10-14",
+  "_probe_result": "4/5 已实测握手成功并列出工具；@pixelbananas 需 Token",
+  "_proxy": {
+    "客户端": "D:\\fcclient\\fcclientCore.exe",
+    "地址": "http://127.0.0.1:7892",
+    "说明": "代理模式下命令行工具不读 Windows 系统代理，必须显式给 HTTP_PROXY/HTTPS_PROXY。已写入用户级环境变量，下面每个 server 也再显式传一份，双保险。"
+  },
+  "mcpServers": {
+    "godot": {
+      "command": "npx",
+      "args": ["-y", "godot-mcp-enhanced"],
+      "env": {
+        "GODOT_PATH": "C:\\Users\\32265\\.godot-mcp\\godot\\4.7.2-stable\\Godot_v4.7.2-stable_win64.exe",
+        "ALLOWED_PROJECT_PATHS": "D:/UU的办公室/小牧场日记",
+        "GODOT_MCP_ALLOWED_GODOT_PATHS": "C:/Users/32265/.godot-mcp/godot",
+        "GODOT_MCP_PROFILE": "full",
+        "GODOT_MCP_UPDATE_CHECK": "false",
+        "GODOT_MCP_WEB_GUI": "0",
+        "HTTP_PROXY": "http://127.0.0.1:7892",
+        "HTTPS_PROXY": "http://127.0.0.1:7892",
+        "NO_PROXY": "localhost,127.0.0.1,::1,registry.npmmirror.com,pypi.tuna.tsinghua.edu.cn"
+      }
+    },
+    "pixelart": {
+      "command": "uvx",
+      "args": ["ssyubix-pixelart-mcp"],
+      "env": {
+        "HTTP_PROXY": "http://127.0.0.1:7892",
+        "HTTPS_PROXY": "http://127.0.0.1:7892",
+        "NO_PROXY": "localhost,127.0.0.1,::1,pypi.tuna.tsinghua.edu.cn"
+      },
+      "_note": "地块/Tileset 精确绘制，24 工具。已实测通过。"
+    },
+    "lpc": {
+      "command": "uvx",
+      "args": ["lpc-character-mcp"],
+      "env": {
+        "LPC_OUTPUT_DIR": "D:/UU的办公室/小牧场日记/assets/characters",
+        "PYTHONPATH": "D:\\UU的办公室\\_uu\\shim",
+        "HTTP_PROXY": "http://127.0.0.1:7892",
+        "HTTPS_PROXY": "http://127.0.0.1:7892",
+        "NO_PROXY": "localhost,127.0.0.1,::1,pypi.tuna.tsinghua.edu.cn"
+      },
+      "_note": "657 items 已就绪。PYTHONPATH 的 DNS 垫片现在是备用（代理已能解析），留着防代理掉线。"
+    },
+    "pixelforge": {
+      "command": "npx",
+      "args": ["-y", "pixelforge-mcp@latest"],
+      "env": {
+        "GEMINI_API_KEY": "REPLACE_ME",
+        "HTTP_PROXY": "http://127.0.0.1:7892",
+        "HTTPS_PROXY": "http://127.0.0.1:7892",
+        "NO_PROXY": "localhost,127.0.0.1,::1,registry.npmmirror.com"
+      },
+      "_note": "★ 必须带代理，否则调不到 generativelanguage.googleapis.com。"
+    },
+    "pixelbananas": {
+      "command": "npx",
+      "args": ["-y", "@pixelbananas/mcp"],
+      "env": {
+        "PIXELBANANAS_TOKEN": "pba_live_REPLACE_ME",
+        "PIXELBANANAS_OUTPUT_DIR": "D:/UU的办公室/小牧场日记/assets/audio",
+        "HTTP_PROXY": "http://127.0.0.1:7892",
+        "HTTPS_PROXY": "http://127.0.0.1:7892",
+        "NO_PROXY": "localhost,127.0.0.1,::1,registry.npmmirror.com"
+      }
+    }
+  },
+  "_windows_note": "Windows 上若客户端报 spawn npx ENOENT，把 command 改成：C:\\Users\\32265\\AppData\\Local\\Programs\\nodejs\\npx.cmd",
+  "_prereq": {
+    "node": "v24.20.0",
+    "uv": "0.13.1  (C:\\Users\\32265\\.local\\bin\\uvx.exe)",
+    "godot": "4.7.2.stable.official.ed1daf0bf",
+    "proxy": "fcclient @ http://127.0.0.1:7892"
+  }
+}

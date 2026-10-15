@@ -1,0 +1,38 @@
+{
+  "mcpServers": {
+    "godot": {
+      "command": "C:\\Users\\32265\\AppData\\Local\\Programs\\nodejs\\npx.cmd",
+      "args": ["-y", "godot-mcp-enhanced"],
+      "env": {
+        "GODOT_PATH": "C:\\Users\\32265\\.godot-mcp\\godot\\4.7.2-stable\\Godot_v4.7.2-stable_win64.exe",
+        "ALLOWED_PROJECT_PATHS": "D:/UU的办公室/小牧场日记",
+        "GODOT_MCP_ALLOWED_GODOT_PATHS": "C:/Users/32265/.godot-mcp/godot",
+        "GODOT_MCP_PROFILE": "full",
+        "GODOT_MCP_UPDATE_CHECK": "false",
+        "GODOT_MCP_WEB_GUI": "0",
+        "HTTP_PROXY": "http://127.0.0.1:7892",
+        "HTTPS_PROXY": "http://127.0.0.1:7892",
+        "NO_PROXY": "localhost,127.0.0.1,::1,registry.npmmirror.com,pypi.tuna.tsinghua.edu.cn"
+      }
+    },
+    "pixelart": {
+      "command": "C:\\Users\\32265\\.local\\bin\\uvx.exe",
+      "args": ["ssyubix-pixelart-mcp"],
+      "env": {
+        "HTTP_PROXY": "http://127.0.0.1:7892",
+        "HTTPS_PROXY": "http://127.0.0.1:7892",
+        "NO_PROXY": "localhost,127.0.0.1,::1,pypi.tuna.tsinghua.edu.cn"
+      }
+    },
+    "lpc": {
+      "command": "C:\\Users\\32265\\.local\\bin\\uvx.exe",
+      "args": ["lpc-character-mcp"],
+      "env": {
+        "LPC_OUTPUT_DIR": "D:/UU的办公室/小牧场日记/assets/characters",
+        "HTTP_PROXY": "http://127.0.0.1:7892",
+        "HTTPS_PROXY": "http://127.0.0.1:7892",
+        "NO_PROXY": "localhost,127.0.0.1,::1,pypi.tuna.tsinghua.edu.cn"
+      }
+    }
+  }
+}

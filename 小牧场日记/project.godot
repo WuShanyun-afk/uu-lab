@@ -1,0 +1,39 @@
+; 《小牧场日记》 / ranch-diary
+; Godot 4.7.2-stable · 里程碑 1：玩家移动 + 时间/昼夜循环
+;
+; 关键设置依据 GDD §10.1
+;   640×360 视口 + 32px 地块 = 一屏 20 × 11.25 格
+;   整数倍缩放（integer）是硬要求，非整数倍会让像素抖动
+
+config_version=5
+
+[application]
+
+config/name="小牧场日记"
+config/description="像素风牧场经营模拟 · v0.1 MVP"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.7", "Forward Plus")
+
+[autoload]
+
+EventBus="*res://scripts/event_bus.gd"
+GameClock="*res://scripts/game_clock.gd"
+CropDB="*res://scripts/data/crop_db.gd"
+ProductDB="*res://scripts/data/product_db.gd"
+AnimalDB="*res://scripts/data/animal_db.gd"
+GameState="*res://scripts/game_state.gd"
+
+[display]
+
+window/size/viewport_width=640
+window/size/viewport_height=360
+window/size/window_width_override=1280
+window/size/window_height_override=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
+window/stretch/scale_mode="integer"
+
+[rendering]
+
+textures/canvas_textures/default_texture_filter=0
+environment/defaults/default_clear_color=Color(0.1, 0.12, 0.16, 1)

@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://bbpc2r7mr55au"
+
+[deps]
+
+files=["res://data/animals.name.translation", "res://data/animals.kind.translation", "res://data/animals.price.translation", "res://data/animals.product.translation", "res://data/animals.product.translation", "res://data/animals.product.translation", "res://data/animals.product.translation", "res://data/animals.high.translation", "res://data/animals.feed.translation", "res://data/animals.mature.translation", "res://data/animals.timed.translation"]
+
+source_file="res://data/animals.csv"
+dest_files=["res://data/animals.name.translation", "res://data/animals.kind.translation", "res://data/animals.price.translation", "res://data/animals.product.translation", "res://data/animals.product.translation", "res://data/animals.product.translation", "res://data/animals.product.translation", "res://data/animals.high.translation", "res://data/animals.feed.translation", "res://data/animals.mature.translation", "res://data/animals.timed.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://cyhr1yk5igist"
+
+[deps]
+
+files=["res://data/crops.name.translation", "res://data/crops.season.translation", "res://data/crops.grow.translation", "res://data/crops.seed.translation", "res://data/crops.sell.translation", "res://data/crops.regrow.translation", "res://data/crops.fertilize.translation"]
+
+source_file="res://data/crops.csv"
+dest_files=["res://data/crops.name.translation", "res://data/crops.season.translation", "res://data/crops.grow.translation", "res://data/crops.seed.translation", "res://data/crops.sell.translation", "res://data/crops.regrow.translation", "res://data/crops.fertilize.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://dqw2rrgp7t5oj"
+
+[deps]
+
+files=["res://data/products.name.translation", "res://data/products.price.translation", "res://data/products.kind.translation"]
+
+source_file="res://data/products.csv"
+dest_files=["res://data/products.name.translation", "res://data/products.price.translation", "res://data/products.kind.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true
