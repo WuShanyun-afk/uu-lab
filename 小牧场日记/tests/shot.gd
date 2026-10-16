@@ -36,7 +36,14 @@ func _ready() -> void:
 
 		var fl = main.get_node_or_null("World/FarmLayer")
 		if fl != null:
-			fl.queue_redraw()
+			fl.refresh()
+
+	# 让玩家拿着洒水壶站在耕地旁边，顺便验「拎壶站立」的姿势
+	var p = main.get_node_or_null("World/YSortRoot/Player")
+	if p != null:
+		p.position = Vector2(10 * 32 + 16, 9 * 32 + 16)
+		p.facing = "down"
+		p._set_tool(Player.Tool.CAN)
 
 	for i in range(12):
 		await get_tree().process_frame
@@ -46,4 +53,16 @@ func _ready() -> void:
 	var out := ProjectSettings.globalize_path("res://_uu/shot.png")
 	var err := img.save_png(out)
 	print("SHOT size=%dx%d err=%s path=%s" % [img.get_width(), img.get_height(), err, out])
+
+	# 第二张：正在浇水的那一帧
+	if p != null:
+		p.play_watering()
+		for i in range(4):
+			await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+		var img2 := get_viewport().get_texture().get_image()
+		var out2 := ProjectSettings.globalize_path("res://_uu/shot_watering.png")
+		var err2 := img2.save_png(out2)
+		print("SHOT2 size=%dx%d err=%s path=%s" % [img2.get_width(), img2.get_height(), err2, out2])
+
 	get_tree().quit()

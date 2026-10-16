@@ -1,0 +1,36 @@
+{
+  "sheet_file": "ground_tileset.png",
+  "tile_width": 32,
+  "tile_height": 32,
+  "columns": 4,
+  "rows": 2,
+  "ppu": 16,
+  "sheet_width": 128,
+  "sheet_height": 64,
+  "filled_tiles": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "total_tiles": 8,
+  "palette": [
+    "#7FC15E",
+    "#6BAF4C",
+    "#94D26E",
+    "#568C3E",
+    "#6B4A2F",
+    "#573B26",
+    "#42301E",
+    "#33240F",
+    "#7E5A3A",
+    "#C8A96B",
+    "#9C8452",
+    "#F2E85C",
+    "#FFFFFF"
+  ]
+}

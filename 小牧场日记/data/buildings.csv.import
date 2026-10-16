@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://hipv0q4thqpi"
+
+[deps]
+
+files=["res://data/buildings.name.translation", "res://data/buildings.price.translation", "res://data/buildings.material.translation", "res://data/buildings.material.translation", "res://data/buildings.gestation.translation", "res://data/buildings.note.translation"]
+
+source_file="res://data/buildings.csv"
+dest_files=["res://data/buildings.name.translation", "res://data/buildings.price.translation", "res://data/buildings.material.translation", "res://data/buildings.material.translation", "res://data/buildings.gestation.translation", "res://data/buildings.note.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

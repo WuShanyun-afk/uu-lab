@@ -77,7 +77,16 @@ func _tick() -> void:
 		_roll_day()
 
 func _roll_day() -> void:
+	# 2:00 强制入睡：这是「新的一天」的分界，也是自动存档点（GDD §10.5）
+	EventBus.forced_sleep.emit()
 	minutes = 0
+	# ⚠️ 必须把时段也拉回清晨：_tick 在归零前已经把它推到了 NIGHT，
+	#    不重置的话 6:00 一睁眼右上角会写「夜晚」，直到下一个 tick 才自愈。
+	var p := phase_at(0)
+	if p != phase:
+		var old := phase
+		phase = p
+		EventBus.phase_changed.emit(old, p)
 	day += 1
 	if day > DAYS_PER_SEASON:
 		day = 1
@@ -118,7 +127,24 @@ func season_name() -> String:
 	return SEASON_NAME[season]
 
 func phase_name() -> String:
-	return PHASE_NAME[phase]
+	return PHASE_NAME[phase_at(minutes)]
+
+## 当前时段 —— 从 minutes 现算，**不要**读缓存的 phase。
+## 缓存的 phase 只在 _tick / _roll_day 里更新，直接改 minutes（存档读档、调试）会让它过期。
+func current_phase() -> Phase:
+	return phase_at(minutes)
+
+## 当日已过分钟 → 24 小时制的「时」（0-23）
+func hour() -> int:
+	return int((DAY_START_HOUR * 60 + minutes) / 60) % 24
+
+## 当日已过分钟 → 24 小时制的「分」
+func minute_of_day() -> int:
+	return (DAY_START_HOUR * 60 + minutes) % 60
+
+## 是否在放牧窗口（GDD §1.3：9:00–17:00）
+func in_graze_window() -> bool:
+	return phase_at(minutes) == Phase.DAY
 
 ## 调试用：跳到一个指定时刻（0 = 6:00）
 func debug_set_minutes(m: int) -> void:

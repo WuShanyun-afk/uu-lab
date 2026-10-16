@@ -6,10 +6,10 @@ uid="uid://bbpc2r7mr55au"
 
 [deps]
 
-files=["res://data/animals.name.translation", "res://data/animals.kind.translation", "res://data/animals.price.translation", "res://data/animals.product.translation", "res://data/animals.product.translation", "res://data/animals.product.translation", "res://data/animals.product.translation", "res://data/animals.high.translation", "res://data/animals.feed.translation", "res://data/animals.mature.translation", "res://data/animals.timed.translation"]
+files=["res://data/animals.name.translation", "res://data/animals.kind.translation", "res://data/animals.housing.translation", "res://data/animals.price.translation", "res://data/animals.product.translation", "res://data/animals.product.translation", "res://data/animals.product.translation", "res://data/animals.product.translation", "res://data/animals.high.translation", "res://data/animals.feed.translation", "res://data/animals.mature.translation", "res://data/animals.produce.translation", "res://data/animals.produce.translation", "res://data/animals.produce.translation", "res://data/animals.brushable.translation", "res://data/animals.pet.translation"]
 
 source_file="res://data/animals.csv"
-dest_files=["res://data/animals.name.translation", "res://data/animals.kind.translation", "res://data/animals.price.translation", "res://data/animals.product.translation", "res://data/animals.product.translation", "res://data/animals.product.translation", "res://data/animals.product.translation", "res://data/animals.high.translation", "res://data/animals.feed.translation", "res://data/animals.mature.translation", "res://data/animals.timed.translation"]
+dest_files=["res://data/animals.name.translation", "res://data/animals.kind.translation", "res://data/animals.housing.translation", "res://data/animals.price.translation", "res://data/animals.product.translation", "res://data/animals.product.translation", "res://data/animals.product.translation", "res://data/animals.product.translation", "res://data/animals.high.translation", "res://data/animals.feed.translation", "res://data/animals.mature.translation", "res://data/animals.produce.translation", "res://data/animals.produce.translation", "res://data/animals.produce.translation", "res://data/animals.brushable.translation", "res://data/animals.pet.translation"]
 
 [params]
 

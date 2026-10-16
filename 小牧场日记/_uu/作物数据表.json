@@ -1,0 +1,1131 @@
+{
+  "meta": {
+    "source": "data/crops.csv",
+    "generated_at": "2026-10-16 20:16",
+    "note": "游戏运行时读 crops.csv（CropDB）；本文件是导出报告，不参与运行。",
+    "season_days": 28,
+    "quality_mult": {
+      "normal": 1.0,
+      "silver": 1.5,
+      "gold": 2.0
+    },
+    "base_quality_chance": [
+      0.05,
+      0.0
+    ],
+    "fertilizer": {
+      "basic": {
+        "name": "基础肥",
+        "price": 100,
+        "bonus_silver": [
+          0.05,
+          0.1,
+          0.15
+        ],
+        "bonus_gold": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "high": {
+        "name": "高级肥",
+        "price": 300,
+        "bonus_silver": [
+          0.12,
+          0.2,
+          0.28
+        ],
+        "bonus_gold": [
+          0.03,
+          0.05,
+          0.08
+        ]
+      }
+    }
+  },
+  "seasons": {
+    "春": {
+      "season": 0,
+      "count": 6,
+      "crops": [
+        "turnip",
+        "potato",
+        "spinach",
+        "garlic",
+        "strawberry",
+        "cauliflower"
+      ]
+    },
+    "夏": {
+      "season": 1,
+      "count": 6,
+      "crops": [
+        "wheat",
+        "pepper",
+        "tomato",
+        "blueberry",
+        "melon",
+        "corn"
+      ]
+    },
+    "秋": {
+      "season": 2,
+      "count": 6,
+      "crops": [
+        "beet",
+        "eggplant",
+        "cranberry",
+        "sunflower",
+        "yam",
+        "pumpkin"
+      ]
+    },
+    "冬": {
+      "season": 3,
+      "count": 6,
+      "crops": [
+        "winter_wheat",
+        "daikon",
+        "napa",
+        "onion",
+        "leek",
+        "snow_greens"
+      ]
+    }
+  },
+  "crops": [
+    {
+      "id": "turnip",
+      "name": "芜菁",
+      "season": 0,
+      "season_name": "春",
+      "grow_days": 4,
+      "seed_price": 20,
+      "sell_price": 35,
+      "regrow_days": 0,
+      "regrow_text": "一次性",
+      "fertilize": 0,
+      "fertilize_name": "低",
+      "color": "#E8E3F5",
+      "quality_price": {
+        "normal": 35,
+        "silver": 52,
+        "gold": 70
+      },
+      "profit_per_plant": 15,
+      "profit_per_day": 3.75,
+      "harvests_per_season": 1,
+      "season_income": 35,
+      "season_profit": 15,
+      "grow_days_by_fertilizer": {
+        "none": 4,
+        "basic": 4,
+        "high": 5
+      },
+      "quality_chance": {
+        "none": [
+          0.05,
+          0.0
+        ],
+        "basic": [
+          0.1,
+          0.0
+        ],
+        "high": [
+          0.16999999999999998,
+          0.03
+        ]
+      }
+    },
+    {
+      "id": "potato",
+      "name": "土豆",
+      "season": 0,
+      "season_name": "春",
+      "grow_days": 6,
+      "seed_price": 50,
+      "sell_price": 80,
+      "regrow_days": 0,
+      "regrow_text": "一次性",
+      "fertilize": 1,
+      "fertilize_name": "中",
+      "color": "#C89A5B",
+      "quality_price": {
+        "normal": 80,
+        "silver": 120,
+        "gold": 160
+      },
+      "profit_per_plant": 30,
+      "profit_per_day": 5.0,
+      "harvests_per_season": 1,
+      "season_income": 80,
+      "season_profit": 30,
+      "grow_days_by_fertilizer": {
+        "none": 6,
+        "basic": 6,
+        "high": 7
+      },
+      "quality_chance": {
+        "none": [
+          0.05,
+          0.0
+        ],
+        "basic": [
+          0.15000000000000002,
+          0.0
+        ],
+        "high": [
+          0.25,
+          0.05
+        ]
+      }
+    },
+    {
+      "id": "spinach",
+      "name": "菠菜",
+      "season": 0,
+      "season_name": "春",
+      "grow_days": 5,
+      "seed_price": 35,
+      "sell_price": 60,
+      "regrow_days": 0,
+      "regrow_text": "一次性",
+      "fertilize": 0,
+      "fertilize_name": "低",
+      "color": "#3E7A34",
+      "quality_price": {
+        "normal": 60,
+        "silver": 90,
+        "gold": 120
+      },
+      "profit_per_plant": 25,
+      "profit_per_day": 5.0,
+      "harvests_per_season": 1,
+      "season_income": 60,
+      "season_profit": 25,
+      "grow_days_by_fertilizer": {
+        "none": 5,
+        "basic": 5,
+        "high": 6
+      },
+      "quality_chance": {
+        "none": [
+          0.05,
+          0.0
+        ],
+        "basic": [
+          0.1,
+          0.0
+        ],
+        "high": [
+          0.16999999999999998,
+          0.03
+        ]
+      }
+    },
+    {
+      "id": "garlic",
+      "name": "大蒜",
+      "season": 0,
+      "season_name": "春",
+      "grow_days": 4,
+      "seed_price": 40,
+      "sell_price": 60,
+      "regrow_days": 0,
+      "regrow_text": "一次性",
+      "fertilize": 0,
+      "fertilize_name": "低",
+      "color": "#EFEADF",
+      "quality_price": {
+        "normal": 60,
+        "silver": 90,
+        "gold": 120
+      },
+      "profit_per_plant": 20,
+      "profit_per_day": 5.0,
+      "harvests_per_season": 1,
+      "season_income": 60,
+      "season_profit": 20,
+      "grow_days_by_fertilizer": {
+        "none": 4,
+        "basic": 4,
+        "high": 5
+      },
+      "quality_chance": {
+        "none": [
+          0.05,
+          0.0
+        ],
+        "basic": [
+          0.1,
+          0.0
+        ],
+        "high": [
+          0.16999999999999998,
+          0.03
+        ]
+      }
+    },
+    {
+      "id": "strawberry",
+      "name": "草莓",
+      "season": 0,
+      "season_name": "春",
+      "grow_days": 8,
+      "seed_price": 100,
+      "sell_price": 120,
+      "regrow_days": 4,
+      "regrow_text": "每 4 天再生",
+      "fertilize": 2,
+      "fertilize_name": "高",
+      "color": "#E23B4A",
+      "quality_price": {
+        "normal": 120,
+        "silver": 180,
+        "gold": 240
+      },
+      "profit_per_plant": 20,
+      "profit_per_day": 2.5,
+      "harvests_per_season": 6,
+      "season_income": 720,
+      "season_profit": 620,
+      "grow_days_by_fertilizer": {
+        "none": 8,
+        "basic": 8,
+        "high": 8
+      },
+      "quality_chance": {
+        "none": [
+          0.05,
+          0.0
+        ],
+        "basic": [
+          0.2,
+          0.0
+        ],
+        "high": [
+          0.33,
+          0.08
+        ]
+      }
+    },
+    {
+      "id": "cauliflower",
+      "name": "花椰菜",
+      "season": 0,
+      "season_name": "春",
+      "grow_days": 12,
+      "seed_price": 80,
+      "sell_price": 175,
+      "regrow_days": 0,
+      "regrow_text": "一次性",
+      "fertilize": 2,
+      "fertilize_name": "高",
+      "color": "#F2EDD8",
+      "quality_price": {
+        "normal": 175,
+        "silver": 262,
+        "gold": 350
+      },
+      "profit_per_plant": 95,
+      "profit_per_day": 7.92,
+      "harvests_per_season": 1,
+      "season_income": 175,
+      "season_profit": 95,
+      "grow_days_by_fertilizer": {
+        "none": 12,
+        "basic": 12,
+        "high": 12
+      },
+      "quality_chance": {
+        "none": [
+          0.05,
+          0.0
+        ],
+        "basic": [
+          0.2,
+          0.0
+        ],
+        "high": [
+          0.33,
+          0.08
+        ]
+      }
+    },
+    {
+      "id": "wheat",
+      "name": "小麦",
+      "season": 1,
+      "season_name": "夏",
+      "grow_days": 4,
+      "seed_price": 15,
+      "sell_price": 25,
+      "regrow_days": 0,
+      "regrow_text": "一次性",
+      "fertilize": 0,
+      "fertilize_name": "低",
+      "color": "#E3C766",
+      "quality_price": {
+        "normal": 25,
+        "silver": 38,
+        "gold": 50
+      },
+      "profit_per_plant": 10,
+      "profit_per_day": 2.5,
+      "harvests_per_season": 1,
+      "season_income": 25,
+      "season_profit": 10,
+      "grow_days_by_fertilizer": {
+        "none": 4,
+        "basic": 4,
+        "high": 5
+      },
+      "quality_chance": {
+        "none": [
+          0.05,
+          0.0
+        ],
+        "basic": [
+          0.1,
+          0.0
+        ],
+        "high": [
+          0.16999999999999998,
+          0.03
+        ]
+      }
+    },
+    {
+      "id": "pepper",
+      "name": "辣椒",
+      "season": 1,
+      "season_name": "夏",
+      "grow_days": 5,
+      "seed_price": 30,
+      "sell_price": 40,
+      "regrow_days": 3,
+      "regrow_text": "每 3 天再生",
+      "fertilize": 0,
+      "fertilize_name": "低",
+      "color": "#D93A2B",
+      "quality_price": {
+        "normal": 40,
+        "silver": 60,
+        "gold": 80
+      },
+      "profit_per_plant": 10,
+      "profit_per_day": 2.0,
+      "harvests_per_season": 8,
+      "season_income": 320,
+      "season_profit": 290,
+      "grow_days_by_fertilizer": {
+        "none": 5,
+        "basic": 5,
+        "high": 6
+      },
+      "quality_chance": {
+        "none": [
+          0.05,
+          0.0
+        ],
+        "basic": [
+          0.1,
+          0.0
+        ],
+        "high": [
+          0.16999999999999998,
+          0.03
+        ]
+      }
+    },
+    {
+      "id": "tomato",
+      "name": "番茄",
+      "season": 1,
+      "season_name": "夏",
+      "grow_days": 11,
+      "seed_price": 50,
+      "sell_price": 60,
+      "regrow_days": 4,
+      "regrow_text": "每 4 天再生",
+      "fertilize": 1,
+      "fertilize_name": "中",
+      "color": "#E04B33",
+      "quality_price": {
+        "normal": 60,
+        "silver": 90,
+        "gold": 120
+      },
+      "profit_per_plant": 10,
+      "profit_per_day": 0.91,
+      "harvests_per_season": 5,
+      "season_income": 300,
+      "season_profit": 250,
+      "grow_days_by_fertilizer": {
+        "none": 11,
+        "basic": 11,
+        "high": 12
+      },
+      "quality_chance": {
+        "none": [
+          0.05,
+          0.0
+        ],
+        "basic": [
+          0.15000000000000002,
+          0.0
+        ],
+        "high": [
+          0.25,
+          0.05
+        ]
+      }
+    },
+    {
+      "id": "blueberry",
+      "name": "蓝莓",
+      "season": 1,
+      "season_name": "夏",
+      "grow_days": 13,
+      "seed_price": 80,
+      "sell_price": 50,
+      "regrow_days": 4,
+      "regrow_text": "每 4 天再生",
+      "fertilize": 2,
+      "fertilize_name": "高",
+      "color": "#4A5BB5",
+      "quality_price": {
+        "normal": 50,
+        "silver": 75,
+        "gold": 100
+      },
+      "profit_per_plant": -30,
+      "profit_per_day": -2.31,
+      "harvests_per_season": 4,
+      "season_income": 200,
+      "season_profit": 120,
+      "grow_days_by_fertilizer": {
+        "none": 13,
+        "basic": 13,
+        "high": 13
+      },
+      "quality_chance": {
+        "none": [
+          0.05,
+          0.0
+        ],
+        "basic": [
+          0.2,
+          0.0
+        ],
+        "high": [
+          0.33,
+          0.08
+        ]
+      }
+    },
+    {
+      "id": "melon",
+      "name": "甜瓜",
+      "season": 1,
+      "season_name": "夏",
+      "grow_days": 12,
+      "seed_price": 80,
+      "sell_price": 250,
+      "regrow_days": 0,
+      "regrow_text": "一次性",
+      "fertilize": 2,
+      "fertilize_name": "高",
+      "color": "#8FCB6B",
+      "quality_price": {
+        "normal": 250,
+        "silver": 375,
+        "gold": 500
+      },
+      "profit_per_plant": 170,
+      "profit_per_day": 14.17,
+      "harvests_per_season": 1,
+      "season_income": 250,
+      "season_profit": 170,
+      "grow_days_by_fertilizer": {
+        "none": 12,
+        "basic": 12,
+        "high": 12
+      },
+      "quality_chance": {
+        "none": [
+          0.05,
+          0.0
+        ],
+        "basic": [
+          0.2,
+          0.0
+        ],
+        "high": [
+          0.33,
+          0.08
+        ]
+      }
+    },
+    {
+      "id": "corn",
+      "name": "玉米",
+      "season": 1,
+      "season_name": "夏",
+      "grow_days": 14,
+      "seed_price": 150,
+      "sell_price": 50,
+      "regrow_days": 4,
+      "regrow_text": "每 4 天再生",
+      "fertilize": 1,
+      "fertilize_name": "中",
+      "color": "#F2D14A",
+      "quality_price": {
+        "normal": 50,
+        "silver": 75,
+        "gold": 100
+      },
+      "profit_per_plant": -100,
+      "profit_per_day": -7.14,
+      "harvests_per_season": 4,
+      "season_income": 200,
+      "season_profit": 50,
+      "grow_days_by_fertilizer": {
+        "none": 14,
+        "basic": 14,
+        "high": 15
+      },
+      "quality_chance": {
+        "none": [
+          0.05,
+          0.0
+        ],
+        "basic": [
+          0.15000000000000002,
+          0.0
+        ],
+        "high": [
+          0.25,
+          0.05
+        ]
+      }
+    },
+    {
+      "id": "beet",
+      "name": "甜菜",
+      "season": 2,
+      "season_name": "秋",
+      "grow_days": 6,
+      "seed_price": 20,
+      "sell_price": 100,
+      "regrow_days": 0,
+      "regrow_text": "一次性",
+      "fertilize": 0,
+      "fertilize_name": "低",
+      "color": "#A8324E",
+      "quality_price": {
+        "normal": 100,
+        "silver": 150,
+        "gold": 200
+      },
+      "profit_per_plant": 80,
+      "profit_per_day": 13.33,
+      "harvests_per_season": 1,
+      "season_income": 100,
+      "season_profit": 80,
+      "grow_days_by_fertilizer": {
+        "none": 6,
+        "basic": 6,
+        "high": 7
+      },
+      "quality_chance": {
+        "none": [
+          0.05,
+          0.0
+        ],
+        "basic": [
+          0.1,
+          0.0
+        ],
+        "high": [
+          0.16999999999999998,
+          0.03
+        ]
+      }
+    },
+    {
+      "id": "eggplant",
+      "name": "茄子",
+      "season": 2,
+      "season_name": "秋",
+      "grow_days": 5,
+      "seed_price": 20,
+      "sell_price": 60,
+      "regrow_days": 5,
+      "regrow_text": "每 5 天再生",
+      "fertilize": 0,
+      "fertilize_name": "低",
+      "color": "#6B3F8F",
+      "quality_price": {
+        "normal": 60,
+        "silver": 90,
+        "gold": 120
+      },
+      "profit_per_plant": 40,
+      "profit_per_day": 8.0,
+      "harvests_per_season": 5,
+      "season_income": 300,
+      "season_profit": 280,
+      "grow_days_by_fertilizer": {
+        "none": 5,
+        "basic": 5,
+        "high": 6
+      },
+      "quality_chance": {
+        "none": [
+          0.05,
+          0.0
+        ],
+        "basic": [
+          0.1,
+          0.0
+        ],
+        "high": [
+          0.16999999999999998,
+          0.03
+        ]
+      }
+    },
+    {
+      "id": "cranberry",
+      "name": "蔓越莓",
+      "season": 2,
+      "season_name": "秋",
+      "grow_days": 7,
+      "seed_price": 240,
+      "sell_price": 75,
+      "regrow_days": 5,
+      "regrow_text": "每 5 天再生",
+      "fertilize": 1,
+      "fertilize_name": "中",
+      "color": "#C22B45",
+      "quality_price": {
+        "normal": 75,
+        "silver": 112,
+        "gold": 150
+      },
+      "profit_per_plant": -165,
+      "profit_per_day": -23.57,
+      "harvests_per_season": 5,
+      "season_income": 375,
+      "season_profit": 135,
+      "grow_days_by_fertilizer": {
+        "none": 7,
+        "basic": 7,
+        "high": 8
+      },
+      "quality_chance": {
+        "none": [
+          0.05,
+          0.0
+        ],
+        "basic": [
+          0.15000000000000002,
+          0.0
+        ],
+        "high": [
+          0.25,
+          0.05
+        ]
+      }
+    },
+    {
+      "id": "sunflower",
+      "name": "向日葵",
+      "season": 2,
+      "season_name": "秋",
+      "grow_days": 8,
+      "seed_price": 200,
+      "sell_price": 300,
+      "regrow_days": 0,
+      "regrow_text": "一次性",
+      "fertilize": 1,
+      "fertilize_name": "中",
+      "color": "#F5C13B",
+      "quality_price": {
+        "normal": 300,
+        "silver": 450,
+        "gold": 600
+      },
+      "profit_per_plant": 100,
+      "profit_per_day": 12.5,
+      "harvests_per_season": 1,
+      "season_income": 300,
+      "season_profit": 100,
+      "grow_days_by_fertilizer": {
+        "none": 8,
+        "basic": 8,
+        "high": 9
+      },
+      "quality_chance": {
+        "none": [
+          0.05,
+          0.0
+        ],
+        "basic": [
+          0.15000000000000002,
+          0.0
+        ],
+        "high": [
+          0.25,
+          0.05
+        ]
+      }
+    },
+    {
+      "id": "yam",
+      "name": "山药",
+      "season": 2,
+      "season_name": "秋",
+      "grow_days": 10,
+      "seed_price": 60,
+      "sell_price": 160,
+      "regrow_days": 0,
+      "regrow_text": "一次性",
+      "fertilize": 1,
+      "fertilize_name": "中",
+      "color": "#B98C6A",
+      "quality_price": {
+        "normal": 160,
+        "silver": 240,
+        "gold": 320
+      },
+      "profit_per_plant": 100,
+      "profit_per_day": 10.0,
+      "harvests_per_season": 1,
+      "season_income": 160,
+      "season_profit": 100,
+      "grow_days_by_fertilizer": {
+        "none": 10,
+        "basic": 10,
+        "high": 11
+      },
+      "quality_chance": {
+        "none": [
+          0.05,
+          0.0
+        ],
+        "basic": [
+          0.15000000000000002,
+          0.0
+        ],
+        "high": [
+          0.25,
+          0.05
+        ]
+      }
+    },
+    {
+      "id": "pumpkin",
+      "name": "南瓜",
+      "season": 2,
+      "season_name": "秋",
+      "grow_days": 13,
+      "seed_price": 100,
+      "sell_price": 320,
+      "regrow_days": 0,
+      "regrow_text": "一次性",
+      "fertilize": 2,
+      "fertilize_name": "高",
+      "color": "#E8802A",
+      "quality_price": {
+        "normal": 320,
+        "silver": 480,
+        "gold": 640
+      },
+      "profit_per_plant": 220,
+      "profit_per_day": 16.92,
+      "harvests_per_season": 1,
+      "season_income": 320,
+      "season_profit": 220,
+      "grow_days_by_fertilizer": {
+        "none": 13,
+        "basic": 13,
+        "high": 13
+      },
+      "quality_chance": {
+        "none": [
+          0.05,
+          0.0
+        ],
+        "basic": [
+          0.2,
+          0.0
+        ],
+        "high": [
+          0.33,
+          0.08
+        ]
+      }
+    },
+    {
+      "id": "winter_wheat",
+      "name": "冬小麦",
+      "season": 3,
+      "season_name": "冬",
+      "grow_days": 6,
+      "seed_price": 25,
+      "sell_price": 45,
+      "regrow_days": 0,
+      "regrow_text": "一次性",
+      "fertilize": 0,
+      "fertilize_name": "低",
+      "color": "#D9C46A",
+      "quality_price": {
+        "normal": 45,
+        "silver": 68,
+        "gold": 90
+      },
+      "profit_per_plant": 20,
+      "profit_per_day": 3.33,
+      "harvests_per_season": 1,
+      "season_income": 45,
+      "season_profit": 20,
+      "grow_days_by_fertilizer": {
+        "none": 6,
+        "basic": 6,
+        "high": 7
+      },
+      "quality_chance": {
+        "none": [
+          0.05,
+          0.0
+        ],
+        "basic": [
+          0.1,
+          0.0
+        ],
+        "high": [
+          0.16999999999999998,
+          0.03
+        ]
+      }
+    },
+    {
+      "id": "daikon",
+      "name": "白萝卜",
+      "season": 3,
+      "season_name": "冬",
+      "grow_days": 5,
+      "seed_price": 30,
+      "sell_price": 55,
+      "regrow_days": 0,
+      "regrow_text": "一次性",
+      "fertilize": 0,
+      "fertilize_name": "低",
+      "color": "#F2F0E6",
+      "quality_price": {
+        "normal": 55,
+        "silver": 82,
+        "gold": 110
+      },
+      "profit_per_plant": 25,
+      "profit_per_day": 5.0,
+      "harvests_per_season": 1,
+      "season_income": 55,
+      "season_profit": 25,
+      "grow_days_by_fertilizer": {
+        "none": 5,
+        "basic": 5,
+        "high": 6
+      },
+      "quality_chance": {
+        "none": [
+          0.05,
+          0.0
+        ],
+        "basic": [
+          0.1,
+          0.0
+        ],
+        "high": [
+          0.16999999999999998,
+          0.03
+        ]
+      }
+    },
+    {
+      "id": "napa",
+      "name": "大白菜",
+      "season": 3,
+      "season_name": "冬",
+      "grow_days": 7,
+      "seed_price": 40,
+      "sell_price": 80,
+      "regrow_days": 0,
+      "regrow_text": "一次性",
+      "fertilize": 1,
+      "fertilize_name": "中",
+      "color": "#CBE39A",
+      "quality_price": {
+        "normal": 80,
+        "silver": 120,
+        "gold": 160
+      },
+      "profit_per_plant": 40,
+      "profit_per_day": 5.71,
+      "harvests_per_season": 1,
+      "season_income": 80,
+      "season_profit": 40,
+      "grow_days_by_fertilizer": {
+        "none": 7,
+        "basic": 7,
+        "high": 8
+      },
+      "quality_chance": {
+        "none": [
+          0.05,
+          0.0
+        ],
+        "basic": [
+          0.15000000000000002,
+          0.0
+        ],
+        "high": [
+          0.25,
+          0.05
+        ]
+      }
+    },
+    {
+      "id": "onion",
+      "name": "洋葱",
+      "season": 3,
+      "season_name": "冬",
+      "grow_days": 6,
+      "seed_price": 35,
+      "sell_price": 70,
+      "regrow_days": 0,
+      "regrow_text": "一次性",
+      "fertilize": 0,
+      "fertilize_name": "低",
+      "color": "#B98BC9",
+      "quality_price": {
+        "normal": 70,
+        "silver": 105,
+        "gold": 140
+      },
+      "profit_per_plant": 35,
+      "profit_per_day": 5.83,
+      "harvests_per_season": 1,
+      "season_income": 70,
+      "season_profit": 35,
+      "grow_days_by_fertilizer": {
+        "none": 6,
+        "basic": 6,
+        "high": 7
+      },
+      "quality_chance": {
+        "none": [
+          0.05,
+          0.0
+        ],
+        "basic": [
+          0.1,
+          0.0
+        ],
+        "high": [
+          0.16999999999999998,
+          0.03
+        ]
+      }
+    },
+    {
+      "id": "leek",
+      "name": "冬葱",
+      "season": 3,
+      "season_name": "冬",
+      "grow_days": 4,
+      "seed_price": 20,
+      "sell_price": 40,
+      "regrow_days": 0,
+      "regrow_text": "一次性",
+      "fertilize": 0,
+      "fertilize_name": "低",
+      "color": "#6FBF73",
+      "quality_price": {
+        "normal": 40,
+        "silver": 60,
+        "gold": 80
+      },
+      "profit_per_plant": 20,
+      "profit_per_day": 5.0,
+      "harvests_per_season": 1,
+      "season_income": 40,
+      "season_profit": 20,
+      "grow_days_by_fertilizer": {
+        "none": 4,
+        "basic": 4,
+        "high": 5
+      },
+      "quality_chance": {
+        "none": [
+          0.05,
+          0.0
+        ],
+        "basic": [
+          0.1,
+          0.0
+        ],
+        "high": [
+          0.16999999999999998,
+          0.03
+        ]
+      }
+    },
+    {
+      "id": "snow_greens",
+      "name": "雪里蕻",
+      "season": 3,
+      "season_name": "冬",
+      "grow_days": 8,
+      "seed_price": 55,
+      "sell_price": 110,
+      "regrow_days": 0,
+      "regrow_text": "一次性",
+      "fertilize": 1,
+      "fertilize_name": "中",
+      "color": "#4F8F52",
+      "quality_price": {
+        "normal": 110,
+        "silver": 165,
+        "gold": 220
+      },
+      "profit_per_plant": 55,
+      "profit_per_day": 6.88,
+      "harvests_per_season": 1,
+      "season_income": 110,
+      "season_profit": 55,
+      "grow_days_by_fertilizer": {
+        "none": 8,
+        "basic": 8,
+        "high": 9
+      },
+      "quality_chance": {
+        "none": [
+          0.05,
+          0.0
+        ],
+        "basic": [
+          0.15000000000000002,
+          0.0
+        ],
+        "high": [
+          0.25,
+          0.05
+        ]
+      }
+    }
+  ]
+}

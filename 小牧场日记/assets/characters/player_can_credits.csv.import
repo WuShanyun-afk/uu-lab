@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://bsf41o6oor44e"
+
+[deps]
+
+files=["res://assets/characters/player_can_credits.notes.translation", "res://assets/characters/player_can_credits.authors.translation", "res://assets/characters/player_can_credits.licenses.translation", "res://assets/characters/player_can_credits.urls.translation"]
+
+source_file="res://assets/characters/player_can_credits.csv"
+dest_files=["res://assets/characters/player_can_credits.notes.translation", "res://assets/characters/player_can_credits.authors.translation", "res://assets/characters/player_can_credits.licenses.translation", "res://assets/characters/player_can_credits.urls.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

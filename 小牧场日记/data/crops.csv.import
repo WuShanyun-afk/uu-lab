@@ -6,10 +6,10 @@ uid="uid://cyhr1yk5igist"
 
 [deps]
 
-files=["res://data/crops.name.translation", "res://data/crops.season.translation", "res://data/crops.grow.translation", "res://data/crops.seed.translation", "res://data/crops.sell.translation", "res://data/crops.regrow.translation", "res://data/crops.fertilize.translation"]
+files=["res://data/crops.name.translation", "res://data/crops.season.translation", "res://data/crops.grow.translation", "res://data/crops.seed.translation", "res://data/crops.sell.translation", "res://data/crops.regrow.translation", "res://data/crops.fertilize.translation", "res://data/crops.color.translation"]
 
 source_file="res://data/crops.csv"
-dest_files=["res://data/crops.name.translation", "res://data/crops.season.translation", "res://data/crops.grow.translation", "res://data/crops.seed.translation", "res://data/crops.sell.translation", "res://data/crops.regrow.translation", "res://data/crops.fertilize.translation"]
+dest_files=["res://data/crops.name.translation", "res://data/crops.season.translation", "res://data/crops.grow.translation", "res://data/crops.seed.translation", "res://data/crops.sell.translation", "res://data/crops.regrow.translation", "res://data/crops.fertilize.translation", "res://data/crops.color.translation"]
 
 [params]
 

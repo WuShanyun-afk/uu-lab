@@ -1,3 +1,10 @@
-id,name,kind,price,product,product_min,product_max,product_high,high_chance,feed_freq,mature_days,timed
-cow,奶牛,livestock,800,milk,1,2,milk_large,0.0,2,7,1
-chicken,鸡,poultry,200,egg,1,1,gold_egg,0.15,1,3,0
+id,name,kind,housing,price,product,product_min,product_max,product_high,high_chance,feed_freq,mature_days,produce_action,produce_window,produce_period,brushable,pet_limit
+cow,奶牛,livestock,barn,800,milk,1,2,milk_large,0.0,2,7,milk,180,1,1,2
+goat,山羊,livestock,barn,600,goat_milk,1,2,goat_milk_large,0.0,2,6,milk,180,1,1,2
+sheep,绵羊,livestock,barn,700,wool,1,1,wool_fine,0.0,2,5,shear,0,3,1,2
+alpaca,羊驼,livestock,barn,1600,alpaca_wool,1,2,alpaca_wool_fine,0.0,2,10,shear,0,4,1,2
+pig,猪,livestock,barn,1000,truffle,1,3,truffle_premium,0.0,2,6,gather,0,1,0,2
+chicken,鸡,poultry,coop,200,egg,1,1,gold_egg,0.15,1,3,gather,0,1,0,2
+duck,鸭,poultry,coop,350,duck_egg,1,1,duck_egg_jumbo,0.15,1,4,gather,0,1,0,2
+turkey,火鸡,poultry,coop,500,turkey_egg,1,1,turkey_egg_jumbo,0.12,1,5,gather,0,1,0,2
+bee,蜜蜂,special,hive,400,honey,1,1,royal_jelly,0.2,1,2,honey,0,4,0,0
