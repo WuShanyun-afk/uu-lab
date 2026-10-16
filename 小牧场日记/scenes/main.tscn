@@ -1,19 +1,128 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=30 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://scenes/player.tscn" id="2_player"]
 [ext_resource type="Script" path="res://scripts/farm/farm_layer.gd" id="3_farm"]
 [ext_resource type="Script" path="res://scripts/animal/animal_layer.gd" id="4_animals"]
+[ext_resource type="Script" path="res://scripts/world/ground_layer.gd" id="5_ground"]
+[ext_resource type="Script" path="res://scripts/farm/crop_layer.gd" id="6_crop"]
+[ext_resource type="Script" path="res://scripts/world/world_collision.gd" id="7_collision"]
+[ext_resource type="Script" path="res://scripts/world/sign_post.gd" id="8_sign"]
+[ext_resource type="Script" path="res://scripts/world/shipping_bin.gd" id="9_bin"]
+[ext_resource type="Script" path="res://scripts/weather/weather_vfx.gd" id="10_vfx"]
+[ext_resource type="Script" path="res://scripts/ui/clock_hud.gd" id="11_clock"]
+[ext_resource type="Script" path="res://scripts/world/seed_shop.gd" id="12_seedshop"]
+[ext_resource type="Script" path="res://scripts/world/animal_shop.gd" id="13_animalshop"]
+[ext_resource type="Script" path="res://scripts/ui/shop_ui.gd" id="14_shopui"]
+[ext_resource type="Script" path="res://scripts/ui/minigame_ui.gd" id="15_minigame"]
+[ext_resource type="Script" path="res://scripts/world/supply_shop.gd" id="16_supplyshop"]
+[ext_resource type="Script" path="res://scripts/world/breeding_shed.gd" id="17_shed"]
+[ext_resource type="Script" path="res://scripts/world/garden_gate.gd" id="18_gate"]
+[ext_resource type="Script" path="res://scripts/world/garden_portal.gd" id="19_portal"]
+[ext_resource type="Script" path="res://scripts/world/garden_collision.gd" id="20_gardencol"]
+[ext_resource type="Script" path="res://scripts/world/garden_decor.gd" id="21_gardendecor"]
+[ext_resource type="Script" path="res://scripts/ui/dialogue_ui.gd" id="22_dialogue"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_sign"]
+size = Vector2(26, 26)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_bin"]
+size = Vector2(30, 26)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_shop"]
+size = Vector2(30, 26)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_shed"]
+size = Vector2(44, 30)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_gate"]
+size = Vector2(34, 40)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_portal"]
+size = Vector2(30, 30)
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_main")
 
 [node name="World" type="Node2D" parent="."]
 
-[node name="GroundLayer" type="Node2D" parent="World"]
+[node name="GroundLayer" type="TileMapLayer" parent="World"]
+z_index = -1
+script = ExtResource("5_ground")
 
 [node name="FarmLayer" type="Node2D" parent="World"]
 script = ExtResource("3_farm")
+
+[node name="SoilLayer" type="TileMapLayer" parent="World/FarmLayer"]
+
+[node name="CropLayer" type="Node2D" parent="World/FarmLayer"]
+script = ExtResource("6_crop")
+
+[node name="GardenDecor" type="Node2D" parent="World"]
+z_index = -1
+script = ExtResource("21_gardendecor")
+
+[node name="WorldCollision" type="StaticBody2D" parent="World"]
+script = ExtResource("7_collision")
+
+[node name="GardenCollision" type="StaticBody2D" parent="World"]
+script = ExtResource("20_gardencol")
+
+[node name="SignPost" type="Area2D" parent="World"]
+position = Vector2(352, 176)
+script = ExtResource("8_sign")
+
+[node name="SignShape" type="CollisionShape2D" parent="World/SignPost"]
+shape = SubResource("RectangleShape2D_sign")
+
+[node name="SeedShop" type="Area2D" parent="World"]
+position = Vector2(416, 176)
+script = ExtResource("12_seedshop")
+
+[node name="SeedShopShape" type="CollisionShape2D" parent="World/SeedShop"]
+shape = SubResource("RectangleShape2D_shop")
+
+[node name="AnimalShop" type="Area2D" parent="World"]
+position = Vector2(416, 248)
+script = ExtResource("13_animalshop")
+
+[node name="AnimalShopShape" type="CollisionShape2D" parent="World/AnimalShop"]
+shape = SubResource("RectangleShape2D_shop")
+
+[node name="SupplyShop" type="Area2D" parent="World"]
+position = Vector2(480, 248)
+script = ExtResource("16_supplyshop")
+
+[node name="SupplyShopShape" type="CollisionShape2D" parent="World/SupplyShop"]
+shape = SubResource("RectangleShape2D_shop")
+
+[node name="BreedingShed" type="Area2D" parent="World"]
+position = Vector2(600, 288)
+script = ExtResource("17_shed")
+
+[node name="ShedShape" type="CollisionShape2D" parent="World/BreedingShed"]
+shape = SubResource("RectangleShape2D_shed")
+
+[node name="GardenGate" type="Area2D" parent="World"]
+position = Vector2(744, 288)
+script = ExtResource("18_gate")
+
+[node name="GateShape" type="CollisionShape2D" parent="World/GardenGate"]
+shape = SubResource("RectangleShape2D_gate")
+
+[node name="GardenPortal" type="Area2D" parent="World"]
+position = Vector2(880, 360)
+script = ExtResource("19_portal")
+
+[node name="PortalShape" type="CollisionShape2D" parent="World/GardenPortal"]
+shape = SubResource("RectangleShape2D_portal")
+
+[node name="ShippingBin" type="Area2D" parent="World"]
+position = Vector2(480, 176)
+script = ExtResource("9_bin")
+
+[node name="BinShape" type="CollisionShape2D" parent="World/ShippingBin"]
+shape = SubResource("RectangleShape2D_bin")
 
 [node name="YSortRoot" type="Node2D" parent="World"]
 y_sort_enabled = true
@@ -30,16 +139,69 @@ color = Color(1, 1, 1, 1)
 
 [node name="UI" type="CanvasLayer" parent="."]
 
+[node name="WeatherVFX" type="Node2D" parent="UI"]
+script = ExtResource("10_vfx")
+
+[node name="ClockBg" type="ColorRect" parent="UI"]
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -196.0
+offset_top = 2.0
+offset_right = -4.0
+offset_bottom = 78.0
+color = Color(0, 0, 0, 0.42)
+
+[node name="ClockPanel" type="Label" parent="UI"]
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -190.0
+offset_top = 5.0
+offset_right = -8.0
+offset_bottom = 74.0
+theme_override_font_sizes/font_size = 10
+horizontal_alignment = 2
+script = ExtResource("11_clock")
+
 [node name="HUD" type="Label" parent="UI"]
 offset_left = 8.0
-offset_top = 6.0
+offset_top = 4.0
 offset_right = 632.0
 offset_bottom = 46.0
+theme_override_font_sizes/font_size = 10
+autowrap_mode = 3
 text = "小牧场日记"
+
+[node name="ToolBar" type="Label" parent="UI"]
+offset_left = 8.0
+offset_top = 260.0
+offset_right = 632.0
+offset_bottom = 290.0
+theme_override_font_sizes/font_size = 9
+text = ""
+
+[node name="Prompt" type="Label" parent="UI"]
+offset_left = 8.0
+offset_top = 292.0
+offset_right = 632.0
+offset_bottom = 310.0
+theme_override_font_sizes/font_size = 11
+horizontal_alignment = 1
+text = ""
 
 [node name="Tip" type="Label" parent="UI"]
 offset_left = 8.0
-offset_top = 322.0
+offset_top = 314.0
 offset_right = 632.0
-offset_bottom = 354.0
+offset_bottom = 350.0
+theme_override_font_sizes/font_size = 10
+autowrap_mode = 3
 text = ""
+
+[node name="ShopPanel" type="Control" parent="UI"]
+script = ExtResource("14_shopui")
+
+[node name="Minigame" type="Control" parent="UI"]
+script = ExtResource("15_minigame")
+
+[node name="Dialogue" type="Control" parent="UI"]
+script = ExtResource("22_dialogue")
