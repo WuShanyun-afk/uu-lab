@@ -54,6 +54,51 @@ static func fence_walls() -> Array[Rect2]:
 	return out
 
 # ============================================================================
+# 棚舍分栏（模块 6 需求 A）
+# ============================================================================
+#
+# 围栏内横向切三段，每段对应一种棚舍。动物按 animals.csv 的 housing 列
+# 自动落到自己那段里活动（见 Housing.zone_rect / main._clamp_animals_to_zones）。
+#
+#   y 64 ───────────── 围栏顶
+#   y 72..112   [畜舍]      [禽舍]      [蜂箱]     ← 建筑向上长
+#   y 120..250  barn 区     coop 区     hive 区    ← 动物活动
+#   y 256 ───────────── 围栏底
+#
+# ⚠️ 三块 zone 必须都在 PEN 里、互不重叠、且不压到建筑 —— 测试会断言这三条。
+# ⚠️ 别改 PEN / GATE：模块 1 的碰撞测试按那组矩形钉死了。
+
+const PEN_ZONES := {
+	&"barn": Rect2(516, 120, 68, 130),
+	&"coop": Rect2(588, 120, 68, 130),
+	&"hive": Rect2(660, 120, 72, 130),
+}
+
+## 棚舍建筑的地面中心点（建筑向上画，所以这是「脚下」那一点）
+const BARN_SLOTS := {
+	&"barn": Vector2(552, 112),
+	&"coop": Vector2(624, 112),
+	&"hive": Vector2(700, 112),
+}
+
+## 某种棚舍的活动区；不认识的 housing 返回整个围栏（兜底，不崩）
+static func zone_rect(housing_id: StringName) -> Rect2:
+	if PEN_ZONES.has(housing_id):
+		return PEN_ZONES[housing_id]
+	return PEN
+
+## 某种棚舍建筑的位置
+static func barn_slot(housing_id: StringName) -> Vector2:
+	return BARN_SLOTS.get(housing_id, PEN.get_center())
+
+## 给定坐标属于哪块 zone（不在任何 zone 里返回 &""）—— 出生点夹取用
+static func zone_at(pos: Vector2) -> StringName:
+	for id in PEN_ZONES.keys():
+		if PEN_ZONES[id].has_point(pos):
+			return id
+	return &""
+
+# ============================================================================
 # 秘密花园（模块 5 需求 5）—— 主地图右侧的一块独立区域
 # ============================================================================
 #

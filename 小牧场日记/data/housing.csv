@@ -1,0 +1,4 @@
+id,name,price,material,material_count,base_capacity,capacity_step,max_level
+barn,畜舍,900,wood,15,4,3,3
+coop,禽舍,450,wood,8,6,3,3
+hive,蜂箱,300,wood,5,3,2,3

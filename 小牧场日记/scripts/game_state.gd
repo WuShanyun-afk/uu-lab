@@ -17,6 +17,10 @@ var inventory: Dictionary = {}     ## StringName -> int
 var garden_unlocked: bool = false
 var shed_built: bool = false
 
+## 棚舍等级（模块 6）：StringName(housing_id) -> int(level)。0 / 缺省 = 没盖。
+## 为什么不塞进 flag：flag 是 bool，棚舍是「有等级的容器」，必须能查等级。
+var barns: Dictionary = {}
+
 func add_gold(n: int) -> void:
 	gold += n
 	gold_changed.emit(gold)
@@ -65,9 +69,29 @@ func has_flag(name: StringName) -> bool:
 			return shed_built
 	return false
 
+# ---------------- 棚舍等级（模块 6）----------------
+
+func barn_level(id: StringName) -> int:
+	return int(barns.get(id, 0))
+
+func has_barn(id: StringName) -> bool:
+	return barn_level(id) > 0
+
+func set_barn_level(id: StringName, level: int) -> void:
+	if level <= 0:
+		barns.erase(id)
+	else:
+		barns[id] = level
+	flag_changed.emit(StringName("barn:" + String(id)), level > 0)
+
+## 所有棚舍等级的快照（传给 Housing 纯逻辑函数用，避免它直接依赖 autoload）
+func barn_levels() -> Dictionary:
+	return barns.duplicate()
+
 func reset() -> void:
 	gold = 500
 	inventory.clear()
 	garden_unlocked = false
 	shed_built = false
+	barns.clear()
 	gold_changed.emit(gold)

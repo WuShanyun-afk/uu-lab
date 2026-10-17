@@ -19,6 +19,12 @@ extends Node2D
 ##   ④ 治病：空手对着生病的动物按 E → 消耗药剂 → AnimalState.cure()
 ##   ⑤ 繁殖：繁殖棚只发 shop_requested(&"breed")，这里判断「盖房 / 选父母」，规则在 Breeding
 ##   ⑥ 花园：Herd.all_species_awakened() → 解锁 → EventBus.portal_used 传送 + 换相机 limit
+##
+## 模块 6 的两条链路：
+##   ⑦ 棚舍：三栋 HousingBarn 只发 housing_upgrade_requested → 这里扣钱扣木材升等级；
+##          容量规则全在 Housing（纯逻辑），动物按 housing 列自动分区活动
+##   ⑧ 换装：AnimalNode 自己按 res://assets/sprites/animals/<species>_32.png 找素材，
+##          有就画真图、没有就退回 _draw() 占位 —— 本文件一行都不用改
 
 ## 挤奶黄金窗口的兜底值（真值来自 animals.csv 的 produce_window 列）
 const MILK_WINDOW_MINUTES := 180
@@ -35,12 +41,9 @@ const SUPPLY_ITEMS: Array[StringName] = [&"feed", &"medicine", &"wood"]
 const MEDICINE := &"medicine"
 const WOOD := &"wood"
 
-## 新动物进牧场的落点（围栏内、避开栅栏与门洞）。按顺序找第一个空位。
-const SPAWN_SLOTS: Array[Vector2] = [
-	Vector2(544, 120), Vector2(608, 120), Vector2(672, 120), Vector2(712, 120),
-	Vector2(544, 184), Vector2(608, 184), Vector2(672, 184), Vector2(712, 184),
-	Vector2(544, 240), Vector2(608, 240), Vector2(672, 240), Vector2(712, 240),
-]
+## 新动物进牧场的落点（模块 6 起不再写死一张表）：
+##   动物按 animals.csv 的 housing 列落进自己的子栏，
+##   网格点由 `_zone_slots()` 从 WorldConfig.PEN_ZONES 现算 —— 改分栏只改 WorldConfig。
 
 @onready var _player: Player = $World/YSortRoot/Player
 @onready var _light: CanvasModulate = $CanvasModulate
@@ -81,6 +84,7 @@ func _ready() -> void:
 	_give_starter_items()
 
 	_herd = Herd.new(20261015)
+	_init_barns()                # 模块 6：开局三栋棚舍都是 Lv1（牧场遗产，不是白手起家）
 	_setup_animals()
 	_animal_layer.herd = _herd
 	_animal_layer.rebuild()
@@ -97,6 +101,7 @@ func _ready() -> void:
 	EventBus.shop_requested.connect(_open_shop)
 	EventBus.portal_used.connect(_on_portal)                 # 模块 5
 	EventBus.dialogue_requested.connect(_on_dialogue)        # 模块 5
+	EventBus.housing_upgrade_requested.connect(_on_housing_upgrade)   # 模块 6
 	_shop.buy_requested.connect(_on_buy)
 	_minigame.finished.connect(_on_minigame_finished)
 	_minigame.cancelled.connect(_on_minigame_cancelled)
@@ -107,6 +112,7 @@ func _ready() -> void:
 	_refresh_light()
 	_apply_camera_limits()
 	_sync_garden()
+	_refresh_barns()             # 模块 6：三栋棚舍的「住了几只」开局就填上
 	_refresh_hud()
 	_refresh_toolbar()
 	_say("WASD 移动 · E 用工具/交互 · 1-7 换工具 · Tab 换种子 · F11 全屏")
@@ -158,15 +164,18 @@ func _toggle_fullscreen() -> void:
 
 func _setup_animals() -> void:
 	# ⚠️ 第 0 只必须是奶牛：test_weather.gd 用 _herd.animals[0] 断言「雨天留棚 +3」
-	var cow1 := _herd.add(&"cow", 300, Vector2(576, 152))
-	_herd.add(&"cow", 150, Vector2(664, 152))
-	var c1 := _herd.add(&"chicken", 250, Vector2(560, 214))
-	var c2 := _herd.add(&"chicken", 400, Vector2(620, 222))
-	_herd.add(&"chicken", 100, Vector2(680, 208))
+	# ⚠️ 坐标全部落在 WorldConfig.PEN_ZONES 各自的子栏里（模块 6）：
+	#    barn 516..584 / coop 588..656 / hive 660..732，y 120..250。
+	#    摆错栏的话开局就会有动物站在别人的棚舍底下，_clamp_animals_to_zones 会在跨日拉回来。
+	var cow1 := _herd.add(&"cow", 300, Vector2(536, 158))
+	_herd.add(&"cow", 150, Vector2(566, 200))
+	var c1 := _herd.add(&"chicken", 250, Vector2(604, 152))
+	var c2 := _herd.add(&"chicken", 400, Vector2(638, 190))
+	_herd.add(&"chicken", 100, Vector2(602, 232))
 	# 模块 4 的展示阵容：羊（剪毛周期 3 天）、鸭、蜜蜂（采蜜周期 4 天）
-	_herd.add(&"sheep", 220, Vector2(544, 120))
-	_herd.add(&"duck", 180, Vector2(712, 120))
-	_herd.add(&"bee", 300, Vector2(544, 240))
+	_herd.add(&"sheep", 220, Vector2(540, 236))
+	_herd.add(&"duck", 180, Vector2(638, 228))
+	_herd.add(&"bee", 300, Vector2(698, 168))
 	for a in _herd.animals:
 		a.debug_grow_adult()
 	# 开局先给一次产出，方便立刻试「挤奶 / 捡蛋 / 剪毛 / 采蜜」
@@ -184,7 +193,7 @@ func _setup_animals() -> void:
 	# ⚠️ 必须加在**最后**：模块 4 的测试按索引取动物（animals[5] = 绵羊、animals[7] = 蜜蜂），
 	#    往中间插一只会把那两个索引顶偏。
 	# 3 心而不是 0 心：0 心 + 连续漏喂会直接走生病分支，开局就病一只太劝退。
-	_herd.add(&"turkey", 300, Vector2(664, 244))
+	_herd.add(&"turkey", 300, Vector2(620, 248))
 
 # ---------------- 工具 ----------------
 
@@ -515,20 +524,33 @@ func _seed_entries() -> Array:
 	return out
 
 ## 货架 = AnimalDB 全表，按价格升序
+## 模块 6：棚舍满了 / 没盖 → 这一行变灰并写明原因（别让玩家点了没反应）
 func _animal_entries() -> Array:
 	var out: Array = []
+	var barns := GameState.barn_levels()
 	for id in AnimalDB.ids_by_price():
 		var a: AnimalData = AnimalDB.get_animal(id)
 		var afford := GameState.gold >= a.price
+		var room := Housing.can_house(id, _herd, barns)
+		var h := Housing.housing_of(id)
+		var note := "%s·%s·%s·成年%d天·有%d" % [
+			a.housing_name(), a.action_name(), a.period_text(),
+			a.mature_days, _herd.count_species(id)]
+		if room != Housing.Reason.OK:
+			note += "·%s %d/%d" % [HousingDB.name_of(h),
+				Housing.count_in(_herd, h), Housing.capacity(barns, h)]
+		var why := ""
+		if not afford:
+			why = "钱不够"
+		elif room != Housing.Reason.OK:
+			why = Housing.reason_text(room)
 		out.append({
 			"id": id,
 			"name": a.display_name,
 			"price": a.price,
-			"note": "%s·%s·%s·成年%d天·有%d" % [
-				a.housing_name(), a.action_name(), a.period_text(),
-				a.mature_days, _herd.count_species(id)],
-			"enabled": afford,
-			"reason": "钱不够" if not afford else "",
+			"note": note,
+			"enabled": afford and room == Housing.Reason.OK,
+			"reason": why,
 		})
 	return out
 
@@ -641,10 +663,16 @@ func _do_breed(a: AnimalState, b: AnimalState) -> void:
 	var fail := ""
 	if reason != Breeding.Reason.OK:
 		fail = Breeding.reason_text(reason)
-	elif GameState.gold < Breeding.GOLD_COST:
-		fail = "手续费不够（%dG）" % Breeding.GOLD_COST
-	elif GameState.count_item(&"feed") < Breeding.FEED_COST:
-		fail = "饲料不够（要 %d 份）" % Breeding.FEED_COST
+	else:
+		# 模块 6：繁殖前也要看棚舍还有没有床位（生下来没地方住就是白配）
+		var room := Housing.can_house(a.species, _herd, GameState.barn_levels())
+		if room != Housing.Reason.OK:
+			fail = "%s%s" % [HousingDB.name_of(Housing.housing_of(a.species)),
+				Housing.reason_text(room)]
+		elif GameState.gold < Breeding.GOLD_COST:
+			fail = "手续费不够（%dG）" % Breeding.GOLD_COST
+		elif GameState.count_item(&"feed") < Breeding.FEED_COST:
+			fail = "饲料不够（要 %d 份）" % Breeding.FEED_COST
 
 	if fail != "":
 		_say("配不了：%s" % fail)
@@ -699,8 +727,13 @@ func _on_buy(entry_id: StringName) -> void:
 			bought = true
 	elif animal != null:
 		spent = animal.price
+		var room := Housing.can_house(entry_id, _herd, GameState.barn_levels())
+		if room != Housing.Reason.OK:
+			_say("%s：%s（对着棚舍按 E 扩建）" % [animal.display_name,
+				Housing.reason_text(room)])
+			return
 		if GameState.spend_gold(spent):
-			var st := _herd.add(entry_id, 0, _free_spawn_pos())
+			var st := _herd.add(entry_id, 0, _free_spawn_pos(entry_id))
 			if st == null:
 				GameState.add_gold(spent)      # 放不下就退钱
 				_say("牧场满了，钱退给你了")
@@ -733,12 +766,92 @@ func _refresh_shop() -> void:
 		SHOP_BREED:
 			_shop.update_entries(_breed_entries())
 
-## 围栏内第一个没有动物的落点
-func _free_spawn_pos() -> Vector2:
-	for p in SPAWN_SLOTS:
-		if _herd.nearest(p, 20.0) == null:
+## 围栏内第一个没有动物的落点（模块 6：按物种落进自己的子栏）
+func _free_spawn_pos(species: StringName = &"") -> Vector2:
+	var zone := WorldConfig.PEN
+	var h := Housing.housing_of(species)
+	if h != &"":
+		zone = WorldConfig.zone_rect(h)
+	var cands := _zone_slots(zone)
+	for p in cands:
+		if _herd.nearest(p, 18.0) == null:
 			return p
-	return SPAWN_SLOTS[_herd.size() % SPAWN_SLOTS.size()]
+	return cands[_herd.size() % cands.size()]
+
+## 一块 zone 内均匀撒 3×3 个候选点（不写死坐标表，改分栏只改 WorldConfig）
+func _zone_slots(z: Rect2) -> Array[Vector2]:
+	var out: Array[Vector2] = []
+	var cols := 3
+	var rows := 3
+	for r in range(rows):
+		for c in range(cols):
+			out.append(Vector2(
+				z.position.x + z.size.x * (float(c) + 0.5) / float(cols),
+				z.position.y + z.size.y * (float(r) + 0.5) / float(rows)))
+	return out
+
+# ---------------- 棚舍（模块 6 需求 A）----------------
+
+## 开局：三栋棚舍都是 Lv1。牧场有牛有鸡有蜂，从空地开始盖会自相矛盾。
+func _init_barns() -> void:
+	for id in HousingDB.all_ids():
+		if GameState.barn_level(id) <= 0:
+			GameState.set_barn_level(id, 1)
+
+func _barn_nodes() -> Array:
+	var out: Array = []
+	for n in get_tree().get_nodes_in_group("housing_barn"):
+		if n is HousingBarn:
+			out.append(n)
+	return out
+
+## 把「住了几只」写进建筑节点（建筑自己不去摸 herd，保持零耦合）
+func _refresh_barns() -> void:
+	for n in _barn_nodes():
+		n.used_slots = Housing.count_in(_herd, n.housing_id)
+		n.queue_redraw()
+
+## 建筑按 E：盖房 / 扩建。价格与木材全是公式（HousingDB），这里只扣款与升级。
+func _on_housing_upgrade(housing_id: StringName) -> void:
+	if not HousingDB.has(housing_id):
+		return
+	var nm := HousingDB.name_of(housing_id)
+	var lv := GameState.barn_level(housing_id)
+	var max_lv := HousingDB.max_level_of(housing_id)
+	if lv >= max_lv:
+		_say("%s 已经满级 Lv%d（可养 %d 只）" % [nm, lv,
+			HousingDB.capacity_at(housing_id, lv)])
+		return
+	var price := HousingDB.upgrade_price(housing_id, lv)
+	var mat := HousingDB.material_of(housing_id)
+	var need := HousingDB.upgrade_material_count(housing_id, lv)
+	if GameState.gold < price:
+		_say("%s%s要 %dG，还差 %dG" % ["建造" if lv <= 0 else "扩建", nm,
+			price, price - GameState.gold])
+		return
+	if GameState.count_item(mat) < need:
+		_say("还缺 %s×%d（杂货铺有卖）" % [ProductDB.display_name(mat),
+			need - GameState.count_item(mat)])
+		return
+	GameState.spend_gold(price)
+	GameState.remove_item(mat, need)
+	GameState.set_barn_level(housing_id, lv + 1)
+	_refresh_barns()
+	_refresh_hud()
+	_refresh_shop()                 # 容量变了，动物商店的灰行要跟着变
+	EventBus.housing_upgraded.emit(housing_id, lv + 1)
+	_say("%s 升到 Lv%d · 可养 %d 只（-%dG 木材×%d）" % [nm, lv + 1,
+		HousingDB.capacity_at(housing_id, lv + 1), price, need])
+
+## 把跑出自己子栏的动物拉回来（买来 / 生崽 / 换分栏规格之后都要跑一次）
+func _clamp_animals_to_zones() -> void:
+	for a in _herd.animals:
+		var z := Housing.zone_rect(a.species)
+		if z.has_point(a.pos):
+			continue
+		a.pos = Vector2(
+			clampf(a.pos.x, z.position.x + 10.0, z.end.x - 10.0),
+			clampf(a.pos.y, z.position.y + 12.0, z.end.y - 6.0))
 
 # ---------------- 时间 ----------------
 
@@ -753,11 +866,12 @@ func _on_day(_d: int, _s: int, _y: int) -> void:
 	for e in aevents:
 		if e["type"] == "birth" or e["type"] == "died":
 			restructure = true
+	_clamp_animals_to_zones()    # 模块 6：生崽会落在母亲旁边，可能跨栏
 	if restructure:
 		_animal_layer.rebuild()
 	else:
 		_animal_layer.refresh()
-	EventBus.animal_events.emit(aevents)
+	_refresh_barns()             # 模块 6：容量占用变了，建筑提示条要重画	EventBus.animal_events.emit(aevents)
 	_check_awakenings()          # 模块 5：留棚 +3 也可能把动物喂到 10 心
 	_sync_garden()
 	_refresh_hud()
@@ -1026,9 +1140,11 @@ func _refresh_hud() -> void:
 	# 日期 / 时间 / 天气已交给右上角的 ClockHUD，这里只管资源，不再重复。
 	# 分三行：觉醒进度 / 牧群 / 背包。一行塞不下会撞到右上角时钟（模块 4 踩过）。
 	var garden := " 🌸秘密花园" if GameState.garden_unlocked else ""
-	_hud.text = "💰%dG   工具[%s]   觉醒 %d/%d%s\n动物[%s] 总心 %d   地[%d 株 · 肥 %d 格]\n背包: %s" % [
+	# 棚舍占用（模块 6）放第一行 —— 第一行最短，第三行背包会溢出到时钟底下
+	var barns := Housing.summary_text(_herd, GameState.barn_levels())
+	_hud.text = "💰%dG   工具[%s]   觉醒 %d/%d%s   棚舍 %s\n动物[%s] 总心 %d   地[%d 株 · 肥 %d 格]\n背包: %s" % [
 		GameState.gold, Player.TOOL_LABEL[_player.current_tool],
-		_herd.awakened_species_count(), AnimalDB.all_ids().size(), garden,
+		_herd.awakened_species_count(), AnimalDB.all_ids().size(), garden, barns,
 		_animal_summary(), _herd.total_hearts(),
 		_grid.crop_count(), _grid.fertilized_count(), inv,
 	]

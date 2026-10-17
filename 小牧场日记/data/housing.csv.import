@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://by1py5q4vwvfc"
+
+[deps]
+
+files=["res://data/housing.name.translation", "res://data/housing.price.translation", "res://data/housing.material.translation", "res://data/housing.material.translation", "res://data/housing.base.translation", "res://data/housing.capacity.translation", "res://data/housing.max.translation"]
+
+source_file="res://data/housing.csv"
+dest_files=["res://data/housing.name.translation", "res://data/housing.price.translation", "res://data/housing.material.translation", "res://data/housing.material.translation", "res://data/housing.base.translation", "res://data/housing.capacity.translation", "res://data/housing.max.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

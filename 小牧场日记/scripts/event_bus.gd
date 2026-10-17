@@ -81,3 +81,12 @@ signal portal_used(dest: StringName)
 ## 建筑落成（模块 5：繁殖棚）
 signal building_built(building_id: StringName)
 
+# ---------------- 模块 6 ----------------
+
+## 请求扩建某种棚舍（畜舍 / 禽舍 / 蜂箱）。建筑节点只发这个，
+## 「够不够钱、升到几级」由 main 判断（和繁殖棚同一套写法）。
+signal housing_upgrade_requested(housing_id: StringName)
+
+## 棚舍升级完成（housing_id, 新等级）
+signal housing_upgraded(housing_id: StringName, level: int)
+
