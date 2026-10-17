@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://d0pmg2mlpdsmm"
+
+[deps]
+
+files=["res://data/upgrades.tool.translation", "res://data/upgrades.level.translation", "res://data/upgrades.price.translation", "res://data/upgrades.material.translation", "res://data/upgrades.material.translation", "res://data/upgrades.name.translation", "res://data/upgrades.note.translation"]
+
+source_file="res://data/upgrades.csv"
+dest_files=["res://data/upgrades.tool.translation", "res://data/upgrades.level.translation", "res://data/upgrades.price.translation", "res://data/upgrades.material.translation", "res://data/upgrades.material.translation", "res://data/upgrades.name.translation", "res://data/upgrades.note.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

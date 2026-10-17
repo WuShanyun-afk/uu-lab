@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://d2y7ajf6prgow"
+
+[deps]
+
+files=["res://data/recipes.input.translation", "res://data/recipes.count.translation", "res://data/recipes.minutes.translation"]
+
+source_file="res://data/recipes.csv"
+dest_files=["res://data/recipes.input.translation", "res://data/recipes.count.translation", "res://data/recipes.minutes.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

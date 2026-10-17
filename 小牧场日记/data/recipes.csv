@@ -1,0 +1,12 @@
+output,input,count,minutes
+cheese,milk,2,120
+fine_cheese,milk_large,1,180
+goat_cheese,goat_milk,2,120
+yarn,wool,2,180
+fine_yarn,wool_fine,1,240
+alpaca_yarn,alpaca_wool,1,240
+mayonnaise,egg,1,120
+gold_mayonnaise,gold_egg,1,180
+duck_mayo,duck_egg,1,120
+truffle_oil,truffle,1,240
+mead,honey,2,360

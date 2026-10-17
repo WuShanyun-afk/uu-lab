@@ -25,6 +25,17 @@ extends Node2D
 ##          容量规则全在 Housing（纯逻辑），动物按 housing 列自动分区活动
 ##   ⑧ 换装：AnimalNode 自己按 res://assets/sprites/animals/<species>_32.png 找素材，
 ##          有就画真图、没有就退回 _draw() 占位 —— 本文件一行都不用改
+##
+## 模块 7 的五条链路（经济与背包）：
+##   ⑨ 背包：GameState 真槽位（40/48/56 格）→ InventoryUI 网格 + 拖拽；
+##          「使用」的语义在本文件（种子 = 换当前种子），UI 只发 index
+##   ⑩ 商店：ToolShop 发 shop_requested(&"tool") → 这里拼升级货架；
+##          杂货铺按 T 切成 SELL 模式（sell_requested），成交在 _on_sell
+##   ⑪ 订单：OrderPost 发 shop_requested(&"order") → OrderBoard 纯逻辑出单，
+##          这里只负责「扣物品 / 加钱 / 广播」
+##   ⑫ 加工：CraftWorkshop 发 shop_requested(&"craft") → Processor 纯逻辑跑槽位，
+##          tick_advanced 里按游戏分钟推进
+##   ⑬ 行情：出货箱 / 订单 / 背包详情统一走 Market.price()，四因子在那边算完
 
 ## 挤奶黄金窗口的兜底值（真值来自 animals.csv 的 produce_window 列）
 const MILK_WINDOW_MINUTES := 180
@@ -33,6 +44,9 @@ const SHOP_SEED := &"seed"
 const SHOP_ANIMAL := &"animal"
 const SHOP_SUPPLY := &"supply"     ## 模块 5：杂货铺（饲料 / 药剂 / 木材）
 const SHOP_BREED := &"breed"       ## 模块 5：繁殖棚（盖房 or 选父母）
+const SHOP_TOOL := &"tool"         ## 模块 7：工具铺（锄头 / 洒水壶 / 背包升级）
+const SHOP_ORDER := &"order"       ## 模块 7：订单板（NPC 委托）
+const SHOP_CRAFT := &"craft"       ## 模块 7：加工坊（放料 / 取货）
 
 ## 杂货铺卖的东西（价格一律来自 products.csv）
 const SUPPLY_ITEMS: Array[StringName] = [&"feed", &"medicine", &"wood"]
@@ -52,6 +66,7 @@ const WOOD := &"wood"
 @onready var _prompt: Label = $UI/Prompt
 @onready var _toolbar: Label = $UI/ToolBar
 @onready var _shop: ShopUI = $UI/ShopPanel
+@onready var _inv: InventoryUI = $UI/InventoryPanel
 @onready var _minigame: MinigameUI = $UI/Minigame
 @onready var _dialogue: DialogueUI = $UI/Dialogue
 @onready var _farm_layer: Node2D = $World/FarmLayer
@@ -60,12 +75,14 @@ const WOOD := &"wood"
 @onready var _gate: GardenGate = $World/GardenGate
 @onready var _shed: BreedingShed = $World/BreedingShed
 @onready var _decor: GardenDecor = $World/GardenDecor
+@onready var _order_post: OrderPost = $World/OrderPost
+@onready var _workshop: CraftWorkshop = $World/CraftWorkshop
 
 var _grid: FarmGrid
 var _herd: Herd
 var _last_tip := ""
 var _tip_until := 0.0
-## 商店里正在卖什么（种子 / 动物 / 杂货 / 繁殖）—— 成交后要按同一份货架刷新
+## 商店里正在卖什么（种子 / 动物 / 杂货 / 繁殖 / 工具 / 订单 / 加工）—— 成交后按同一份货架刷新
 var _shop_kind: StringName = &""
 ## 正在等节奏条结果的那只动物
 var _pending_animal: AnimalState = null
@@ -75,6 +92,10 @@ var _breed_picks: Array[StringName] = []
 var _zone_garden := false
 ## 灾害判定专用（栅栏损坏 / 雷击烧作物）—— 和玩法随机分开，避免污染主随机流
 var _storm_rng := RandomNumberGenerator.new()
+## 模块 7：订单板（纯逻辑，随本局存活；将来存档时整坨序列化）
+var _orders := OrderBoard.new(20261101)
+## 模块 7：加工坊（纯逻辑，槽位 2 个；Lv2/Lv3 的 4/6 槽接口已在 Processor 里）
+var _proc := Processor.new(1)
 
 func _ready() -> void:
 	_storm_rng.seed = 20261022
@@ -103,6 +124,10 @@ func _ready() -> void:
 	EventBus.dialogue_requested.connect(_on_dialogue)        # 模块 5
 	EventBus.housing_upgrade_requested.connect(_on_housing_upgrade)   # 模块 6
 	_shop.buy_requested.connect(_on_buy)
+	_shop.sell_requested.connect(_on_sell)          # 模块 7：回收（SELL 模式）
+	_shop.mode_toggle_requested.connect(_on_mode_toggle)
+	_inv.use_requested.connect(_on_inv_use)         # 模块 7：背包里「使用」
+	_inv.drop_requested.connect(_on_inv_drop)       # 模块 7：背包里「丢弃」
 	_minigame.finished.connect(_on_minigame_finished)
 	_minigame.cancelled.connect(_on_minigame_cancelled)
 	GameState.gold_changed.connect(_on_gold)
@@ -113,9 +138,11 @@ func _ready() -> void:
 	_apply_camera_limits()
 	_sync_garden()
 	_refresh_barns()             # 模块 6：三栋棚舍的「住了几只」开局就填上
+	_init_workshop()             # 模块 7：加工坊等级 + 节点状态
+	_tick_orders()               # 模块 7：开局就刷 2 单（day 1 - (-999) >= 3）
 	_refresh_hud()
 	_refresh_toolbar()
-	_say("WASD 移动 · E 用工具/交互 · 1-7 换工具 · Tab 换种子 · F11 全屏")
+	_say("WASD 移动 · E 用工具/交互 · 1-7 换工具 · Tab 换种子 · I 背包 · F11 全屏")
 
 ## 开局补给：
 ##   · 每季作物各 3 颗种子（模块 4 起种子是要消耗的背包物品，种子商店能补货）
@@ -152,6 +179,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_F11:
 			_toggle_fullscreen()
+		elif event.keycode == KEY_I:
+			# 背包自己会吃掉「关」的那一次（它在树里更靠后，先收到 unhandled_input），
+			# 所以这里只负责「开」。商店 / 对话弹着的时候不许开背包。
+			if not EventBus.ui_modal:
+				_inv.open()
 
 func _toggle_fullscreen() -> void:
 	var fs := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
@@ -215,14 +247,7 @@ func _on_tool_used(tool: int, cell: Vector2i) -> void:
 		Player.Tool.HOE:
 			_hoe(cell)
 		Player.Tool.CAN:
-			if _grid.water(cell):
-				_say("浇水")
-				_player.play_watering()
-				_farm_layer.refresh()
-			elif WeatherSystem.is_wet():
-				_say("雨天不用浇水，地是湿的")
-			else:
-				_say("这格还没锄（先用 1 锄头）")
+			_water(cell)
 		Player.Tool.SEED:
 			_plant(cell)
 		Player.Tool.FERT:
@@ -230,21 +255,88 @@ func _on_tool_used(tool: int, cell: Vector2i) -> void:
 		Player.Tool.FERT_HIGH:
 			_fertilize(cell, Fertilizer.Level.HIGH)
 
-# ---------------- 锄地（模块 3：顺带清理枯死作物）----------------
+# ---------------- 工具作用范围（模块 7 需求 2：工具升级）----------------
+
+## 一次工具作用到哪些格子。等级来自 GameState（1/2/3），数值见 data/upgrades.csv。
+##   Lv1 → 1 格
+##   Lv2 → 3 格直线（沿当前朝向往前推）
+##   Lv3 → 以目标格为中心的 3×3
+## 为什么把「范围」和「锄地 / 浇水」分开：范围是纯几何，能单独断言，
+## 而 _hoe / _water 只管对每个格子调 FarmGrid。
+func _tool_cells(cell: Vector2i, lv: int) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	if lv <= 1:
+		out.append(cell)
+		return out
+	if lv == 2:
+		var d := _facing_step()
+		for i in range(3):
+			out.append(cell + d * i)
+		return out
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			out.append(cell + Vector2i(dx, dy))
+	return out
+
+func _facing_step() -> Vector2i:
+	match _player.facing:
+		"up":
+			return Vector2i(0, -1)
+		"left":
+			return Vector2i(-1, 0)
+		"right":
+			return Vector2i(1, 0)
+	return Vector2i(0, 1)
+
+# ---------------- 锄地（模块 3：顺带清理枯死作物；模块 7：范围随等级）----------------
 
 func _hoe(cell: Vector2i) -> void:
-	var t := _grid.tile_at(cell)
-	var was_dead := t != null and t.dead
-	var was_tilled := t != null and t.tilled
-	if _grid.till(cell):
+	var cells := _tool_cells(cell, GameState.tool_level(&"hoe"))
+	var tilled := 0
+	var cleaned := 0
+	var already := 0
+	for c in cells:
+		if not _grid.in_bounds(c):
+			continue
+		var t := _grid.tile_at(c)
+		var was_dead := t != null and t.dead
+		if _grid.till(c):
+			tilled += 1
+			if was_dead:
+				cleaned += 1
+			if WeatherSystem.is_wet():
+				_grid.water(c)      # 雨天锄完就是湿的
+		elif t != null and t.tilled:
+			already += 1
+	if tilled > 0:
 		_player.play_hoe()
-		if WeatherSystem.is_wet():
-			_grid.water(cell)      # 雨天锄完就是湿的
-		_say("清理枯死作物，这块地又能种了" if was_dead else "锄地")
+		if cleaned > 0:
+			_say("清理枯死作物 %d 格，又能种了" % cleaned)
+		else:
+			_say("锄地 %d 格" % tilled if tilled > 1 else "锄地")
 		_farm_layer.refresh()
 		_refresh_toolbar()
-	elif was_tilled:
-		_say("这块地已经锄过了")
+	elif already > 0:
+		_say("这块地已经锄过了" if already == 1 else "这几格都锄过了")
+
+# ---------------- 浇水（模块 7：范围随等级）----------------
+
+func _water(cell: Vector2i) -> void:
+	var cells := _tool_cells(cell, GameState.tool_level(&"can"))
+	var n := 0
+	for c in cells:
+		if not _grid.in_bounds(c):
+			continue
+		if _grid.water(c):
+			n += 1
+	if n > 0:
+		_player.play_watering()
+		_say("浇水 %d 格" % n if n > 1 else "浇水")
+		_farm_layer.refresh()
+	elif WeatherSystem.is_wet():
+		_say("雨天不用浇水，地是湿的")
+	else:
+		_say("这格还没锄（先用 1 锄头）")
 
 # ---------------- 播种（模块 3 需求 1 / 3 + 模块 4 种子消耗）----------------
 
@@ -474,7 +566,7 @@ func _show_hint() -> void:
 # ---------------- 商店（模块 4 + 模块 5）----------------
 
 func _open_shop(shop_id: StringName) -> void:
-	if _shop.is_open() or _minigame.is_active() or _dialogue.is_open():
+	if _shop.is_open() or _minigame.is_active() or _dialogue.is_open() or _inv.is_open():
 		return
 	_shop_kind = shop_id
 	_breed_picks.clear()
@@ -483,7 +575,13 @@ func _open_shop(shop_id: StringName) -> void:
 	elif shop_id == SHOP_ANIMAL:
 		_shop.open("动物商店 · 买下直接放进牧场（成年）", _animal_entries())
 	elif shop_id == SHOP_SUPPLY:
-		_shop.open("杂货铺 · 饲料 / 药剂 / 木材（买下即入背包）", _supply_entries())
+		_shop.open("杂货铺 · 饲料 / 药剂 / 木材（T 键切成回收模式）", _supply_entries())
+	elif shop_id == SHOP_TOOL:
+		_shop.open("工具铺 · 升级（%s）" % _tool_levels_text(), _tool_entries())
+	elif shop_id == SHOP_ORDER:
+		_open_order_panel()
+	elif shop_id == SHOP_CRAFT:
+		_open_craft_panel()
 	elif shop_id == SHOP_BREED:
 		# 繁殖棚一个信号两件事：没盖就盖，盖了就配
 		if not GameState.has_flag(&"shed_built"):
@@ -579,6 +677,398 @@ func _supply_note(id: StringName) -> String:
 		&"wood":
 			return "盖繁殖棚要 %d 根" % BuildingDB.material_count_of(BreedingShed.BUILDING_ID)
 	return ""
+
+# ============================================================================
+# 模块 7 · 工具铺（需求 2）
+# ============================================================================
+#
+# 货架 = data/upgrades.csv 全表。每行都是「某工具升到某级」，
+# 已经拥有 / 买不起 / 缺材料就变灰并写明原因（同模块 6 的棚舍：别让玩家点了没反应）。
+
+func _tool_levels_text() -> String:
+	return "锄 Lv%d · 壶 Lv%d · 背包 %d 格" % [
+		GameState.tool_level(&"hoe"), GameState.tool_level(&"can"),
+		GameState.slot_capacity()]
+
+func _tool_entries() -> Array:
+	var out: Array = []
+	for uid in ItemDB.upgrade_ids():
+		var u := ItemDB.get_upgrade(uid)
+		var tool: StringName = u["tool"]
+		var cur := GameState.tool_level(tool)
+		var lv := int(u["level"])
+		var mat: StringName = u["material"]
+		var need := int(u["material_count"])
+		var have_mat := GameState.count_item(mat)
+		var price := int(u["price"])
+		var afford := GameState.gold >= price
+		var ok_mat := have_mat >= need
+		var owned := cur >= lv
+		var why := ""
+		if owned:
+			why = "已拥有"
+		elif not afford:
+			why = "钱不够"
+		elif not ok_mat:
+			why = "缺 %s×%d" % [ItemDB.display_name(mat), need - have_mat]
+		out.append({
+			"id": uid,
+			"name": str(u["name"]),
+			"price": price,
+			"note": "%s · 现在 Lv%d · 需 %s×%d" % [u["note"], cur,
+				ItemDB.display_name(mat), need],
+			"enabled": not owned and afford and ok_mat,
+			"reason": why,
+		})
+	return out
+
+## 买升级：先问「有没有更高级 / 钱够不够 / 材料够不够」，再一次性扣干净
+func _buy_upgrade(uid: StringName) -> bool:
+	var u := ItemDB.get_upgrade(uid)
+	if u.is_empty():
+		return false
+	var tool: StringName = u["tool"]
+	var lv := int(u["level"])
+	var price := int(u["price"])
+	var mat: StringName = u["material"]
+	var need := int(u["material_count"])
+	if GameState.tool_level(tool) >= lv:
+		_say("%s 已经拥有了" % u["name"])
+		return false
+	if GameState.gold < price:
+		_say("%s 要 %dG，还差 %dG" % [u["name"], price, price - GameState.gold])
+		return false
+	if GameState.count_item(mat) < need:
+		_say("还缺 %s×%d（杂货铺有卖）" % [ItemDB.display_name(mat),
+			need - GameState.count_item(mat)])
+		return false
+	GameState.spend_gold(price)
+	GameState.remove_item(mat, need)
+	GameState.set_tool_level(tool, lv)
+	EventBus.tool_upgraded.emit(tool, lv)
+	_say("%s 到手 · %s（-%dG %s×%d）" % [u["name"], u["note"], price,
+		ItemDB.display_name(mat), need])
+	_refresh_hud()
+	_refresh_toolbar()
+	return true
+
+# ============================================================================
+# 模块 7 · 订单板（需求 3）
+# ============================================================================
+#
+# OrderBoard 是纯逻辑（出单 / 过期 / 交付判定），本文件只做三件副作用：
+# 扣物品、加金币、广播。UI 复用 ShopUI（一张单 = 一行货架）。
+
+func _open_order_panel() -> void:
+	if _orders.active_count() <= 0:
+		_say("订单板空着 —— 每 %d 天会有新的委托" % OrderBoard.REFRESH_DAYS)
+		return
+	_shop.open("订单板 · 已完成 %d 单（报酬 = 行情价 × 数量 × 1.5）" % _orders.completed,
+		_order_entries(), "↑↓ 选单 · E 交付 · Esc 关掉")
+
+func _order_entries() -> Array:
+	var out: Array = []
+	for o in _orders.active_orders():
+		var chk := _orders.can_deliver(o, GameState.count_item)
+		var ok := bool(chk["ok"])
+		out.append({
+			"id": StringName("order:%d" % int(o["id"])),
+			"name": "%s 要 %s" % [o["npc"], ItemDB.display_name(o["item"])],
+			"price": int(o["reward"]),
+			"note": "×%d · 有 %d · %s" % [int(o["count"]),
+				GameState.count_item(o["item"]),
+				_orders.due_text(o, GameClock.day, GameClock.minutes)],
+			"enabled": ok,
+			"reason": "" if ok else str(chk.get("reason", "")),
+		})
+	return out
+
+## entry id 形如 "order:3" → 找到那张单
+func _find_order(entry_id: StringName) -> Dictionary:
+	var s := str(entry_id)
+	if not s.begins_with("order:"):
+		return {}
+	var oid := int(s.substr(6))
+	for o in _orders.orders:
+		if int(o["id"]) == oid:
+			return o
+	return {}
+
+func _on_order_deliver(entry_id: StringName) -> void:
+	var o := _find_order(entry_id)
+	if o.is_empty():
+		return
+	var chk := _orders.can_deliver(o, GameState.count_item)
+	if not bool(chk["ok"]):
+		_say("交不了：%s" % chk["reason"])
+		return
+	var res := _orders.deliver(o)
+	if res.is_empty():
+		return
+	GameState.remove_item(res["item"], int(res["count"]))
+	GameState.add_gold(int(res["reward"]))
+	_say("%s 收下 %s×%d · +%dG · 已完成 %d 单" % [res["npc"],
+		ItemDB.display_name(res["item"]), int(res["count"]), int(res["reward"]),
+		_orders.completed])
+	if bool(res["famous"]) and not GameState.has_flag(&"famous"):
+		GameState.set_flag(&"famous", true)
+		EventBus.dialogue_requested.emit("村长", [
+			"十单了。",
+			"村里人现在提起牧场，说的都是你的名字。",
+			"——「村中名人」，这称号你担得起。",
+		], Color("#E8C05A"))
+		_say("解锁成就「村中名人」（完成 %d 单）" % OrderBoard.FAMOUS_GOAL)
+	_refresh_orders()
+	if _shop.is_open() and _shop_kind == SHOP_ORDER:
+		if _orders.active_count() <= 0:
+			_shop.close()
+		else:
+			_shop.update_entries(_order_entries())
+	_refresh_hud()
+
+## 把订单状态灌进节点（节点不持有 OrderBoard）+ HUD 跟着刷新
+func _refresh_orders() -> void:
+	if _order_post != null:
+		_order_post.active_count = _orders.active_count()
+		_order_post.ready_now = _ready_order_count()
+		_order_post.queue_redraw()
+
+func _ready_order_count() -> int:
+	var n := 0
+	for o in _orders.active_orders():
+		if bool(_orders.can_deliver(o, GameState.count_item)["ok"]):
+			n += 1
+	return n
+
+# ============================================================================
+# 模块 7 · 加工坊（需求 4）
+# ============================================================================
+#
+# Processor 是纯逻辑（槽位 / 倒计时 / 取货），本文件负责：
+# 放料时扣原料、取货时进背包、每 tick 推进时间、把状态灌进节点。
+#
+# ⚠️ 原料按**品质**分别列货架。背包里「金星牛奶」和「牛奶」是两个 item id，
+#    只按基础 id 查会让金星牛奶做不了奶酪 —— 第一版就是这么错的。
+
+func _init_workshop() -> void:
+	_proc.set_level(1)
+	_refresh_workshop()
+
+func _refresh_workshop() -> void:
+	if _workshop == null:
+		return
+	_workshop.level = _proc.level
+	_workshop.used = _proc.used_slots()
+	_workshop.total = _proc.slot_count()
+	_workshop.ready_count = _proc.ready_count()
+	_workshop.status = _proc.status_text()
+	_workshop.queue_redraw()
+
+## 按 E：有成品就取货（不弹面板），没成品就弹「放料」
+func _open_craft_panel() -> void:
+	if _proc.ready_count() > 0:
+		_collect_crafts()
+		return
+	var entries := _craft_entries()
+	if entries.is_empty():
+		_say("没有能做的东西 —— 先去收点牛奶 / 羊毛 / 蛋")
+		return
+	_shop.open("加工坊 · 放料（%d/%d 槽 · 24 小时开工）" % [_proc.used_slots(),
+		_proc.slot_count()], entries, "↑↓ 选配方 · E 放料 · Esc 关掉")
+
+func _craft_entries() -> Array:
+	var out: Array = []
+	var free := _proc.first_free() >= 0
+	for rid in RecipeDB.all_ids():
+		var r := RecipeDB.get_recipe(rid)
+		for q in range(3):
+			var input_item := CropQuality.item_id(r["input"], q)
+			var have := GameState.count_item(input_item)
+			if have <= 0:
+				continue
+			var need := int(r["count"])
+			var ok := have >= need and free
+			var why := ""
+			if not free:
+				why = "槽满了"
+			elif have < need:
+				why = "还差 %d" % (need - have)
+			out.append({
+				"id": StringName("%s@%d" % [rid, q]),
+				"name": ItemDB.display_name(rid),
+				"price": 0,
+				"note": "%s×%d → %s（有 %d）" % [
+					ItemDB.display_name(input_item), need,
+					RecipeDB.minutes_text(int(r["minutes"])), have],
+				"enabled": ok,
+				"reason": why,
+			})
+	return out
+
+## "cheese@1" → {rid: cheese, quality: 1}
+static func parse_craft_entry(entry_id: StringName) -> Dictionary:
+	var s := str(entry_id)
+	var at := s.find("@")
+	if at < 0:
+		return {}
+	return {
+		"rid": StringName(s.substr(0, at)),
+		"quality": clampi(int(s.substr(at + 1)), 0, 2),
+	}
+
+func _on_craft_start(entry_id: StringName) -> void:
+	var p := parse_craft_entry(entry_id)
+	if p.is_empty():
+		return
+	var rid: StringName = p["rid"]
+	var q := int(p["quality"])
+	var r := RecipeDB.get_recipe(rid)
+	if r.is_empty():
+		return
+	var input_item := CropQuality.item_id(r["input"], q)
+	var need := int(r["count"])
+	if GameState.count_item(input_item) < need:
+		_say("原料不够（要 %s×%d）" % [ItemDB.display_name(input_item), need])
+		return
+	if _proc.first_free() < 0:
+		_say("加工槽满了 —— 先取货")
+		return
+	GameState.remove_item(input_item, need)
+	_proc.start(rid, q)
+	_say("放进 %s×%d → %s（%s 后取）" % [ItemDB.display_name(input_item), need,
+		ItemDB.display_name(CropQuality.item_id(rid, q)),
+		RecipeDB.minutes_text(int(r["minutes"]))])
+	_refresh_workshop()
+	_refresh_hud()
+	if _shop.is_open() and _shop_kind == SHOP_CRAFT:
+		var entries := _craft_entries()
+		if entries.is_empty():
+			_shop.close()
+		else:
+			_shop.update_entries(entries)
+
+func _collect_crafts() -> void:
+	var got := _proc.take_all()
+	if got.is_empty():
+		_say("还没有加工好的东西")
+		return
+	var parts: Array[String] = []
+	for g in got:
+		var item := CropQuality.item_id(g["output"], int(g["quality"]))
+		var put := GameState.add_item(item, int(g["count"]))
+		parts.append(ItemDB.display_name(item) if put > 0
+			else "%s（背包满了）" % ItemDB.display_name(item))
+	_say("取货：%s" % "、".join(parts))
+	_refresh_workshop()
+	_refresh_hud()
+	_refresh_toolbar()
+
+## 每个 tick 推进加工槽（时间单位是游戏分钟，和时钟天然对齐）
+func _advance_workshop(minutes: int) -> void:
+	var done := _proc.advance_minutes(minutes)
+	if not done.is_empty():
+		var names: Array[String] = []
+		for d in done:
+			names.append(ItemDB.display_name(
+				CropQuality.item_id(d["output"], int(d["quality"]))))
+		_say("加工好了：%s —— 去加工坊取货" % "、".join(names))
+	_refresh_workshop()
+
+# ============================================================================
+# 模块 7 · 背包（需求 1）—— 「使用」的语义在这一层
+# ============================================================================
+#
+# UI 只把「第几格」丢上来。什么东西能怎么用属于玩法，不属于 UI。
+
+func _on_inv_use(i: int) -> void:
+	var id := GameState.slot_item(i)
+	if id == &"":
+		return
+	# ① 种子 → 直接换成当前种子（省得 Tab 一颗颗翻过 24 种）
+	var c: CropData = CropDB.crop_of_seed_item(id)
+	if c != null:
+		_player.set_seed(c.id)
+		_inv.close()
+		_say("当前种子换成 %s（%s季 · %d 天 · 有 %d 颗）" % [
+			c.display_name, c.season_name(), c.grow_days, GameState.count_item(id)])
+		return
+	# ② 消耗品 → 必须对着地块 / 动物用，背包里用不了
+	var d := ItemDB.resolve(id)
+	if d != null and d.category == ItemDef.Cat.CONSUMABLE:
+		_inv.close()
+		_say("%s 要在世界里用：肥料选 6 / 7 号工具，饲料选 4 号，药剂空手对着病畜按 E"
+			% d.display_name)
+		return
+	# ③ 作物 / 畜产品 / 加工品 → 出货或加工，不能「吃」
+	_say("%s 不能直接使用 —— 拿去出货箱卖，或放进加工坊" % ItemDB.display_name(id))
+
+func _on_inv_drop(i: int) -> void:
+	var id := GameState.slot_item(i)
+	if id == &"":
+		return
+	var nm := ItemDB.display_name(id)
+	if GameState.drop_slot(i, 1):
+		_say("丢掉了 1 个 %s" % nm)
+
+# ============================================================================
+# 模块 7 · 商店回收（需求 2：买卖）
+# ============================================================================
+#
+# ShopUI 的 SELL 模式把 (entry_id, all) 丢过来。all = 按着 Shift，整叠卖掉。
+# 为什么不做成「独立回收站」：出货箱已经能一键全卖，玩家真正缺的是
+# 「只卖某一种、看清楚单价和行情」—— 那就是杂货铺的第二个页签。
+
+## 可回收的东西：能卖 + 背包里有
+func _sell_entries() -> Array:
+	var out: Array = []
+	for id in GameState.inventory.keys():
+		if not ItemDB.is_sellable(id):
+			continue
+		var n := GameState.count_item(id)
+		if n <= 0:
+			continue
+		var unit := Market.price(id, GameClock.season, GameClock.day)
+		var delta := Market.delta_percent(id, GameClock.season, GameClock.day)
+		out.append({
+			"id": id,
+			"name": ItemDB.display_name(id),
+			"price": unit,
+			"note": "×%d · 行情 %+d%% · 共 %dG" % [n, delta, unit * n],
+			"enabled": true,
+		})
+	# 贵的排前面：一眼看到该先卖什么
+	out.sort_custom(func(a, b): return int(a["price"]) > int(b["price"]))
+	return out
+
+func _on_sell(entry_id: StringName, all: bool) -> void:
+	if entry_id == &"":
+		return
+	var have := GameState.count_item(entry_id)
+	if have <= 0:
+		_say("背包里没有 %s 了" % ItemDB.display_name(entry_id))
+		_refresh_shop()
+		return
+	var n := have if all else 1
+	var unit := Market.price(entry_id, GameClock.season, GameClock.day)
+	var total := unit * n
+	GameState.remove_item(entry_id, n)
+	GameState.add_gold(total)
+	_say("卖出 %s×%d · +%dG（%dG/个）" % [ItemDB.display_name(entry_id), n, total, unit])
+	EventBus.shop_purchased.emit(_shop_kind, entry_id, -total)
+	_refresh_shop()
+	_refresh_hud()
+	_refresh_toolbar()
+
+## 杂货铺按 T 在「买」和「回收」之间切
+func _on_mode_toggle() -> void:
+	if _shop_kind != SHOP_SUPPLY:
+		return
+	if _shop.mode() == ShopUI.Mode.BUY:
+		_shop.open("杂货铺 · 回收（E 卖 1 个 · Shift+E 全卖 · T 切回买）",
+			_sell_entries(), "", ShopUI.Mode.SELL)
+	else:
+		_shop.open("杂货铺 · 饲料 / 药剂 / 木材（T 键切成回收模式）",
+			_supply_entries(), "", ShopUI.Mode.BUY)
 
 # ---------------- 繁殖棚（模块 5 需求 4）----------------
 
@@ -696,6 +1186,17 @@ func _on_buy(entry_id: StringName) -> void:
 	if _shop_kind == SHOP_BREED:
 		_on_breed_pick(entry_id)
 		return
+	# 模块 7：订单板 / 加工坊 / 工具铺也复用同一个壳，但语义各不相同
+	if _shop_kind == SHOP_ORDER:
+		_on_order_deliver(entry_id)
+		return
+	if _shop_kind == SHOP_CRAFT:
+		_on_craft_start(entry_id)
+		return
+	if _shop_kind == SHOP_TOOL:
+		if _buy_upgrade(entry_id):
+			_refresh_shop()
+		return
 
 	var bought := false
 	var spent := 0
@@ -762,7 +1263,17 @@ func _refresh_shop() -> void:
 		SHOP_ANIMAL:
 			_shop.update_entries(_animal_entries())
 		SHOP_SUPPLY:
-			_shop.update_entries(_supply_entries())
+			# 模块 7：杂货铺有「买」和「回收」两页，重铺时按当前模式走
+			if _shop.mode() == ShopUI.Mode.SELL:
+				_shop.update_entries(_sell_entries())
+			else:
+				_shop.update_entries(_supply_entries())
+		SHOP_TOOL:
+			_shop.update_entries(_tool_entries())
+		SHOP_ORDER:
+			_shop.update_entries(_order_entries())
+		SHOP_CRAFT:
+			_shop.update_entries(_craft_entries())
 		SHOP_BREED:
 			_shop.update_entries(_breed_entries())
 
@@ -874,6 +1385,12 @@ func _on_day(_d: int, _s: int, _y: int) -> void:
 	_refresh_barns()             # 模块 6：容量占用变了，建筑提示条要重画	EventBus.animal_events.emit(aevents)
 	_check_awakenings()          # 模块 5：留棚 +3 也可能把动物喂到 10 心
 	_sync_garden()
+	# 模块 7：换天 = 行情重掷。清缓存后 Market 会按新的 day 重算三个品类。
+	Market.clear_cache()
+	_orders.prune()
+	_tick_orders()
+	_refresh_orders()
+	_refresh_workshop()
 	_refresh_hud()
 	_refresh_toolbar()
 
@@ -978,7 +1495,35 @@ func _burn_crops(risk: float) -> int:
 	return n
 
 func _on_tick(_m: int) -> void:
+	_advance_workshop(GameClock.TICK_GAME_MINUTES)   # 模块 7：加工坊按游戏分钟跑
+	_tick_orders()                                   # 模块 7：订单过期 / 刷新
 	_refresh_hud()
+
+## 订单板的时间推进（每 tick 一次）。OrderBoard 只返回事件，弹提示在这里。
+func _tick_orders() -> void:
+	var ev := _orders.tick(GameClock.day, GameClock.minutes,
+		ItemDB.sellable_ids(), GameClock.season)
+	if ev.is_empty():
+		return
+	var fresh := 0
+	var expired := 0
+	for e in ev:
+		match e["type"]:
+			"new":
+				fresh += 1
+			"expired":
+				expired += 1
+	if expired > 0:
+		_say("有 %d 张订单超时了（%s）" % [expired,
+			"已完成 %d 单" % _orders.completed])
+	elif fresh > 0:
+		_say("订单板来了 %d 张新委托（%s 看板）" % [fresh, "对着订单板按 E"])
+	_refresh_orders()
+	if _shop.is_open() and _shop_kind == SHOP_ORDER:
+		if _orders.active_count() <= 0:
+			_shop.close()
+		else:
+			_shop.update_entries(_order_entries())
 
 func _on_phase(_old: int, _new: int) -> void:
 	_refresh_hud()
@@ -1007,6 +1552,7 @@ func _on_gold(_g: int) -> void:
 func _on_inventory(_id: StringName, _n: int) -> void:
 	_refresh_hud()
 	_refresh_toolbar()
+	_refresh_orders()      # 模块 7：背包变了，「现在能交的订单」可能跟着变
 
 # ---------------- 觉醒 / 对话（模块 5 需求 1）----------------
 
@@ -1138,18 +1684,22 @@ func _refresh_hud() -> void:
 	if inv == "":
 		inv = "空"
 	# 日期 / 时间 / 天气已交给右上角的 ClockHUD，这里只管资源，不再重复。
-	# 分三行：觉醒进度 / 牧群 / 背包。一行塞不下会撞到右上角时钟（模块 4 踩过）。
+	# 分四行：资源 / 牧群与地 / 行情与订单与加工 / 背包。
+	# ⚠️ HUD 的右边界是 442（不是 632）—— 再往右是 ClockBg 的地盘，模块 4 踩过。
 	var garden := " 🌸秘密花园" if GameState.garden_unlocked else ""
-	# 棚舍占用（模块 6）放第一行 —— 第一行最短，第三行背包会溢出到时钟底下
 	var barns := Housing.summary_text(_herd, GameState.barn_levels())
-	_hud.text = "💰%dG   工具[%s]   觉醒 %d/%d%s   棚舍 %s\n动物[%s] 总心 %d   地[%d 株 · 肥 %d 格]\n背包: %s" % [
+	_hud.text = "💰%dG  工具[%s]  觉醒 %d/%d%s  棚舍 %s\n动物[%s] 总心 %d  地[%d株 肥%d格]\n%s\n订单 %d/%d · 加工 %d/%d槽\n背包 %d/%d格: %s" % [
 		GameState.gold, Player.TOOL_LABEL[_player.current_tool],
 		_herd.awakened_species_count(), AnimalDB.all_ids().size(), garden, barns,
 		_animal_summary(), _herd.total_hearts(),
-		_grid.crop_count(), _grid.fertilized_count(), inv,
+		_grid.crop_count(), _grid.fertilized_count(),
+		Market.summary(GameClock.day, GameClock.season),
+		_orders.active_count(), OrderBoard.MAX_ACTIVE,
+		_proc.ready_count(), _proc.slot_count(),
+		GameState.used_slot_count(), GameState.slot_capacity(), inv,
 	]
 
-## 左下角工具条：工具 1-7 + 当前种子（含季节、天数、库存）+ 药剂 / 木材
+## 左下角工具条：工具 1-7 + 当前种子 + 消耗品 + 工具等级 / 背包 / 订单 / 加工
 func _refresh_toolbar() -> void:
 	var parts: Array[String] = []
 	for i in range(Player.TOOL_LABEL.size()):
@@ -1174,7 +1724,13 @@ func _refresh_toolbar() -> void:
 		GameState.count_item(MEDICINE),
 		GameState.count_item(WOOD),
 	]
-	_toolbar.text = "  ".join(parts) + "\n" + seed_line + fert_line
+	var up_line := "  锄Lv%d 壶Lv%d 背包%d/%d格 · 订单%d/%d · 加工%d/%d" % [
+		GameState.tool_level(&"hoe"), GameState.tool_level(&"can"),
+		GameState.used_slot_count(), GameState.slot_capacity(),
+		_orders.active_count(), OrderBoard.MAX_ACTIVE,
+		_proc.ready_count(), _proc.slot_count(),
+	]
+	_toolbar.text = "  ".join(parts) + "\n" + seed_line + "\n" + fert_line + up_line
 
 func _say(msg: String) -> void:
 	_tip.text = msg
