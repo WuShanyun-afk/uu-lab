@@ -204,3 +204,31 @@ func status_text() -> String:
 	if free_slots() <= 0:
 		return "槽满"
 	return "空闲 %d/%d 槽" % [free_slots(), slot_count()]
+
+# ---------------- 存档（模块 8）----------------
+#
+# 槽位里的 recipe / output / input 是 StringName，JSON 回来会变 String，必须转回来：
+# CropQuality.item_id() 和 RecipeDB 查表全按 StringName 走。
+
+func to_dict() -> Dictionary:
+	var arr: Array = []
+	for s in slots:
+		arr.append(s.duplicate(true) if s != null else null)
+	return {"level": level, "slots": arr}
+
+func from_dict(d: Dictionary) -> void:
+	set_level(int(d.get("level", 1)))
+	var src: Array = d.get("slots", [])
+	for i in range(mini(src.size(), slots.size())):
+		var raw: Variant = src[i]
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		slots[i] = {
+			"recipe": StringName(str(raw.get("recipe", ""))),
+			"output": StringName(str(raw.get("output", ""))),
+			"input": StringName(str(raw.get("input", ""))),
+			"need": maxi(0, int(raw.get("need", 0))),
+			"quality": clampi(int(raw.get("quality", 0)), 0, 2),
+			"remain": maxi(0, int(raw.get("remain", 0))),
+			"total": maxi(1, int(raw.get("total", 1))),
+		}

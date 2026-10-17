@@ -150,3 +150,24 @@ func in_graze_window() -> bool:
 func debug_set_minutes(m: int) -> void:
 	minutes = clampi(m, 0, TOTAL_MINUTES - TICK_GAME_MINUTES)
 	phase = phase_at(minutes)
+
+# ---------------- 存档（模块 8）----------------
+
+func to_dict() -> Dictionary:
+	return {
+		"day": day,
+		"season": season,
+		"year": year,
+		"minutes": minutes,
+		"acc": _acc,
+	}
+
+## ⚠️ phase 是**派生值**，不存也不该信存档里的。
+##    读档后必须 phase_at(minutes) 重算 —— 模块 2 就踩过「缓存 phase 过期」的坑。
+func from_dict(d: Dictionary) -> void:
+	day = clampi(int(d.get("day", 1)), 1, DAYS_PER_SEASON)
+	season = clampi(int(d.get("season", 0)), 0, 3)
+	year = maxi(1, int(d.get("year", 1)))
+	minutes = clampi(int(d.get("minutes", 0)), 0, TOTAL_MINUTES - TICK_GAME_MINUTES)
+	_acc = clampf(float(d.get("acc", 0.0)), 0.0, TICK_REAL_SECONDS)
+	phase = phase_at(minutes)

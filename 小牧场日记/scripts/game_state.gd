@@ -335,3 +335,64 @@ func reset() -> void:
 	barns.clear()
 	gold_changed.emit(gold)
 	slots_changed.emit()
+
+# ---------------- 存档（模块 8）----------------
+#
+# 只存**真源**：gold / slots / tool_levels / barns / flags。
+# inventory 是派生索引（每次 _rebuild_index 重建），不进存档 —— 存了反而会有两份真值。
+
+func to_dict() -> Dictionary:
+	return {
+		"gold": gold,
+		"slots": slots.duplicate(true),
+		"tool_levels": tool_levels.duplicate(),
+		"barns": barns.duplicate(),
+		"flags": {
+			"garden_unlocked": garden_unlocked,
+			"shed_built": shed_built,
+			"famous": famous,
+		},
+	}
+
+## ⚠️ 槽位里的 id 从 JSON 回来是 **String**，必须 StringName() 回来，
+##    否则 count_item / remove_item 用 StringName 查 inventory 会全部查不到。
+func from_dict(d: Dictionary) -> void:
+	gold = int(d.get("gold", 500))
+	slots.clear()
+	var raw_slots: Array = d.get("slots", [])
+	for raw in raw_slots:
+		if typeof(raw) != TYPE_DICTIONARY:
+			slots.append(null)
+			continue
+		var id := StringName(str(raw.get("id", "")))
+		var cnt := int(raw.get("count", 0))
+		if id == StringName("") or cnt <= 0:
+			slots.append(null)
+		else:
+			slots.append({"id": id, "count": cnt})
+	tool_levels.clear()
+	var tl: Dictionary = d.get("tool_levels", {})
+	for k in tl:
+		tool_levels[StringName(str(k))] = clampi(int(tl[k]), 1, 3)
+	if tool_levels.is_empty():
+		_reset_tool_levels()
+	barns.clear()
+	var bn: Dictionary = d.get("barns", {})
+	for k in bn:
+		var lv := int(bn[k])
+		if lv > 0:
+			barns[StringName(str(k))] = lv
+	var fl: Dictionary = d.get("flags", {})
+	garden_unlocked = bool(fl.get("garden_unlocked", false))
+	shed_built = bool(fl.get("shed_built", false))
+	famous = bool(fl.get("famous", false))
+	# 长度按「当前背包等级」对齐，不走 _ensure_slots()：
+	# 那个函数会调 add_item，而此刻派生索引还是空的，会把尾巴上的物品算丢。
+	var cap := slot_capacity()
+	while slots.size() < cap:
+		slots.append(null)
+	while slots.size() > cap:
+		slots.pop_back()
+	_rebuild_index()
+	gold_changed.emit(gold)
+	slots_changed.emit()

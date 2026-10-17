@@ -142,7 +142,14 @@ func _ready() -> void:
 	_tick_orders()               # 模块 7：开局就刷 2 单（day 1 - (-999) >= 3）
 	_refresh_hud()
 	_refresh_toolbar()
-	_say("WASD 移动 · E 用工具/交互 · 1-7 换工具 · Tab 换种子 · I 背包 · F11 全屏")
+	# 模块 8：有档就告诉玩家 F9 能续，没档就把键位一次性说清楚（只占 2.5 秒提示条）
+	if SaveSystem.exists(SaveSystem.SLOT_QUICK) or SaveSystem.exists(SaveSystem.SLOT_AUTO):
+		var slot := SaveSystem.SLOT_QUICK if SaveSystem.exists(SaveSystem.SLOT_QUICK) else SaveSystem.SLOT_AUTO
+		var info := SaveSystem.info(slot)
+		_say("检测到%s：第 %d 天 · F9 继续 · F5 存档" % [SaveSystem.slot_label(slot),
+			int(info.get("day", 0))])
+	else:
+		_say("WASD 移动 · E 用工具/交互 · 1-7 换工具 · Tab 换种子 · I 背包 · F5 存/F9 读 · F11 全屏")
 
 ## 开局补给：
 ##   · 每季作物各 3 颗种子（模块 4 起种子是要消耗的背包物品，种子商店能补货）
@@ -179,6 +186,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_F11:
 			_toggle_fullscreen()
+		elif event.keycode == KEY_F5:
+			_save_game(SaveSystem.SLOT_QUICK)        # 模块 8
+		elif event.keycode == KEY_F9:
+			_load_latest()                            # 模块 8
 		elif event.keycode == KEY_I:
 			# 背包自己会吃掉「关」的那一次（它在树里更靠后，先收到 unhandled_input），
 			# 所以这里只负责「开」。商店 / 对话弹着的时候不许开背包。
@@ -1382,7 +1393,8 @@ func _on_day(_d: int, _s: int, _y: int) -> void:
 		_animal_layer.rebuild()
 	else:
 		_animal_layer.refresh()
-	_refresh_barns()             # 模块 6：容量占用变了，建筑提示条要重画	EventBus.animal_events.emit(aevents)
+	EventBus.animal_events.emit(aevents)     # ⚠️ 模块 8 修：这行以前被并进上一行的注释里，成了死代码
+	_refresh_barns()             # 模块 6：容量占用变了，建筑提示条要重画
 	_check_awakenings()          # 模块 5：留棚 +3 也可能把动物喂到 10 心
 	_sync_garden()
 	# 模块 7：换天 = 行情重掷。清缓存后 Market 会按新的 day 重算三个品类。
@@ -1450,6 +1462,11 @@ func _on_day(_d: int, _s: int, _y: int) -> void:
 	parts.append_array(weather_notes)
 	if not parts.is_empty():
 		_say(" | ".join(parts))
+
+	# 模块 8：跨日结算完 = 自动存档点（GDD §10.5「每天 2:00 强制入睡时自动存」）。
+	# ⚠️ 必须放在所有 advance_day 之后：这时存下的才是「新一天开始」的干净状态，
+	#    放在开头会存成「旧的一天 + 已推进的时钟」，读档时等于白过一天。
+	_save_game(SaveSystem.SLOT_AUTO, true)
 
 # ---------------- 天气效果落地（模块 2）----------------
 #
@@ -1763,3 +1780,115 @@ func _draw_pen() -> void:
 	var g := WorldConfig.GATE
 	draw_rect(Rect2(g.position.x - 2, g.position.y - 6, 5, 10), c)
 	draw_rect(Rect2(g.position.x - 2, g.end.y - 4, 5, 10), c)
+
+# ============================================================================
+# 模块 8 · 存档系统
+# ============================================================================
+#
+# 三层分工（前两层在别处，这里只做第三层）：
+#   SaveSystem          只管「字典 ⇄ 文件」：JSON 化 / 原子写 / 版本 / 容错
+#   各系统 to_dict      只管自己有哪些字段（GameClock / FarmGrid / Herd / …）
+#   本文件              只管「一局 = 哪几坨」，以及**读档后的画面同步**
+#
+# 存：clock / weather / state / farm / herd / orders / processor / player
+# 不存：
+#   · Market 行情缓存 —— (天, 品类) 的纯函数，清掉缓存按新天数重算即可
+#   · just_awakened / _pending_animal / _breed_picks / UI 开关 —— 瞬态
+#   · inventory 派生索引 —— GameState.from_dict 里会 _rebuild_index()
+#
+# 键位：F5 快速存档到 1 号槽 · F9 读档 · 跨日 2:00 自动存 0 号槽
+
+## 把一局摊平成字典（version / 时间戳由 SaveSystem.save 补）
+func _build_save() -> Dictionary:
+	return {
+		"meta": {
+			"day": GameClock.day,
+			"season": GameClock.season,
+			"year": GameClock.year,
+			"clock": GameClock.clock_text(),
+			"weather": WeatherSystem.weather_name(),
+			"gold": GameState.gold,
+			"animals": _herd.size(),
+			"awakened": _herd.awakened_species_count(),
+			"garden": GameState.garden_unlocked,
+		},
+		"clock": GameClock.to_dict(),
+		"weather": WeatherSystem.to_dict(),
+		"state": GameState.to_dict(),
+		"farm": _grid.to_dict(),
+		"herd": _herd.to_dict(),
+		"orders": _orders.to_dict(),
+		"processor": _proc.to_dict(),
+		"player": _player.to_dict(),
+	}
+
+## 存档。quiet = true 时不弹提示（自动存档用，别每天 2:00 怼玩家一句）
+func _save_game(slot: int, quiet: bool = false) -> bool:
+	var res := SaveSystem.save(slot, _build_save())
+	if bool(res["ok"]):
+		if not quiet:
+			_say("已存档 · 第 %d 天 %s · %s" % [GameClock.day, GameClock.clock_text(),
+				SaveSystem.slot_label(slot)])
+		return true
+	_say("存档失败：%s" % res["error"])
+	return false
+
+## 读档。返回是否成功。
+func _load_game(slot: int) -> bool:
+	var res := SaveSystem.load_slot(slot)
+	if not bool(res["ok"]):
+		_say("读档失败：%s" % res["error"])
+		return false
+	_apply_save(res["data"])
+	_say("已读档 · 第 %d 天 %s · %s（%d 只动物 · %dG）" % [
+		GameClock.day, GameClock.clock_text(), SaveSystem.slot_label(slot),
+		_herd.size(), GameState.gold])
+	return true
+
+## F9：优先快速存档（F5 手存的），没有就退回自动存档
+func _load_latest() -> void:
+	if SaveSystem.exists(SaveSystem.SLOT_QUICK):
+		_load_game(SaveSystem.SLOT_QUICK)
+	elif SaveSystem.exists(SaveSystem.SLOT_AUTO):
+		_load_game(SaveSystem.SLOT_AUTO)
+	else:
+		_say("还没有存档 —— 先按 F5 存一个")
+
+## 把字典灌回每个系统，然后把画面从头同步一遍。
+## ⚠️ 顺序：先数据后视觉。_sync_garden() 要读 herd + GameState 的 flag，
+##    必须等 state / herd 都灌完再调。
+## ⚠️ 读档不触发任何 advance_day / tick —— 时间直接落位，不结算、不掷骰。
+func _apply_save(d: Dictionary) -> void:
+	_shop.close()
+	_inv.close()
+	GameState.from_dict(d.get("state", {}))
+	GameClock.from_dict(d.get("clock", {}))
+	WeatherSystem.from_dict(d.get("weather", {}))
+	_grid.from_dict(d.get("farm", {}))
+	_grid.season = GameClock.season          # 存档里的 season 可能和门禁不一致，以时钟为准
+	_herd.from_dict(d.get("herd", {}))
+	_orders.from_dict(d.get("orders", {}))
+	_proc = Processor.new(1)
+	_proc.from_dict(d.get("processor", {}))
+	_player.from_dict(d.get("player", {}))
+	_zone_garden = WorldConfig.in_garden(_player.global_position)
+
+	Market.clear_cache()                     # 行情按读回来的天数重算
+	_ground.set_season_tint(GameClock.season)
+	_farm_layer.grid = _grid                 # 防御：grid 出过实例就重新挂上
+	_farm_layer.refresh()
+	_animal_layer.herd = _herd
+	_animal_layer.rebuild()
+	_refresh_barns()
+	_refresh_workshop()
+	_refresh_orders()
+	_sync_garden()
+	_apply_camera_limits()
+	# 时钟面板自己订阅 tick / day 刷新，读档不触发任何 tick —— 得手动叫它刷一次，
+	# 否则读档后右上角会拿旧时间糊你 0.6 秒（到下一个 tick 才自愈）。
+	var clock_panel := get_node_or_null("UI/ClockPanel") as ClockHUD
+	if clock_panel != null:
+		clock_panel.refresh()
+	_refresh_light()
+	_refresh_hud()
+	_refresh_toolbar()

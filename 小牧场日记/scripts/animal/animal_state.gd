@@ -362,3 +362,63 @@ func debug_awaken() -> void:
 func debug_pregnant(days: int = 1) -> void:
 	pregnant_days = maxi(1, days)
 	gestation = pregnant_days
+
+# ---------------- 存档（模块 8）----------------
+#
+# ⚠️ just_awakened **不存**：它只是「main 还没弹觉醒对话」的临时标记，
+#    存了的话读档会重新弹一遍觉醒演出 —— 玩家会以为出了 bug。
+# ⚠️ rng.state 存字符串：64 位整数过 JSON 的 double 会掉精度。
+
+func to_dict() -> Dictionary:
+	return {
+		"uid": String(uid),
+		"species": String(species),
+		"x": pos.x,
+		"y": pos.y,
+		"affection": affection,
+		"days_old": days_old,
+		"fed_today": fed_today,
+		"pet_today": pet_today,
+		"brushed_today": brushed_today,
+		"hugged_today": hugged_today,
+		"days_unfed": days_unfed,
+		"product_ready": product_ready,
+		"product_quality": product_quality,
+		"product_is_high": product_is_high,
+		"product_awakened": product_awakened,
+		"produce_timer": produce_timer,
+		"sick": sick,
+		"sick_days": sick_days,
+		"awakened": awakened,
+		"pregnant_days": pregnant_days,
+		"gestation": gestation,
+		"partner": String(partner_species),
+		"rng_state": str(rng.state),
+	}
+
+func from_dict(d: Dictionary) -> void:
+	uid = StringName(str(d.get("uid", uid)))
+	species = StringName(str(d.get("species", species)))
+	pos = Vector2(float(d.get("x", 0.0)), float(d.get("y", 0.0)))
+	affection = clampi(int(d.get("affection", 0)), 0, MAX_AFFECTION)
+	days_old = maxi(0, int(d.get("days_old", 0)))
+	fed_today = maxi(0, int(d.get("fed_today", 0)))
+	pet_today = maxi(0, int(d.get("pet_today", 0)))
+	brushed_today = bool(d.get("brushed_today", false))
+	hugged_today = bool(d.get("hugged_today", false))
+	days_unfed = maxi(0, int(d.get("days_unfed", 0)))
+	product_ready = bool(d.get("product_ready", false))
+	product_quality = clampi(int(d.get("product_quality", 0)), 0, 2)
+	product_is_high = bool(d.get("product_is_high", false))
+	product_awakened = bool(d.get("product_awakened", false))
+	produce_timer = maxi(0, int(d.get("produce_timer", 0)))
+	sick = bool(d.get("sick", false))
+	sick_days = maxi(0, int(d.get("sick_days", 0)))
+	awakened = bool(d.get("awakened", false))
+	pregnant_days = maxi(0, int(d.get("pregnant_days", 0)))
+	gestation = maxi(0, int(d.get("gestation", 0)))
+	partner_species = StringName(str(d.get("partner", "")))
+	just_awakened = false
+	var st := int(str(d.get("rng_state", "0")))
+	if st != 0:
+		rng.state = st

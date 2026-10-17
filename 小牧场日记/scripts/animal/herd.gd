@@ -148,3 +148,36 @@ func nearest(pos: Vector2, radius: float) -> AnimalState:
 			best_d = d
 			best = a
 	return best
+
+# ---------------- 存档（模块 8）----------------
+
+func to_dict() -> Dictionary:
+	var arr: Array = []
+	for a in animals:
+		arr.append(a.to_dict())
+	return {"animals": arr, "next_id": _next_id, "rng_state": str(_rng.state)}
+
+## ⚠️ 存档里的物种可能在新版本里被删了（改 animals.csv）。
+##    未知物种**跳过**，不让一个旧档把游戏崩掉 —— 少一只动物总比打不开游戏好。
+## ⚠️ uid 是主键（animal_node / 订单 / 提示都靠它），_next_id 必须大于所有已存在的编号，
+##    否则新买的动物会和读回来的老动物重号，两只动物共用一个 uid。
+func from_dict(d: Dictionary) -> void:
+	animals.clear()
+	var raw_list: Array = d.get("animals", [])
+	for raw in raw_list:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var sp := StringName(str(raw.get("species", "")))
+		if AnimalDB.get_animal(sp) == null:
+			continue
+		var a := AnimalState.new(StringName(str(raw.get("uid", ""))), sp, 0)
+		a.from_dict(raw)
+		animals.append(a)
+	_next_id = maxi(1, int(d.get("next_id", 1)))
+	for a in animals:
+		var tail := str(a.uid).split("_")
+		if tail.size() == 2 and tail[1].is_valid_int():
+			_next_id = maxi(_next_id, int(tail[1]) + 1)
+	var st := int(str(d.get("rng_state", "0")))
+	if st != 0:
+		_rng.state = st
