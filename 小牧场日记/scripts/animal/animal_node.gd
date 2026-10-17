@@ -71,7 +71,8 @@ func _draw() -> void:
 
 	var a := art()
 	if _has_sprite:
-		draw_texture(_tex, Vector2(-16, -32))
+		# 真素材是 32×32、底边对齐脚底（pos）；会飞的物种再按 fly 抬起来
+		draw_texture(_tex, Vector2(-16, -32 - float(a["fly"])))
 	else:
 		match String(a["shape"]):
 			"quad":
