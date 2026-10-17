@@ -9,6 +9,9 @@ _uu/环境档案.md
 # DNS 垫片：某次 raw.githubusercontent.com 被投毒时的临时自救补丁，本机专属。
 _uu/shim/
 
+# DSH 工作区权限修复的备份与报告（含本机 ACL 细节），本机专属。
+_uu/acl-report/
+
 # 系统垃圾
 Thumbs.db
 desktop.ini

@@ -316,3 +316,24 @@ func _input_dir() -> Vector2:
 	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
 		d.y += 1.0
 	return d.normalized() if d != Vector2.ZERO else Vector2.ZERO
+
+# ---------------- 存档（模块 8）----------------
+# 只存「玩家自己的东西」：位置 / 朝向 / 当前工具 / 当前种子。
+# 背包、金币、工具等级都在 GameState，跟玩家节点无关。
+
+func to_dict() -> Dictionary:
+	return {
+		"x": global_position.x,
+		"y": global_position.y,
+		"facing": facing,
+		"facing8": facing8,
+		"tool": current_tool,
+		"seed": String(selected_seed),
+	}
+
+func from_dict(d: Dictionary) -> void:
+	global_position = Vector2(float(d.get("x", 704.0)), float(d.get("y", 288.0)))
+	facing = str(d.get("facing", "down"))
+	facing8 = str(d.get("facing8", "down"))
+	current_tool = clampi(int(d.get("tool", 0)), 0, TOOL_LABEL.size() - 1)
+	selected_seed = StringName(str(d.get("seed", "turnip")))

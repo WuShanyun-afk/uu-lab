@@ -224,6 +224,14 @@ func to_dict() -> Dictionary:
 
 func from_dict(d: Dictionary) -> void:
 	orders = (d.get("orders", []) as Array).duplicate(true)
+	# ⚠️ JSON 回来之后：color 是 "#RRGGBB" 字符串、item 是 String。
+	#    item 不转回 StringName 的话，main 用 GameState.count_item(o["item"]) 会永远查到 0
+	#    （inventory 的键是 StringName），订单就变成永远交不了 —— 模块 8 踩过。
+	for o in orders:
+		if typeof(o.get("color")) == TYPE_STRING:
+			o["color"] = Color(str(o["color"]))
+		if typeof(o.get("item")) == TYPE_STRING:
+			o["item"] = StringName(str(o["item"]))
 	completed = int(d.get("completed", 0))
 	failed = int(d.get("failed", 0))
 	last_refresh_day = int(d.get("last_refresh_day", -999))

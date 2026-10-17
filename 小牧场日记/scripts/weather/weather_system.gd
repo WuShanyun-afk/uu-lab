@@ -173,3 +173,25 @@ func debug_set(w: int, bliz: bool = false) -> void:
 	_refresh_cache(GameClock.season)
 	if w != old or bliz != old_bliz:
 		EventBus.weather_changed.emit(today, old)
+
+# ---------------- 存档（模块 8）----------------
+
+## rng.state 是 64 位整数，JSON 数字过一遍 double 会掉精度 —— 一律存成字符串。
+func to_dict() -> Dictionary:
+	return {
+		"today": today,
+		"tomorrow": tomorrow,
+		"forecast": forecast,
+		"blizzard": blizzard,
+		"rng_state": str(rng.state),
+	}
+
+func from_dict(d: Dictionary) -> void:
+	today = clampi(int(d.get("today", 0)), 0, Weather.SNOW)
+	tomorrow = clampi(int(d.get("tomorrow", 0)), 0, Weather.SNOW)
+	forecast = clampi(int(d.get("forecast", 0)), 0, Weather.SNOW)
+	blizzard = bool(d.get("blizzard", false))
+	var st := int(str(d.get("rng_state", "0")))
+	if st != 0:
+		rng.state = st
+	_refresh_cache(GameClock.season)

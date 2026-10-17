@@ -293,3 +293,56 @@ func debug_grow(cell: Vector2i, days: int) -> void:
 	for i in range(days):
 		water(cell)
 		advance_day()
+
+# ---------------- 存档（模块 8）----------------
+#
+# 格子用 "x,y" 字符串做键：JSON 的对象键只能是字符串，
+# 而 Vector2i 直接 stringify 出来是 "(3, 5)"，读回来还得再拆一次。
+# 每格只存非缺省值？不 —— 一律全存。省那几个字节换来的是
+# 「读档后 watered / fertilized / harvest_count 哪个漏了」这种半夜才发现的 bug。
+
+func to_dict() -> Dictionary:
+	var out: Dictionary = {}
+	for cell in tiles:
+		var t: Tile = tiles[cell]
+		out["%d,%d" % [cell.x, cell.y]] = {
+			"tilled": t.tilled,
+			"watered": t.watered,
+			"crop": String(t.crop_id),
+			"days": t.days_grown,
+			"dry": t.dry_days,
+			"dead": t.dead,
+			"fert": t.fertilized,
+			"harvested": t.harvested_once,
+			"harvest_count": t.harvest_count,
+		}
+	return {"season": season, "rng_state": str(rng.state), "tiles": out}
+
+func from_dict(d: Dictionary) -> void:
+	season = int(d.get("season", -1))
+	var st := int(str(d.get("rng_state", "0")))
+	if st != 0:
+		rng.state = st
+	tiles.clear()
+	var src: Dictionary = d.get("tiles", {})
+	for key in src:
+		var parts := str(key).split(",")
+		if parts.size() != 2:
+			continue
+		var cell := Vector2i(int(parts[0]), int(parts[1]))
+		if not in_bounds(cell):
+			continue                      # 改过 SIZE 的老档：越界格直接丢，别撑爆字典
+		var raw: Variant = src[key]
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var t := Tile.new()
+		t.tilled = bool(raw.get("tilled", true))
+		t.watered = bool(raw.get("watered", false))
+		t.crop_id = StringName(str(raw.get("crop", "")))
+		t.days_grown = maxi(0, int(raw.get("days", 0)))
+		t.dry_days = maxi(0, int(raw.get("dry", 0)))
+		t.dead = bool(raw.get("dead", false))
+		t.fertilized = clampi(int(raw.get("fert", 0)), 0, Fertilizer.MAX_LEVEL)
+		t.harvested_once = bool(raw.get("harvested", false))
+		t.harvest_count = maxi(0, int(raw.get("harvest_count", 0)))
+		tiles[cell] = t
