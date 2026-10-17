@@ -1,0 +1,7 @@
+id,tool,level,price,material,material_count,name,note
+hoe_2,hoe,2,1500,wood,5,锄头 Lv2,一次锄 3 格直线
+hoe_3,hoe,3,4000,wood,12,锄头 Lv3,一次锄 3×3
+can_2,can,2,1500,wood,5,洒水壶 Lv2,一次浇 3 格直线
+can_3,can,3,4000,wood,12,洒水壶 Lv3,一次浇 3×3
+bag_2,bag,2,800,wood,5,背包 Lv2,格子 +8
+bag_3,bag,3,2000,wood,12,背包 Lv3,格子 +8

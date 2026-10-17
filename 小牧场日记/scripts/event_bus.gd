@@ -90,3 +90,11 @@ signal housing_upgrade_requested(housing_id: StringName)
 ## 棚舍升级完成（housing_id, 新等级）
 signal housing_upgraded(housing_id: StringName, level: int)
 
+# ---------------- 模块 7 ----------------
+
+## 工具升级完成（&"hoe" / &"can" / &"bag", 新等级）
+signal tool_upgraded(tool: StringName, level: int)
+
+## 背包槽位布局变化（拖拽 / 合并 / 增删后）—— 背包 UI 订阅它重绘
+signal inventory_slots_changed()
+

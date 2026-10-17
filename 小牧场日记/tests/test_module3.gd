@@ -378,14 +378,18 @@ func _test_loop_end_to_end() -> void:
 	_check(not bin.is_sellable(&"feed"), "饲料不可卖")
 	_check(not bin.is_sellable(Fertilizer.item_id(1)), "肥料不可卖")
 
-	_check(bin.unit_price(&"turnip") == 35, "出货箱：芜菁 35G")
-	_check(bin.unit_price(&"turnip_silver") == 53, "出货箱：银星芜菁 53G")
-	_check(bin.unit_price(&"turnip_gold") == 70, "出货箱：金星芜菁 70G")
+	# 模块 7：unit_price 现在含「当日行情」（Market），标价改看 base_price。
+	# 断言标价钉死 35/53/70，再断言实收落在行情 ±15% 区间内。
+	_check(bin.base_price(&"turnip") == 35, "出货箱标价：芜菁 35G")
+	_check(bin.base_price(&"turnip_silver") == 53, "出货箱标价：银星芜菁 53G")
+	_check(bin.base_price(&"turnip_gold") == 70, "出货箱标价：金星芜菁 70G")
 	_check(bin.unit_price(&"turnip_gold") > bin.unit_price(&"turnip"), "金星比普通值钱")
+	_check(bin.unit_price(&"turnip") >= 29 and bin.unit_price(&"turnip") <= 41,
+		"实收在行情 ±15% 内（%dG）" % bin.unit_price(&"turnip"))
 
 	var season_backup := GameClock.season
 	GameClock.season = 2
-	_check(bin.unit_price(&"pumpkin") == 352, "秋季：南瓜 320 × 1.1 = 352G")
+	_check(bin.base_price(&"pumpkin") == 352, "秋季：南瓜 320 × 1.1 = 352G")
 	GameClock.season = season_backup
 
 	var g := FarmGrid.new(5001)

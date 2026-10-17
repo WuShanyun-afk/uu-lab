@@ -24,6 +24,8 @@ ProductDB="*res://scripts/data/product_db.gd"
 AnimalDB="*res://scripts/data/animal_db.gd"
 BuildingDB="*res://scripts/data/building_db.gd"
 HousingDB="*res://scripts/data/housing_db.gd"
+ItemDB="*res://scripts/data/item_db.gd"
+RecipeDB="*res://scripts/data/recipe_db.gd"
 GameState="*res://scripts/game_state.gd"
 
 [display]
