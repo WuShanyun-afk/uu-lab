@@ -55,6 +55,9 @@ const SUPPLY_ITEMS: Array[StringName] = [&"feed", &"medicine", &"wood"]
 ## 药剂 / 木材的 item id（别写成裸字符串散落各处）
 const MEDICINE := &"medicine"
 const WOOD := &"wood"
+## 模块 12：建材与建造许可证（都是 products.csv 里的 material 类物品）
+const PERMIT := &"permit"
+const STONE := &"stone"
 
 ## 新动物进牧场的落点（模块 6 起不再写死一张表）：
 ##   动物按 animals.csv 的 housing 列落进自己的子栏，
@@ -119,6 +122,9 @@ var _story := StorySystem.new()
 var _gift_target: StringName = &""
 ## 模块 10：正在播的剧情节点 id（播完才登记，避免中途存档丢一段）
 var _story_pending: StringName = &""
+## 模块 12：施工队列（工期 1–3 天的建筑）+ 锚点 -> 脚手架节点
+var _sites := Construction.new()
+var _site_nodes: Dictionary = {}
 
 func _ready() -> void:
 	_storm_rng.seed = 20261022
@@ -1460,6 +1466,7 @@ func _clamp_animals_to_zones() -> void:
 # ---------------- 时间 ----------------
 
 func _on_day(_d: int, _s: int, _y: int) -> void:
+	_tick_construction()          # 模块 12：工地过一天
 	var events := _grid.advance_day()
 	var aevents := _herd.advance_day()
 	# 天气效果必须在 advance_day 之后：advance_day 把 watered 重置了，雨天再浇满新的那一天
@@ -1912,6 +1919,7 @@ func _build_save() -> Dictionary:
 		"buildings": _builds.to_dict(),     # 模块 9：建筑账本 + 牧场阶段
 		"npcs": _npcs.to_dict(),            # 模块 10：好感 / 送礼记录
 		"story": _story.to_dict(),          # 模块 10：剧情进度 / 计数器 / 结局
+		"construction": _sites.to_dict(),   # 模块 12：施工队列（剩余工期）
 	}
 
 ## 存档。quiet = true 时不弹提示（自动存档用，别每天 2:00 怼玩家一句）
@@ -1972,6 +1980,7 @@ func _apply_save(d: Dictionary) -> void:
 	_builds.from_dict(d.get("buildings", {}))        # 模块 9：建筑先落数据（阶段也在里面）
 	_npcs.from_dict(d.get("npcs", {}))               # 模块 10：好感
 	_story.from_dict(d.get("story", {}))             # 模块 10：剧情进度
+	_sites.from_dict(d.get("construction", {}))      # 模块 12：施工队列
 	_zone_garden = WorldConfig.in_garden(_player.global_position)
 
 	Market.clear_cache()                     # 行情按读回来的天数重算
@@ -1996,8 +2005,10 @@ func _apply_save(d: Dictionary) -> void:
 
 	# 模块 9：建筑节点是纯视图，数据灌完再整批重建（比 diff 简单，也不会漏）
 	_rebuild_build_nodes()
+	_rebuild_site_nodes()                            # 模块 12：施工中的脚手架
 	# 模块 10：村民节点同样整批重建，并立刻按日程落位（别从 (0,0) 走过来）
 	_rebuild_npc_nodes()
+	_refresh_build_effects()                         # 模块 12：谷仓背包格 / 温室反季要按读回来的建筑重算
 	EventBus.set_build_mode(false)
 	_cursor.hide_cursor()
 
@@ -2025,6 +2036,7 @@ func _apply_save(d: Dictionary) -> void:
 ## 建造网格挂上农场（放置时不许压已耕的地）+ 阶段从存档里恢复
 func _init_buildings() -> void:
 	_builds.farm = _grid
+	_builds.sites = _sites
 	_builds.stage = RanchStage.clamp_stage(_builds.stage)
 	_cursor.position = Vector2.ZERO
 	_cursor.hide_cursor()
@@ -2111,6 +2123,10 @@ func _build_confirm() -> void:
 
 # ---------------- 放置 ----------------
 
+## 放置一栋建筑（模块 9）+ 模块 12 的许可证 / 石头 / 工期
+##
+## 顺序：能不能放 → 有没有许可证 → 钱 → 木 → 石 → 扣 → 当场落成 or 进施工队列
+## 为什么许可证要在「钱」前面查：玩家看到「还差 500G」会去赚钱，但根本问题是没买证。
 func _try_place(id: StringName, anchor: Vector2i) -> void:
 	var reason := _builds.can_place(id, anchor)
 	if reason != BuildingGrid.OK:
@@ -2119,6 +2135,9 @@ func _try_place(id: StringName, anchor: Vector2i) -> void:
 	var d: BuildingDef = BuildingDB.def_of(id)
 	if d == null:
 		return
+	if GameState.count_item(PERMIT) < 1:
+		_say("要先买一张「建造许可证」（杂货铺有卖 · %dG）" % ProductDB.price(PERMIT))
+		return
 	if GameState.gold < d.price:
 		_say("%s 要 %dG，还差 %dG" % [d.display_name, d.price, d.price - GameState.gold])
 		return
@@ -2126,23 +2145,90 @@ func _try_place(id: StringName, anchor: Vector2i) -> void:
 		_say("还缺 %s×%d（杂货铺有卖）" % [ProductDB.display_name(d.material),
 			d.material_count - GameState.count_item(d.material)])
 		return
+	if d.stone_count > 0 and GameState.count_item(STONE) < d.stone_count:
+		_say("还缺 石头×%d（杂货铺有卖）" % (d.stone_count - GameState.count_item(STONE)))
+		return
 	GameState.spend_gold(d.price)
 	GameState.remove_item(d.material, d.material_count)
-	var b := _builds.place(id, anchor, GameClock.day)
+	if d.stone_count > 0:
+		GameState.remove_item(STONE, d.stone_count)
+	GameState.remove_item(PERMIT, 1)
+	if d.build_days <= 0:
+		_build_now(id, anchor, GameClock.day)
+		return
+	var site := _sites.start(id, anchor, d.build_days, GameClock.day)
+	_spawn_site_node(site)
+	_refresh_build_effects()
+	_say("%s 开工 · 工期 %d 天（-1 张许可证）· 施工期间这块地不能再用" % [
+		d.display_name, d.build_days])
+	_refresh_build_hint()
+
+## 立刻落成（工期 0 的建筑 / 工地到期）
+func _build_now(id: StringName, anchor: Vector2i, day: int) -> void:
+	var d: BuildingDef = BuildingDB.def_of(id)
+	var b := _builds.place(id, anchor, day)
 	if b == null:
-		# 走到这里说明 can_place 和 place 的判定不同步（改代码改出来的 bug）——
-		# 钱退回去，别让玩家白白损失一笔。
-		GameState.add_gold(d.price)
-		GameState.add_item(d.material, d.material_count)
+		# can_place 和 place 不同步（改代码改出来的 bug）：钱料退回去，别让玩家白亏
+		if d != null:
+			GameState.add_gold(d.price)
+			GameState.add_item(d.material, d.material_count)
+			if d.stone_count > 0:
+				GameState.add_item(STONE, d.stone_count)
+			GameState.add_item(PERMIT, 1)
 		_say("放不下 · 换个位置试试")
 		return
 	_spawn_building_node(b)
 	GameState.bump_stat(GameState.ST_BUILT)
 	EventBus.building_placed.emit(id, anchor)
 	_refresh_build_effects()
-	_say("%s 落成（-%dG 木材×%d）· %s" % [d.display_name, d.price,
-		d.material_count, d.stat_text(1)])
+	if d != null:
+		_say("%s 落成 · %s" % [d.display_name, d.stat_text(1)])
 	_refresh_build_hint()
+
+# ---------------- 施工队列（模块 12 需求 2）----------------
+
+func _spawn_site_node(site: Dictionary) -> void:
+	var anchor := Vector2i(int(site["x"]), int(site["y"]))
+	_remove_site_node(anchor)
+	var n := BuildSiteNode.new()
+	n.name = "S_%d_%d" % [anchor.x, anchor.y]
+	_build_root.add_child(n)
+	n.setup(StringName(str(site["def_id"])), anchor, int(site["days_left"]),
+		int(site["total_days"]))
+	_site_nodes[anchor] = n
+
+func _remove_site_node(anchor: Vector2i) -> void:
+	var n := _site_nodes.get(anchor) as BuildSiteNode
+	if n == null:
+		return
+	if is_instance_valid(n):
+		n.queue_free()
+	_site_nodes.erase(anchor)
+
+func _rebuild_site_nodes() -> void:
+	for anchor in _site_nodes.keys():
+		var old := _site_nodes[anchor] as BuildSiteNode
+		if old != null and is_instance_valid(old):
+			old.queue_free()
+	_site_nodes.clear()
+	for site in _sites.sites:
+		_spawn_site_node(site)
+
+## 跨日推进工期；竣工的按「开工时那天」记账落成
+func _tick_construction() -> void:
+	if _sites.is_empty():
+		return
+	var done := _sites.tick_day()
+	for site in _sites.sites:
+		var n := _site_nodes.get(Vector2i(int(site["x"]), int(site["y"]))) as BuildSiteNode
+		if n != null and is_instance_valid(n):
+			n.refresh(int(site["days_left"]))
+	for site in done:
+		var anchor := Vector2i(int(site["x"]), int(site["y"]))
+		_remove_site_node(anchor)
+		_build_now(StringName(str(site["def_id"])), anchor, int(site["day_started"]))
+		_say("%s 竣工了" % BuildingDB.name_of(StringName(str(site["def_id"]))))
+	_refresh_hud()
 
 # ---------------- 升级 ----------------
 
@@ -2237,6 +2323,13 @@ func _refresh_build_effects() -> void:
 		if n != null and n.building != null:
 			n.refresh_state(n.building.can_upgrade())
 	_refresh_barns()       # 棚舍床位变了，建筑上的「住了几只」要重画
+	# 模块 12：谷仓 → 背包格（每级 +8）；温室 → 反季种植（FarmGrid.season = -1 表示不限制）
+	var granary_level := 0
+	for gb in _builds.buildings_of_category(BuildingDef.CAT_STORAGE):
+		granary_level += (gb as PlacedBuilding).level
+	GameState.set_bonus_slots(granary_level * 8)
+	_grid.season = -1 if _builds.has_building(&"greenhouse") else GameClock.season
+	_rebuild_site_nodes()
 	_refresh_hud()
 	_refresh_toolbar()
 	_refresh_build_hint()
@@ -2711,6 +2804,7 @@ func _enter_with_carry() -> void:
 	if incoming.is_empty():
 		return
 	_apply_save(incoming)
+	_catch_up_days(incoming)      # 模块 12：在屋里睡掉的那几天，牧场要补结算
 	if SceneRouter.has_pending_pos:
 		_set_player_global_pos(SceneRouter.pending_pos)
 	else:
@@ -2720,3 +2814,26 @@ func _enter_with_carry() -> void:
 	_refresh_toolbar()
 	_say("回到牧场 · 第 %d 天 %s · %s" % [GameClock.day, GameClock.clock_text(),
 		"按 E 进门/去镇上/进矿洞"])
+
+## 模块 12：在屋里睡掉的天数要补结算。
+## 睡觉由 DayCycle 推进 GameClock.day，但牧场不在场景树里（模块 11 的 change_scene 会 free 掉），
+## 所以 _on_day 没人跑。回场时按「存档里的天数」和「当前天数」的差值补跑。
+## 上限 7 天：手改存档 / 死循环时不会一次结算出一年的作物。
+func _catch_up_days(incoming: Dictionary) -> void:
+	var saved_clock: Dictionary = incoming.get("clock", {})
+	var saved_abs := int(saved_clock.get("season", 0)) * GameClock.DAYS_PER_SEASON \
+		+ int(saved_clock.get("day", GameClock.day))
+	var now_abs := GameClock.season * GameClock.DAYS_PER_SEASON + GameClock.day
+	var delta := now_abs - saved_abs
+	if delta <= 0:
+		return
+	delta = mini(delta, 7)
+	for i in range(delta):
+		# 热饭菜 buff：昨天做的那顿饭，今天给全牧群 +5 友好度
+		var buff_day := GameClock.day - delta + i
+		if GameState.consume_buff(&"warm_meal", buff_day):
+			for a in _herd.animals:
+				if a.has_method("gain_affection"):
+					a.gain_affection(5)
+		_on_day(GameClock.day, GameClock.season, GameClock.year)
+	_say("牧场补上了 %d 天的结算" % delta)

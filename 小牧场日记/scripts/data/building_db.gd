@@ -50,10 +50,10 @@ func load_csv() -> void:
 		defs[d.id] = d
 	print("[BuildingDB] 载入 %d 种可建造物" % defs.size())
 
-## 把一行补齐到 16 列，缺的位置填 ""（BuildingDef.from_row 自己会兜 0 / 1）
+## 把一行补齐到 18 列（模块 12 加了 stone_count / build_days），缺的位置填 ""
 func _padded(row: PackedStringArray) -> PackedStringArray:
 	var out := row
-	while out.size() < 16:
+	while out.size() < 18:
 		out.append("")
 	return out
 

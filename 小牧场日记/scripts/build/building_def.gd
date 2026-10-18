@@ -24,6 +24,10 @@ const CAT_WORKSHOP := &"workshop"
 const CAT_MARKET := &"market"
 const CAT_TOWN := &"town"
 const CAT_SPECIAL := &"special"
+## 模块 12（7.5）：谷仓 / 温室。住宅不在这张表里 —— 它是「继承的老屋」，
+## 走 house_levels.csv 的三级升级（有独立室内场景和功能解锁），详见 _uu/模块12 文档。
+const CAT_STORAGE := &"storage"
+const CAT_GREENHOUSE := &"greenhouse"
 
 ## 拆建筑返还比例（GDD §6：拆除返还 50% 材料）
 const REFUND_RATIO := 0.5
@@ -50,6 +54,10 @@ var efficiency: int = 0
 ## 需要牧场到第几阶段才能盖（0 = 开局就能盖）
 var stage_required: int = 0
 var note: String = ""
+## 模块 12：石头建材（谷仓/温室/加工坊要石头，杂货铺有卖）
+var stone_count: int = 0
+## 模块 12：工期（游戏日）。0 = 当场落成；1–3 天进入施工队列
+var build_days: int = 0
 
 ## 一行 CSV → 一份 Def。列顺序见 data/buildings.csv 的表头。
 ## ⚠️ 解析放在 DB 里做，这里只接一个已经切好的行数组 —— 方便测试直接构造。
@@ -70,6 +78,9 @@ static func from_row(row: PackedStringArray) -> BuildingDef:
 	d.efficiency = maxi(0, int(row[13]))
 	d.stage_required = maxi(0, int(row[14]))
 	d.note = row[15].strip_edges() if row.size() > 15 else ""
+	# 模块 12 追加的两列：放在最后，老行（没有这两列）读出来是 0
+	d.stone_count = maxi(0, int(row[16])) if row.size() > 16 else 0
+	d.build_days = maxi(0, int(row[17])) if row.size() > 17 else 0
 	return d
 
 ## 占地格数 → 相对锚点的偏移表（含 (0,0)）
@@ -121,9 +132,12 @@ func upgrade_wood(lv: int) -> int:
 static func refund_of(spent: int) -> int:
 	return int(floor(float(spent) * REFUND_RATIO))
 
-## "900G + 木材×15"
+## "900G + 木材×15 + 石头×2"
 func cost_text() -> String:
-	return "%dG + %s×%d" % [price, ProductDB.display_name(material), material_count]
+	var s := "%dG + %s×%d" % [price, ProductDB.display_name(material), material_count]
+	if stone_count > 0:
+		s += " + 石头×%d" % stone_count
+	return s
 
 ## "Lv2 容量 +7 / 速度 +30%"（提示条用）
 func stat_text(lv: int) -> String:

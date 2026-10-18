@@ -103,13 +103,13 @@ func _build_world() -> void:
 		add_child(ex)
 		ex.setup(e["to"], e["entry"], str(e["label"]),
 			Vector2(e["pos"]), Vector2(e["size"]))
-	# 可交互物
-	for p in RoomData.props_of(room_id):
-		var prop := RoomProp.new()
-		prop.name = "Prop_" + String(p["id"])
-		add_child(prop)
-		prop.setup(p["id"], p["action"], str(p["label"]),
-			Vector2(p["pos"]), Vector2(p["size"]))
+	# 可交互物：住宅按**等级**动态生成（模块 12 需求 3），其余房间读 RoomData
+	if room_id == &"house":
+		_build_house_props()
+	else:
+		for p in RoomData.props_of(room_id):
+			_add_prop(p["id"], p["action"], str(p["label"]),
+				Vector2(p["pos"]), Vector2(p["size"]))
 
 func _draw() -> void:
 	var size := Vector2(RoomData.room_size(room_id))
@@ -132,6 +132,30 @@ func _draw() -> void:
 	# 墙上的暗角，别让房间看起来像一个纯色矩形
 	draw_rect(Rect2(16, 16, size.x - 32, 10), Color(0, 0, 0, 0.18))
 	draw_rect(Rect2(16, 16, 10, size.y - 32), Color(0, 0, 0, 0.18))
+	_draw_furniture()          # 模块 12：玩家摆的家具（画在地板上、道具下面）
+
+## 住宅里的道具随等级增加（需求 3）：
+##   Lv1 床 + 存档箱 + 工作台（升级用）
+##   Lv2 再加灶台（做饭）
+##   Lv3 再加地窖门（酿酒）
+## 工作台放在屋里而不是农场：房子的升级本来就该在**房子里**点。
+func _build_house_props() -> void:
+	var lv := GameState.house_level
+	_add_prop(&"bed", &"bed", "床（睡觉 → 次日）", Vector2(150, 240), Vector2(64, 36))
+	_add_prop(&"chest", &"save", "存档柜", Vector2(510, 240), Vector2(52, 36))
+	_add_prop(&"bench", &"house_upgrade", "工作台（升级房子）", Vector2(510, 110),
+		Vector2(60, 36))
+	if lv >= 2:
+		_add_prop(&"kitchen", &"cook", "灶台（做饭）", Vector2(330, 240), Vector2(66, 36))
+	if lv >= 3:
+		_add_prop(&"cellar", &"brew", "地窖门（酿酒）", Vector2(150, 110), Vector2(56, 36))
+
+func _add_prop(id: StringName, action: StringName, label: String,
+		pos: Vector2, size: Vector2) -> void:
+	var prop := RoomProp.new()
+	prop.name = "Prop_" + String(id)
+	add_child(prop)
+	prop.setup(id, action, label, pos, size)
 
 # ---------------- 落位（入口 / 读档）----------------
 
@@ -175,10 +199,13 @@ func _on_prop_used(prop_id: StringName, action: StringName) -> void:
 		"shop":
 			_open_shop()
 		"bed":
-			_talk("床", [
-				"（被褥叠得很整齐，是妈妈留下的那种叠法。）",
-				"（现在还不困 —— 先把今天的活干完吧。）",
-			], Color("#7A6EA8"))
+			_sleep()
+		"cook":
+			_cook()
+		"brew":
+			_brew()
+		"house_upgrade":
+			_upgrade_house()
 		"machine":
 			_talk_machine()
 		_:
@@ -193,6 +220,126 @@ func _on_dialogue_requested(speaker: String, lines: Array, color: Color) -> void
 	if _dialogue != null:
 		_dialogue.show_dialogue(speaker, lines, color)
 
+# ---------------- 住宅：睡觉 / 做饭 / 酿酒 / 升级（需求 3 / 4 / 5）----------------
+
+## 睡觉（需求 4 / 5）：推进到次日 + 自动存档，人还醒在屋里（出门才回牧场）
+## 为什么睡觉要自动存档：这是**唯一的跨日点**，不存的话玩家睡完直接关游戏就白睡一天。
+func _sleep() -> void:
+	var day := DayCycle.sleep_to_next_day()
+	SceneRouter.save_session(SaveSystem.SLOT_AUTO)
+	_say("第 %d 天 %s · 已睡到天亮（自动存档 %s）" % [day, GameClock.clock_text(),
+		SaveSystem.slot_label(SaveSystem.SLOT_AUTO)])
+	_refresh_hud()
+	_rebuild_house_props()
+
+## 睡觉后等级可能变了（升级在工期里完成），道具要重建
+func _rebuild_house_props() -> void:
+	if room_id != &"house":
+		return
+	for child in get_children():
+		if child is RoomProp:
+			child.queue_free()
+	_build_house_props()
+
+## 做饭（Lv2）：消耗牛奶 + 鸡蛋 → 家常菜；当天动物友好度 +5（次日结算时生效）
+func _cook() -> void:
+	if GameState.house_level < 2:
+		_say("还没有厨房 —— 先把房子升到 Lv2")
+		return
+	if GameState.has_buff(&"cooked", GameClock.day):
+		_say("今天已经做过一顿了（一天一次）")
+		return
+	if GameState.count_item(&"milk") < 1 or GameState.count_item(&"egg") < 1:
+		_say("要 牛奶×1 + 鸡蛋×1")
+		return
+	GameState.remove_item(&"milk", 1)
+	GameState.remove_item(&"egg", 1)
+	GameState.add_item(&"home_cooked", 1)
+	GameState.set_buff(&"cooked", GameClock.day)
+	GameState.set_buff(&"warm_meal", GameClock.day)
+	_say("做了一份家常菜（放背包 · 可卖）· 今天动物会吃得很开心")
+	_refresh_hud()
+
+## 酿酒（Lv3）：消耗蜂蜜×2 → 蜂蜜酒
+func _brew() -> void:
+	if GameState.house_level < 3:
+		_say("还没有地窖 —— 先把房子升到 Lv3")
+		return
+	if GameState.has_buff(&"brewed", GameClock.day):
+		_say("今天已经酿过一轮了（一天一次）")
+		return
+	if GameState.count_item(&"honey") < 2:
+		_say("要 蜂蜜×2")
+		return
+	GameState.remove_item(&"honey", 2)
+	GameState.add_item(&"mead", 1)
+	GameState.set_buff(&"brewed", GameClock.day)
+	_say("酿出了一瓶蜂蜜酒（放背包 · 可卖）")
+	_refresh_hud()
+
+## 升级住宅（需求 3）：扣钱料 → 进工期（2/3 天）→ DayCycle 跨日推进 → 等级 +1
+func _upgrade_house() -> void:
+	var lv := GameState.house_level
+	if GameState.house_upgrade_days > 0:
+		_say("还在施工 · 剩 %d 天（睡一觉就会推进）" % GameState.house_upgrade_days)
+		return
+	var cost := HouseDB.upgrade_cost(lv)
+	if cost.is_empty():
+		_say("房子已经是最高级 Lv%d 了" % lv)
+		return
+	if GameState.gold < int(cost["gold"]):
+		_say("要 %dG，还差 %dG" % [int(cost["gold"]), int(cost["gold"]) - GameState.gold])
+		return
+	if GameState.count_item(&"wood") < int(cost["wood"]) or \
+			GameState.count_item(&"stone") < int(cost["stone"]):
+		_say("还缺 木材×%d / 石头×%d" % [int(cost["wood"]), int(cost["stone"])])
+		return
+	GameState.spend_gold(int(cost["gold"]))
+	GameState.remove_item(&"wood", int(cost["wood"]))
+	GameState.remove_item(&"stone", int(cost["stone"]))
+	GameState.house_upgrade_target = int(cost["to"])
+	GameState.house_upgrade_days = int(cost["days"])
+	_say("开工 · 「%s」%d 天后落成（睡 %d 觉）" % [cost["name"], int(cost["days"]),
+		int(cost["days"])])
+	_refresh_hud()
+
+# ---------------- 家具摆放（需求 4 · 可选）----------------
+#
+# 规则压到最简：
+#   F = 把背包里的家具放到脚下那一格（地毯 / 盆栽）
+#   站在家具上按 F = 收回家具
+# 家具的真源是 GameState.furniture（存档里带坐标），这里只画 + 改数据。
+
+const FURNITURE := [&"rug", &"plant"]
+
+func _furniture_action() -> void:
+	var cell := WorldConfig.px_to_cell(_player.global_position)
+	var here := GameState.take_furniture(cell)
+	if here != &"":
+		GameState.add_item(here, 1)
+		_say("收起了 %s" % ItemDB.display_name(here))
+		queue_redraw()
+		return
+	for id in FURNITURE:
+		if GameState.count_item(id) > 0:
+			if GameState.add_furniture(id, cell):
+				GameState.remove_item(id, 1)
+				_say("摆下了 %s（F 可以收回）" % ItemDB.display_name(id))
+				queue_redraw()
+			else:
+				_say("这一格已经有家具了")
+			return
+	_say("背包里没有家具 —— 小镇杂货铺有卖")
+
+func _draw_furniture() -> void:
+	var tile := float(WorldConfig.TILE)
+	for f in GameState.furniture:
+		var id := StringName(str(f["id"]))
+		var cell := Vector2i(int(f["x"]), int(f["y"]))
+		var r := Rect2(Vector2(cell) * tile + Vector2(4, 4), Vector2(tile - 8, tile - 8))
+		var col := Color("#C06A8A") if id == &"rug" else Color("#4F9A5E")
+		draw_rect(r, col)
+		draw_rect(r, col.lightened(0.25), false, 1.0)
 ## 矿洞里的机器：和模块 10 的 B 线咬在一起（有没有唤醒，台词不一样）
 func _talk_machine() -> void:
 	if GameState.story_flag(&"quest_secret_done"):
@@ -313,9 +460,13 @@ func _refresh_hud() -> void:
 	if _hud == null:
 		return
 	var season: String = GameClock.SEASON_NAME[clampi(GameClock.season, 0, 3)]
-	_hud.text = "%s\n第 %d 天 %s %s · %dG · 背包 %d/%d 格\nE 交互 · F5 快速存档 · F6 存档面板 · F9 读档" % [
-		RoomData.room_name(room_id),
-		GameClock.day, season, GameClock.clock_text(), GameState.gold,
+	var title := RoomData.room_name(room_id)
+	if room_id == &"house":
+		title = "住宅 Lv%d「%s」· %s" % [GameState.house_level,
+			HouseDB.name_of(GameState.house_level),
+			HouseDB.features_text(GameState.house_level)]
+	_hud.text = "%s\n第 %d 天 %s %s · %dG · 背包 %d/%d 格\nE 交互 · F 摆家具 · F5 存档 · F6 存档面板 · F9 读档" % [
+		title, GameClock.day, season, GameClock.clock_text(), GameState.gold,
 		GameState.used_slot_count(), GameState.slot_capacity()]
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -323,4 +474,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		# 商店开着的时候 T 切买卖（ShopUI 自己不发这个信号，房间这边接一下）
 		if _shop != null and _shop.is_open() and event.keycode == KEY_T:
 			_on_mode_toggle()
+			get_viewport().set_input_as_handled()
+			return
+		# 模块 12：屋内 F 摆/收家具
+		if room_id == &"house" and event.keycode == KEY_F and not EventBus.ui_modal:
+			_furniture_action()
 			get_viewport().set_input_as_handled()

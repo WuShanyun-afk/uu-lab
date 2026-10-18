@@ -96,6 +96,24 @@ func _roll_day() -> void:
 		EventBus.season_changed.emit(season)
 	EventBus.day_advanced.emit(day, season, year)
 
+## 主动睡觉（模块 12）：和 2:00 强制入睡走同一套跨日逻辑，但**不**发 forced_sleep。
+## 发 forced_sleep = 昏倒（要扣钱）；睡觉是正常行为，所以分成两个入口。
+func sleep_next_day() -> void:
+	minutes = 0
+	var p := phase_at(0)
+	if p != phase:
+		var old := phase
+		phase = p
+		EventBus.phase_changed.emit(old, p)
+	day += 1
+	if day > DAYS_PER_SEASON:
+		day = 1
+		season = (season + 1) % 4
+		if season == 0:
+			year += 1
+		EventBus.season_changed.emit(season)
+	EventBus.day_advanced.emit(day, season, year)
+
 ## 当日已过分钟 → 时段
 func phase_at(m: int) -> Phase:
 	if m < 180:        # 6:00 – 9:00
