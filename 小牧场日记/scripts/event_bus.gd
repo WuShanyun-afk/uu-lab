@@ -147,6 +147,20 @@ signal story_ending(node_id: StringName)
 ## 房间里某个可交互物被用（prop_id, action：save / shop / bed / machine / info）
 signal room_prop_used(prop_id: StringName, action: StringName)
 
-## 换场景完成（新场景 _ready 之后）
-signal scene_entered(scene_id: StringName)
+# 换场完成的信号在 SceneRouter 上（SceneRouter.scene_entered），不要在这里再造一个：
+# 模块 11 曾经留过一个同名死信号，结果音频系统连错了地方、进屋不换 BGM。
+
+# ---------------- 附属模块 1（全局音频与氛围）----------------
+## 音频系统只订阅这些**已经在发生的玩法事件**，不反过来改玩法。
+## 这样「加音效」= 在一个地方订阅，不用去每个系统里埋 AudioManager 调用。
+
+## 金币变化（delta 正为入账、负为花费；total 是变化后的余额）
+## 由 GameState.add_gold / spend_gold 广播 —— 那里是金币唯一的出入口。
+signal gold_changed(delta: int, total: int)
+
+## 动物叫了一声（species 是物种 id，pos 是世界坐标）—— 只有镜头附近的动物才会发
+signal animal_vocalized(species: StringName, pos: Vector2)
+
+## 玩家落地走了一步（世界坐标）—— 具体踩的是草/泥/木板由地表查询决定
+signal player_stepped(world_pos: Vector2)
 

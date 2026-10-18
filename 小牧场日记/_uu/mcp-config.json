@@ -61,14 +61,16 @@
       "args": ["-y", "@pixelbananas/mcp"],
       "env": {
         "PIXELBANANAS_TOKEN": "pba_live_REPLACE_ME",
-        "PIXELBANANAS_OUTPUT_DIR": "D:/UU的办公室/小牧场日记/assets/audio",
+        "PIXELBANANAS_OUTPUT_DIR": "D:/UU的办公室/小牧场日记/audio/sfx",
         "HTTP_PROXY": "http://127.0.0.1:7892",
         "HTTPS_PROXY": "http://127.0.0.1:7892",
         "NO_PROXY": "localhost,127.0.0.1,::1,registry.npmmirror.com"
-      }
+      },
+      "_note": "音效生成。输出目录已改到 audio/sfx（原来指向 assets/audio，和 data/audio.csv 的 res://audio/sfx/<id>.wav 对不上）。生成后要按 id 重命名，BGM 仍用 _uu/gen_audio.py。详见 _uu/音频MCP使用指南.md。"
     }
   },
   "_windows_note": "Windows 上若客户端报 spawn npx ENOENT，把 command 改成：C:\\Users\\32265\\AppData\\Local\\Programs\\nodejs\\npx.cmd",
+  "_audio_note": "sfx-gen-mcp 只有 GitHub 仓库（JimCline/sfx-gen-mcp），npm/PyPI 都 404，不是能直接 npx 的 MCP server；它要 HF 门禁模型 + GPU，只做 SFX。BGM 两个包都做不了，继续用 _uu/gen_audio.py。详见 _uu/音频MCP使用指南.md。",
   "_prereq": {
     "node": "v24.20.0",
     "uv": "0.13.1  (C:\\Users\\32265\\.local\\bin\\uvx.exe)",

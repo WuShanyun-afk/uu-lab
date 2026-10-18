@@ -32,6 +32,9 @@ SceneRouter="*res://scripts/world/scene_router.gd"
 SavePanel="*res://scripts/ui/save_panel.gd"
 HouseDB="*res://scripts/data/house_db.gd"
 DayCycle="*res://scripts/world/day_cycle.gd"
+AudioDB="*res://scripts/data/audio_db.gd"
+AudioManager="*res://scripts/audio/audio_manager.gd"
+AudioDebugPanel="*res://scripts/ui/audio_debug_panel.gd"
 
 [display]
 

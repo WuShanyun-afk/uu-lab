@@ -49,6 +49,9 @@ var focus: Interactable = null
 ## 一次性动作（浇水 / 锄地）播放中，期间锁移动
 var _busy := false
 var _last_prompt := ""
+## 脚步节流（模块 附1）：按走得时间算，不按帧算 —— 帧率高低不该改变脚步声密度
+var _step_timer := 0.0
+const STEP_INTERVAL := 0.34
 
 func _ready() -> void:
 	# 探针只扫「可交互物」层（layer 2），自己不上任何层
@@ -56,16 +59,24 @@ func _ready() -> void:
 	_probe.collision_mask = 2
 	_probe.monitoring = true
 	_probe.monitorable = false
+	# 模块 附1：2D 音效（动物叫 / 建造落点）要被听见，场景里必须有一个音频监听者。
+	# 挂在玩家身上而不是各个场景：牧场和房间场景共用 player.tscn，走到哪听到哪，改一处就够。
+	var listener := AudioListener2D.new()
+	listener.name = "AudioListener2D"
+	add_child(listener)
+	listener.make_current()
 
-func _physics_process(_delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	# 商店 / 小游戏弹着的时候冻结玩家（模块 4）。
 	# 玩家只认 EventBus.ui_modal 这一个开关，不需要知道是谁弹的 UI。
 	if EventBus.ui_modal:
 		velocity = Vector2.ZERO
+		_step_timer = 0.0
 		move_and_slide()
 		return
 	if _busy:
 		velocity = Vector2.ZERO
+		_step_timer = 0.0
 		move_and_slide()
 		_scan_interactables()
 		return
@@ -77,8 +88,15 @@ func _physics_process(_delta: float) -> void:
 		facing8 = dir8_of(dir)
 		facing = cardinal_of(facing8)
 		_play("walk_" + facing)
+		# 模块 附1：走一步发一个「脚步」事件，具体是草/泥/木板由地表查询决定，
+		# player 不关心地表长什么样（房间场景没有 FarmGrid，也不该逼它知道）。
+		_step_timer -= delta
+		if _step_timer <= 0.0:
+			_step_timer = STEP_INTERVAL
+			EventBus.player_stepped.emit(global_position)
 	else:
 		_idle()
+		_step_timer = 0.0
 	_scan_interactables()
 
 func _unhandled_input(event: InputEvent) -> void:

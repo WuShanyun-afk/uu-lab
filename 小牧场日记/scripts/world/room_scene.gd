@@ -47,6 +47,12 @@ func _ready() -> void:
 	EventBus.room_prop_used.connect(_on_prop_used)
 	EventBus.dialogue_requested.connect(_on_dialogue_requested)
 	EventBus.world_message.connect(_say)              # 存档面板的提示也走提示条
+	# 模块 附1：屋里是木地板，脚步换个音；回牧场时 main 会把地表查询重新注册回来
+	AudioManager.set_terrain_provider(_terrain_wood)
+
+## 房间地表恒为木地板（没有 FarmGrid，也不需要知道草地是什么）
+func _terrain_wood(_world_pos: Vector2) -> StringName:
+	return &"wood"
 
 func _process(_delta: float) -> void:
 	var now := Time.get_ticks_msec() / 1000.0
