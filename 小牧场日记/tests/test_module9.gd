@@ -447,7 +447,7 @@ func _test_grid_save() -> void:
 
 func _test_save_v2() -> void:
 	print("[8] 存档 v2：版本号 + 老档迁移")
-	_check(SaveSystem.VERSION == 2, "存档版本升到 v2（%d）" % SaveSystem.VERSION)
+	_check(SaveSystem.VERSION >= 2, "存档版本 >= v2（现在是 v%d）" % SaveSystem.VERSION)
 
 	# v1 老档迁移：补 buildings 段，其它一个字段都不许动
 	var v1 := {
@@ -456,7 +456,7 @@ func _test_save_v2() -> void:
 		"state": {"gold": 999},
 	}
 	var m := SaveSystem.migrate(v1, 1)
-	_check(int(m["version"]) == 2, "迁移后版本 = 2")
+	_check(int(m["version"]) == SaveSystem.VERSION, "迁移后版本 = 当前版本（v%d）" % SaveSystem.VERSION)
 	_check(typeof(m.get("buildings")) == TYPE_DICTIONARY, "迁移补了 buildings 段")
 	_check(int(m["buildings"]["stage"]) == 0, "老档阶段 = 0（一片空地）")
 	_check((m["buildings"]["items"] as Array).is_empty(), "老档没有建筑")
@@ -512,6 +512,11 @@ func _test_main_integration() -> void:
 	GameState.add_item(&"wood", 500)
 	m._builds.stage = 5
 	await get_tree().process_frame
+
+	# 模块 10 加进来以后，_process 可能会弹剧情对话（UI 模态会挡住建造模式开关），
+	# 先把对话框清空再测建造
+	while m._dialogue.is_open():
+		m._dialogue.skip()
 
 	# 9.1 建造模式开关
 	m._toggle_build_mode()

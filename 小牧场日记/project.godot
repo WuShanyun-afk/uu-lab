@@ -26,6 +26,7 @@ BuildingDB="*res://scripts/data/building_db.gd"
 HousingDB="*res://scripts/data/housing_db.gd"
 ItemDB="*res://scripts/data/item_db.gd"
 RecipeDB="*res://scripts/data/recipe_db.gd"
+NpcDB="*res://scripts/data/npc_db.gd"
 GameState="*res://scripts/game_state.gd"
 
 [display]

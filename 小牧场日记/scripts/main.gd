@@ -47,6 +47,7 @@ const SHOP_BREED := &"breed"       ## 模块 5：繁殖棚（盖房 or 选父母
 const SHOP_TOOL := &"tool"         ## 模块 7：工具铺（锄头 / 洒水壶 / 背包升级）
 const SHOP_ORDER := &"order"       ## 模块 7：订单板（NPC 委托）
 const SHOP_CRAFT := &"craft"       ## 模块 7：加工坊（放料 / 取货）
+const SHOP_GIFT := &"gift"         ## 模块 10：送礼面板（借商店壳，价格 0、效果是好感）
 
 ## 杂货铺卖的东西（价格一律来自 products.csv）
 const SUPPLY_ITEMS: Array[StringName] = [&"feed", &"medicine", &"wood"]
@@ -79,6 +80,7 @@ const WOOD := &"wood"
 @onready var _workshop: CraftWorkshop = $World/CraftWorkshop
 @onready var _build_root: Node2D = $World/YSortRoot/BuildRoot     # 模块 9：落地建筑的父节点
 @onready var _cursor: BuildCursor = $World/BuildCursor            # 模块 9：幽灵预览
+@onready var _npc_root: Node2D = $World/YSortRoot/NpcRoot         # 模块 10：村民父节点
 
 var _grid: FarmGrid
 var _herd: Herd
@@ -107,6 +109,16 @@ var _build_pick: int = 0
 ## 模块 9：排队等提示条的播报（阶段达成这种「迟早要说」的话，
 ## 不能当场抢掉玩家刚看到的「木材不够」—— 等提示条空了再说）
 var _tip_queue: Array[String] = []
+## 模块 10：村民好感状态（真源，存档整段序列化）
+var _npcs := NpcRegistry.new()
+## 模块 10：锚点 —— 村民 id -> NpcNode（纯视图）
+var _npc_nodes: Dictionary = {}
+## 模块 10：剧情推进器（纯逻辑）
+var _story := StorySystem.new()
+## 模块 10：送礼面板当前对着谁
+var _gift_target: StringName = &""
+## 模块 10：正在播的剧情节点 id（播完才登记，避免中途存档丢一段）
+var _story_pending: StringName = &""
 
 func _ready() -> void:
 	_storm_rng.seed = 20261022
@@ -134,6 +146,7 @@ func _ready() -> void:
 	EventBus.portal_used.connect(_on_portal)                 # 模块 5
 	EventBus.dialogue_requested.connect(_on_dialogue)        # 模块 5
 	EventBus.housing_upgrade_requested.connect(_on_housing_upgrade)   # 模块 6
+	EventBus.npc_interacted.connect(_on_npc_interacted)               # 模块 10
 	_shop.buy_requested.connect(_on_buy)
 	_shop.sell_requested.connect(_on_sell)          # 模块 7：回收（SELL 模式）
 	_shop.mode_toggle_requested.connect(_on_mode_toggle)
@@ -152,6 +165,8 @@ func _ready() -> void:
 	_init_workshop()             # 模块 7：加工坊等级 + 节点状态
 	_tick_orders()               # 模块 7：开局就刷 2 单（day 1 - (-999) >= 3）
 	_init_buildings()            # 模块 9：建造网格 + 阶段（开局一片空地，阶段 0）
+	_init_npcs()                 # 模块 10：8 位村民 + 好感表
+	_init_story()                # 模块 10：三条主线（开局全是第 0 幕）
 	_refresh_hud()
 	_refresh_toolbar()
 	# 模块 8：有档就告诉玩家 F9 能续，没档就把键位一次性说清楚（只占 2.5 秒提示条）
@@ -188,6 +203,8 @@ func _process(_delta: float) -> void:
 	_check_awakenings()          # 模块 5：觉醒要**立刻**弹对话，不能等到跨日
 	_update_zone()               # 模块 5：进出花园 → 换相机 limit
 	_refresh_stage()             # 模块 9：指标变了就升阶段（升了才播报，其余帧直接 return）
+	_update_npcs()               # 模块 10：按日程表摆人（每帧 move_toward，看得见走动）
+	_refresh_story()             # 模块 10：有可播节点就播（一次只播一段）
 	var now := Time.get_ticks_msec() / 1000.0
 	if _tip_until > 0.0 and now > _tip_until:
 		_tip_until = 0.0
@@ -206,6 +223,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if event.keycode == KEY_B:
 			_toggle_build_mode()
+		elif event.keycode == KEY_G:
+			_try_open_gift()          # 模块 10：对着村民按 G 送礼
 		elif event.keycode == KEY_F11:
 			_toggle_fullscreen()
 		elif event.keycode == KEY_F5:
@@ -620,6 +639,8 @@ func _open_shop(shop_id: StringName) -> void:
 		_open_order_panel()
 	elif shop_id == SHOP_CRAFT:
 		_open_craft_panel()
+	elif shop_id == SHOP_GIFT:
+		_open_gift_panel(_gift_target)
 	elif shop_id == SHOP_BREED:
 		# 繁殖棚一个信号两件事：没盖就盖，盖了就配
 		if not GameState.has_flag(&"shed_built"):
@@ -630,17 +651,20 @@ func _open_shop(shop_id: StringName) -> void:
 ## 货架 = 当季 6 种种子 + 两档肥料
 func _seed_entries() -> Array:
 	var out: Array = []
+	var disc := _npcs.discount_percent(&"seed")      # 模块 10：玛莎 3 心
 	for id in CropDB.of_season(GameClock.season):
 		var c: CropData = CropDB.get_crop(id)
 		var item := CropDB.seed_item(id)
-		var afford := GameState.gold >= c.seed_price
+		var price := _discounted(c.seed_price, disc)
+		var afford := GameState.gold >= price
 		out.append({
 			"id": item,
 			"name": "%s种子" % c.display_name,
-			"price": c.seed_price,
-			"note": "%d天·卖%dG·需肥%s·有%d" % [
+			"price": price,
+			"note": "%d天·卖%dG·需肥%s·有%d%s" % [
 				c.grow_days, c.sell_price, ["低", "中", "高"][c.fertilize],
-				GameState.count_item(item)],
+				GameState.count_item(item),
+				"·好感-%d%%" % disc if disc > 0 else ""],
 			"enabled": afford,
 			"reason": "钱不够" if not afford else "",
 		})
@@ -695,14 +719,17 @@ func _animal_entries() -> Array:
 ## 货架 = 杂货铺三件套（饲料 / 药剂 / 木材），价格来自 products.csv
 func _supply_entries() -> Array:
 	var out: Array = []
+	var disc := _npcs.discount_percent(&"medicine")   # 模块 10：小葵 5 心
 	for id in SUPPLY_ITEMS:
 		var p := ProductDB.price(id)
-		var afford := GameState.gold >= p
+		var price := _discounted(p, disc) if id == MEDICINE else p
+		var afford := GameState.gold >= price
 		out.append({
 			"id": id,
 			"name": ProductDB.display_name(id),
-			"price": p,
-			"note": "%s · 有 %d" % [_supply_note(id), GameState.count_item(id)],
+			"price": price,
+			"note": "%s · 有 %d%s" % [_supply_note(id), GameState.count_item(id),
+				"·好感-%d%%" % disc if (disc > 0 and id == MEDICINE) else ""],
 			"enabled": afford,
 			"reason": "钱不够" if not afford else "",
 		})
@@ -732,6 +759,8 @@ func _tool_levels_text() -> String:
 
 func _tool_entries() -> Array:
 	var out: Array = []
+	var disc := _npcs.discount_percent(&"tool")       # 模块 10：老周 4 心
+	var golden := GameState.has_perk(&"golden_tools") # 模块 10：老周 8 心
 	for uid in ItemDB.upgrade_ids():
 		var u := ItemDB.get_upgrade(uid)
 		var tool: StringName = u["tool"]
@@ -740,13 +769,15 @@ func _tool_entries() -> Array:
 		var mat: StringName = u["material"]
 		var need := int(u["material_count"])
 		var have_mat := GameState.count_item(mat)
-		var price := int(u["price"])
+		var price := _discounted(int(u["price"]), disc)
 		var afford := GameState.gold >= price
 		var ok_mat := have_mat >= need
 		var owned := cur >= lv
 		var why := ""
 		if owned:
 			why = "已拥有"
+		elif lv >= 3 and not golden:
+			why = "要老周 8 心（黄金工具）"
 		elif not afford:
 			why = "钱不够"
 		elif not ok_mat:
@@ -755,9 +786,10 @@ func _tool_entries() -> Array:
 			"id": uid,
 			"name": str(u["name"]),
 			"price": price,
-			"note": "%s · 现在 Lv%d · 需 %s×%d" % [u["note"], cur,
-				ItemDB.display_name(mat), need],
-			"enabled": not owned and afford and ok_mat,
+			"note": "%s · 现在 Lv%d · 需 %s×%d%s" % [u["note"], cur,
+				ItemDB.display_name(mat), need,
+				"·好感-%d%%" % disc if disc > 0 else ""],
+			"enabled": not owned and afford and ok_mat and (lv < 3 or golden),
 			"reason": why,
 		})
 	return out
@@ -769,9 +801,12 @@ func _buy_upgrade(uid: StringName) -> bool:
 		return false
 	var tool: StringName = u["tool"]
 	var lv := int(u["level"])
-	var price := int(u["price"])
+	var price := _discounted(int(u["price"]), _npcs.discount_percent(&"tool"))
 	var mat: StringName = u["material"]
 	var need := int(u["material_count"])
+	if lv >= 3 and not GameState.has_perk(&"golden_tools"):
+		_say("%s 要老周的黄金工具认可（好感 8 心）" % u["name"])
+		return false
 	if GameState.tool_level(tool) >= lv:
 		_say("%s 已经拥有了" % u["name"])
 		return false
@@ -919,7 +954,8 @@ func _open_craft_panel() -> void:
 func _craft_entries() -> Array:
 	var out: Array = []
 	var free := _proc.first_free() >= 0
-	for rid in RecipeDB.all_ids():
+	# 模块 10：秘方要 NPC 好感解锁才会出现（RecipeDB.available_ids 里过滤）
+	for rid in RecipeDB.available_ids():
 		var r := RecipeDB.get_recipe(rid)
 		for q in range(3):
 			var input_item := CropQuality.item_id(r["input"], q)
@@ -937,9 +973,10 @@ func _craft_entries() -> Array:
 				"id": StringName("%s@%d" % [rid, q]),
 				"name": ItemDB.display_name(rid),
 				"price": 0,
-				"note": "%s×%d → %s（有 %d）" % [
+				"note": "%s×%d → %s（有 %d）%s" % [
 					ItemDB.display_name(input_item), need,
-					RecipeDB.minutes_text(int(r["minutes"])), have],
+					RecipeDB.minutes_text(int(r["minutes"])), have,
+					"·秘方" if RecipeDB.is_secret(rid) else ""],
 				"enabled": ok,
 				"reason": why,
 			})
@@ -1245,6 +1282,9 @@ func _on_buy(entry_id: StringName) -> void:
 		if _buy_upgrade(entry_id):
 			_refresh_shop()
 		return
+	if _shop_kind == SHOP_GIFT:
+		_give_gift(entry_id)
+		return
 
 	var bought := false
 	var spent := 0
@@ -1254,7 +1294,7 @@ func _on_buy(entry_id: StringName) -> void:
 	var animal: AnimalData = AnimalDB.get_animal(entry_id)
 
 	if seed_crop != null:
-		spent = seed_crop.seed_price
+		spent = _discounted(seed_crop.seed_price, _npcs.discount_percent(&"seed"))
 		if GameState.spend_gold(spent):
 			GameState.add_item(entry_id, 1)
 			_say("买了 1 颗 %s 种子（-%dG，共 %d 颗）" % [
@@ -1269,6 +1309,8 @@ func _on_buy(entry_id: StringName) -> void:
 			bought = true
 	elif SUPPLY_ITEMS.has(entry_id):
 		spent = ProductDB.price(entry_id)
+		if entry_id == MEDICINE:
+			spent = _discounted(spent, _npcs.discount_percent(&"medicine"))
 		if GameState.spend_gold(spent):
 			GameState.add_item(entry_id, 1)
 			_say("买了 1 份 %s（-%dG，共 %d）" % [
@@ -1325,6 +1367,8 @@ func _refresh_shop() -> void:
 			_shop.update_entries(_craft_entries())
 		SHOP_BREED:
 			_shop.update_entries(_breed_entries())
+		SHOP_GIFT:
+			_shop.update_entries(_gift_entries(_gift_target))
 
 ## 围栏内第一个没有动物的落点（模块 6：按物种落进自己的子栏）
 func _free_spawn_pos(species: StringName = &"") -> Vector2:
@@ -1433,6 +1477,7 @@ func _on_day(_d: int, _s: int, _y: int) -> void:
 		_animal_layer.refresh()
 	EventBus.animal_events.emit(aevents)     # ⚠️ 模块 8 修：这行以前被并进上一行的注释里，成了死代码
 	_refresh_barns()             # 模块 6：容量占用变了，建筑提示条要重画
+	_apply_immune_perk()         # 模块 10：小葵 9 心的「免疫一次生病」
 	_check_awakenings()          # 模块 5：留棚 +3 也可能把动物喂到 10 心
 	_sync_garden()
 	# 模块 7：换天 = 行情重掷。清缓存后 Market 会按新的 day 重算三个品类。
@@ -1743,11 +1788,12 @@ func _refresh_hud() -> void:
 	# ⚠️ HUD 的右边界是 442（不是 632）—— 再往右是 ClockBg 的地盘，模块 4 踩过。
 	var garden := " 🌸秘密花园" if GameState.garden_unlocked else ""
 	var barns := Housing.summary_text(_herd, GameState.barn_levels(), _builds.capacity_bonus())
-	_hud.text = "💰%dG  工具[%s]  觉醒 %d/%d%s  棚舍 %s\n动物[%s] 总心 %d  地[%d株 肥%d格]\n%s\n阶段 %d/%d %s · 订单 %d/%d · 加工 %d/%d槽\n背包 %d/%d格: %s" % [
+	_hud.text = "💰%dG  工具[%s]  觉醒 %d/%d%s  棚舍 %s\n动物[%s] 总心 %d  地[%d株 肥%d格]  ♥%d 剧情%d\n%s\n阶段 %d/%d %s · 订单 %d/%d · 加工 %d/%d槽\n背包 %d/%d格: %s" % [
 		GameState.gold, Player.TOOL_LABEL[_player.current_tool],
 		_herd.awakened_species_count(), AnimalDB.all_ids().size(), garden, barns,
 		_animal_summary(), _herd.total_hearts(),
 		_grid.crop_count(), _grid.fertilized_count(),
+		_npcs.total_hearts(), _story.done.size(),
 		Market.summary(GameClock.day, GameClock.season),
 		_builds.stage, RanchStage.last_stage(), RanchStage.stage_name(_builds.stage),
 		_orders.active_count(), OrderBoard.MAX_ACTIVE,
@@ -1864,6 +1910,8 @@ func _build_save() -> Dictionary:
 		"processor": _proc.to_dict(),
 		"player": _player.to_dict(),
 		"buildings": _builds.to_dict(),     # 模块 9：建筑账本 + 牧场阶段
+		"npcs": _npcs.to_dict(),            # 模块 10：好感 / 送礼记录
+		"story": _story.to_dict(),          # 模块 10：剧情进度 / 计数器 / 结局
 	}
 
 ## 存档。quiet = true 时不弹提示（自动存档用，别每天 2:00 怼玩家一句）
@@ -1916,6 +1964,8 @@ func _apply_save(d: Dictionary) -> void:
 	_proc.from_dict(d.get("processor", {}))
 	_player.from_dict(d.get("player", {}))
 	_builds.from_dict(d.get("buildings", {}))        # 模块 9：建筑先落数据（阶段也在里面）
+	_npcs.from_dict(d.get("npcs", {}))               # 模块 10：好感
+	_story.from_dict(d.get("story", {}))             # 模块 10：剧情进度
 	_zone_garden = WorldConfig.in_garden(_player.global_position)
 
 	Market.clear_cache()                     # 行情按读回来的天数重算
@@ -1940,6 +1990,8 @@ func _apply_save(d: Dictionary) -> void:
 
 	# 模块 9：建筑节点是纯视图，数据灌完再整批重建（比 diff 简单，也不会漏）
 	_rebuild_build_nodes()
+	# 模块 10：村民节点同样整批重建，并立刻按日程落位（别从 (0,0) 走过来）
+	_rebuild_npc_nodes()
 	EventBus.set_build_mode(false)
 	_cursor.hide_cursor()
 
@@ -2205,6 +2257,9 @@ func _stage_metrics() -> Dictionary:
 ## 只升不降 + 升了才播报，所以每帧调是安全的：绝大多数帧第一个 if 就 return。
 func _refresh_stage() -> void:
 	var nxt := RanchStage.next_stage(_builds.stage, _stage_metrics())
+	# 模块 10：第 5 阶段「小镇」要老陈 9 心给的扩建许可（两条线咬在一起）
+	if nxt >= 5 and not GameState.story_flag(&"permit_expansion"):
+		nxt = 4
 	if nxt == _builds.stage:
 		return
 	_builds.stage = nxt
@@ -2288,3 +2343,318 @@ func _sell_unit_price(id: StringName) -> int:
 	if base <= 0:
 		return base
 	return int(round(float(base) * (1.0 + _builds.sell_bonus())))
+
+# ============================================================================
+# 模块 10 · NPC 与剧情
+# ============================================================================
+#
+# 四条链路（需求 1 / 2 / 3 / 4 / 5）：
+#   ① 好感：E 说话（+5/天）· G 送礼（普通 +15 / 喜欢 +25 / 讨厌 -10，一天 2 次）
+#   ② 日程：NpcSchedule 按 分钟 + 本季第几天 求值 → 每帧喂给 NpcNode 走过去
+#   ③ 解锁：NPC 到心数 → 折扣 / 秘方 / 被动 / 剧情许可（NpcDB 的解锁表驱动）
+#   ④ 剧情：StorySystem 每帧问「有没有能播的节点」→ 对话框 → 发奖励 → 登记
+#
+# 分层（和前面九个模块一套）：
+#   NpcDef / NpcState    CSV 定义 / 好感点数（真源）
+#   NpcRegistry          8 个人的好感表 + 解锁汇总
+#   NpcSchedule          几点在哪（纯逻辑，headless 可断言）
+#   NpcNode              画人 + 走过去 + 被 E 到（纯视图）
+#   StoryData / StorySystem  剧情节点表 + 条件 DSL（纯逻辑）
+#   本文件               钱 / 物品 / 对话框 / 存档 / 把解锁落到实处
+#
+# ⚠️ 存档：npcs 与 story 是两段（v3）。老档没有这两段 → 读进来是「谁都没见过、
+#    一段剧情没播」，语义正确，不需要写迁移特例（SaveSystem.migrate 已补空段）。
+
+## 开局：好感表初始化 + 生成 8 个村民节点 + 按日程落位
+func _init_npcs() -> void:
+	_npcs.reset()
+	_rebuild_npc_nodes()
+
+## 整批重建村民节点（开局 / 读档）：数据在前，视图在后
+func _rebuild_npc_nodes() -> void:
+	for id in _npc_nodes.keys():
+		var old := _npc_nodes[id] as NpcNode
+		if old != null and is_instance_valid(old):
+			old.queue_free()
+	_npc_nodes.clear()
+	for id in NpcDB.all_ids():
+		var n := NpcNode.new()
+		n.name = "N_" + String(id)
+		_npc_root.add_child(n)
+		n.setup(id, _npcs.state(id))
+		_npc_nodes[id] = n
+	_update_npcs(true)            # 直接落位，别让村民从 (0,0) 走过来
+
+## 每帧：按日程把目标点 / 在场状态 / 在干什么喂给节点
+## force_snap = true 时直接落位（开局、读档、传送回牧场）
+func _update_npcs(force_snap: bool = false) -> void:
+	var minutes := GameClock.minutes
+	var season_day := NpcSchedule.day_of_season(GameClock.day)
+	for id in _npc_nodes:
+		var n := _npc_nodes[id] as NpcNode
+		if n == null or not is_instance_valid(n):
+			continue
+		var slot := NpcSchedule.slot_for(id, minutes, season_day)
+		var vis := not slot.is_empty() and bool(slot["visible"])
+		var action := "不在" if slot.is_empty() else str(slot["action"])
+		var pos := n.position
+		if not slot.is_empty():
+			pos = Vector2(float(slot["x"]), float(slot["y"]))
+		if force_snap:
+			n.snap_to(pos)
+			n.visible = vis
+			n.enabled = vis
+			n.action = action
+			n.queue_redraw()
+		else:
+			n.update_schedule(pos, vis, action)
+
+## 玩家 E 到的那个村民（不是村民就返回 &""）
+func _focused_npc() -> StringName:
+	var f := _player.focus
+	if f is NpcNode:
+		return (f as NpcNode).npc_id
+	return &""
+
+# ---------------- 对话 / 送礼（需求 1 / 3）----------------
+
+## E 对村民：聊天加点 + 播台词 + 结算新解锁
+func _on_npc_interacted(npc_id: StringName) -> void:
+	var st := _npcs.state(npc_id)
+	var d := NpcDB.def_of(npc_id)
+	if st == null or d == null:
+		return
+	var prev_hearts := st.hearts()
+	var met_before := st.met
+	var gained := _npcs.talk(npc_id, GameClock.day)
+	# 台词要在 talk() 之前取：talk() 会把 met 置 true，第一次见面的自我介绍就没了
+	var lines := NpcDB.greeting_lines(npc_id, _state_view(npc_id, met_before))
+	EventBus.dialogue_requested.emit("%s · %s" % [d.display_name, d.title], lines, d.color)
+	EventBus.npc_hearts_changed.emit(npc_id, st.hearts(), gained)
+	if gained > 0:
+		_say("%s 好感 +%d（♥%d/10）" % [d.display_name, gained, st.hearts()])
+	_apply_npc_unlocks(npc_id, prev_hearts)
+	# 模块 10：和这个人有关的剧情节点能播就接在后面（手动触发的那些）
+	var story_node := _story.pick_manual(_story_ctx(), npc_id)
+	if not story_node.is_empty():
+		_play_story(story_node, _story_ctx())
+	_refresh_npc_visual(npc_id)
+	_refresh_hud()
+	_refresh_toolbar()
+
+## 造一个「还没见过面」的视图给台词表用（不改真状态）
+func _state_view(npc_id: StringName, met: bool) -> NpcState:
+	var st := _npcs.state(npc_id)
+	if st == null:
+		return null
+	var v := NpcState.new(npc_id)
+	v.points = st.points
+	v.met = met
+	return v
+
+func _refresh_npc_visual(npc_id: StringName) -> void:
+	var n := _npc_nodes.get(npc_id) as NpcNode
+	if n != null and is_instance_valid(n):
+		n.refresh_visual()
+
+## G：开送礼面板（商店壳，价格 0、效果是好感）
+func _try_open_gift() -> void:
+	var id := _focused_npc()
+	if id == &"":
+		_say("走到村民面前按 G 才能送礼")
+		return
+	if not _npcs.can_gift(id, GameClock.day):
+		_say("%s 今天已经收过 %d 份礼物了 —— 明天再说" % [
+			NpcDB.name_of(id), NpcState.GIFTS_PER_DAY])
+		return
+	_gift_target = id
+	EventBus.shop_requested.emit(SHOP_GIFT)
+
+func _open_gift_panel(id: StringName) -> void:
+	if id == &"" or not NpcDB.has(id):
+		return
+	var d := NpcDB.def_of(id)
+	var st := _npcs.state(id)
+	_shop.open("送礼 · %s（%s · ♥%d/10）" % [d.display_name, d.title,
+		0 if st == null else st.hearts()], _gift_entries(id),
+		"↑↓ 选物品 · E 送出 · Esc 关掉（一天 %d 份）" % NpcState.GIFTS_PER_DAY)
+
+## 送礼货架 = 背包里所有能送人的东西（工具 / 种子也能送，但会显示真实反应）
+func _gift_entries(id: StringName) -> Array:
+	var out: Array = []
+	var d := NpcDB.def_of(id)
+	if d == null:
+		return out
+	var can := _npcs.can_gift(id, GameClock.day)
+	for item in GameState.inventory.keys():
+		var n := GameState.count_item(item)
+		if n <= 0:
+			continue
+		var delta := d.gift_points(item)
+		out.append({
+			"id": item,
+			"name": ItemDB.display_name(item),
+			"price": 0,
+			"note": "%s · 好感 %+d · 有 %d" % [d.gift_reaction(item), delta, n],
+			"enabled": can,
+			"reason": "" if can else "今天送够了",
+		})
+	out.sort_custom(func(a, b):
+		return d.gift_points(a["id"]) > d.gift_points(b["id"]))   # 喜欢的排前面
+	return out
+
+## 送出一份礼
+func _give_gift(item_id: StringName) -> void:
+	var id := _gift_target
+	var d := NpcDB.def_of(id)
+	if d == null or GameState.count_item(item_id) <= 0:
+		_refresh_shop()
+		return
+	# 每日上限在**这里**也判一次：面板会灰掉，但存档改数据 / 连点都可能绕过去
+	if not _npcs.can_gift(id, GameClock.day):
+		_say("%s 今天已经收过 %d 份礼物了 —— 明天再说" % [d.display_name,
+			NpcState.GIFTS_PER_DAY])
+		_refresh_shop()
+		return
+	var st := _npcs.state(id)
+	var prev_hearts := 0 if st == null else st.hearts()
+	var delta := _npcs.gift(id, item_id, GameClock.day)
+	GameState.remove_item(item_id, 1)
+	_say("%s %s %s · 好感 %+d（♥%d/10）" % [d.display_name, d.gift_reaction(item_id),
+		ItemDB.display_name(item_id), delta, _npcs.hearts(id)])
+	EventBus.npc_hearts_changed.emit(id, _npcs.hearts(id), delta)
+	_apply_npc_unlocks(id, prev_hearts)
+	_refresh_npc_visual(id)
+	_refresh_shop()
+	_refresh_hud()
+	_refresh_toolbar()
+
+# ---------------- 解锁结算（需求 3）----------------
+
+## 把「这次跨过的心数门槛」逐条落实。prev_hearts 是操作前的，避免重复发放。
+func _apply_npc_unlocks(id: StringName, prev_hearts: int) -> void:
+	var now := _npcs.hearts(id)
+	if now <= prev_hearts:
+		return
+	for u in NpcDB.unlocks_of(id):
+		var need := int(u["hearts"])
+		if need <= prev_hearts or need > now:
+			continue
+		var kind: StringName = u["kind"]
+		var uid: StringName = u["id"]
+		match String(kind):
+			"recipe":
+				GameState.unlock_recipe(uid)
+			"perk":
+				GameState.add_perk(uid)
+			"tool":
+				GameState.add_perk(&"golden_tools") if uid == &"golden" else GameState.add_perk(uid)
+			"story":
+				GameState.set_story_flag(uid)
+			"price":
+				pass              # 折扣是现算的（NpcRegistry.discount_percent），不用落地
+		EventBus.npc_unlocked.emit(id, need, kind, uid, str(u["text"]))
+		_say("♥ %s %d 心 · 解锁：%s" % [NpcDB.name_of(id), need, u["text"]])
+	_refresh_hud()
+	_refresh_toolbar()
+
+## 折扣价：price × (100 - percent) / 100，向下取整（别让折扣价四舍五入变贵）
+func _discounted(price: int, percent: int) -> int:
+	if percent <= 0:
+		return price
+	return maxi(1, int(floor(float(price) * (100.0 - float(percent)) / 100.0)))
+
+## 小葵 9 心的被动：每天跨日时把第一只生病的动物治好，然后消耗掉
+func _apply_immune_perk() -> void:
+	if not GameState.has_perk(&"immune_once"):
+		return
+	for a in _herd.animals:
+		if a.sick and a.has_method("cure"):
+			a.cure()
+			GameState.perks.erase(&"immune_once")
+			_say("小葵的药提前到货了 —— %s 的病好了（免疫一次已用掉）" % a.display_label())
+			_animal_layer.refresh()
+			return
+
+# ---------------- 剧情（需求 4 / 5）----------------
+
+func _init_story() -> void:
+	_story.reset()
+
+## 剧情条件上下文：每帧现拼一次（纯数据，StorySystem 不认识 GameState）
+func _story_ctx() -> Dictionary:
+	return {
+		"flags": GameState.story_flags,
+		"hearts": _npcs.hearts_map(),
+		"stage": _builds.stage,
+		"day": GameClock.day,
+		"season": GameClock.season,
+		"gold": GameState.gold,
+		"perks": GameState.perks,
+		"met": _npc_met_map(),
+		"count_item": Callable(GameState, "count_item"),
+	}
+
+func _npc_met_map() -> Dictionary:
+	var out: Dictionary = {}
+	for id in NpcDB.all_ids():
+		var st := _npcs.state(id)
+		out[id] = st != null and st.met
+	return out
+
+## 每帧问一次：能播就播一段。
+## 为什么不一口气全播：三线交织时同一帧可能同时满足 3 个节点，
+## 全塞进对话框队列会让玩家一口气读 15 句、还分不清是哪条线。
+func _refresh_story() -> void:
+	if _dialogue.is_open() or _shop.is_open() or _minigame.is_active():
+		return
+	var ctx := _story_ctx()
+	var node := _story.pick_auto(ctx)
+	if node.is_empty():
+		return
+	_play_story(node, ctx)
+
+func _play_story(node: Dictionary, _ctx: Dictionary) -> void:
+	var id: StringName = node["id"]
+	var quest: StringName = node["quest"]
+	EventBus.story_node_started.emit(id, quest)
+	# 先登记再播：玩家中途退出/读档也不会把同一段剧情重播到吐
+	var eff := _story.complete(node)
+	_apply_story_effects(eff)
+	var speaker := str(node.get("speaker", "剧情"))
+	var color := Color("#D8D2C0")
+	if node.get("npc", &"") != &"":
+		color = NpcDB.color_of(StringName(str(node["npc"])))
+	EventBus.dialogue_requested.emit(speaker, node.get("lines", []), color)
+	EventBus.story_node_done.emit(id)
+	if bool(node.get("ending", false)):
+		EventBus.story_ending.emit(id)
+		_say("—— 结局：%s ——" % speaker)
+	else:
+		_say("剧情推进 · %s（%d/%d 幕）" % [
+			StoryData.QUESTS[quest]["name"], _story.act_of(quest), StorySystem.max_act(quest)])
+	_refresh_hud()
+	_refresh_toolbar()
+
+## 剧情奖励：金币 / 物品（剧情标记在 StorySystem.complete 之外的由 effects.flag 落）
+func _apply_story_effects(eff: Dictionary) -> void:
+	if eff.has("gold"):
+		GameState.add_gold(int(eff["gold"]))
+	if eff.has("item"):
+		GameState.add_item(StringName(str(eff["item"])), int(eff.get("count", 1)))
+	if eff.has("flag"):
+		GameState.set_story_flag(StringName(str(eff["flag"])))
+
+## 剧情 / 好感的一行摘要（工具条 / 调试用）
+func story_summary() -> String:
+	return "%s · ♥%d · 村民 %d/%d 见过" % [
+		_story.progress_text(), _npcs.total_hearts(),
+		_npc_met_count(), NpcDB.all_ids().size()]
+
+func _npc_met_count() -> int:
+	var n := 0
+	for id in NpcDB.all_ids():
+		var st := _npcs.state(id)
+		if st != null and st.met:
+			n += 1
+	return n

@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://b2bipe3plpmiq"
+
+[deps]
+
+files=["res://data/npc_unlocks.hearts.translation", "res://data/npc_unlocks.kind.translation", "res://data/npc_unlocks.id.translation", "res://data/npc_unlocks.value.translation", "res://data/npc_unlocks.text.translation"]
+
+source_file="res://data/npc_unlocks.csv"
+dest_files=["res://data/npc_unlocks.hearts.translation", "res://data/npc_unlocks.kind.translation", "res://data/npc_unlocks.id.translation", "res://data/npc_unlocks.value.translation", "res://data/npc_unlocks.text.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

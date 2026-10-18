@@ -48,8 +48,9 @@ func _test_item_def() -> void:
 	var seeds := ItemDB.of_category(ItemDef.Cat.SEED)
 	_check(crops.size() == 24, "作物 24 种（%d）" % crops.size())
 	_check(seeds.size() == 24, "种子 24 种（%d）" % seeds.size())
-	_check(ItemDB.of_category(ItemDef.Cat.CRAFTED).size() == 11,
-		"加工品 11 种（%d）" % ItemDB.of_category(ItemDef.Cat.CRAFTED).size())
+	# 模块 10 加了 3 个「好感解锁」的秘方产物（蜂蜜黄油 / 香草奶酪 / 烟熏奶酪）
+	_check(ItemDB.of_category(ItemDef.Cat.CRAFTED).size() == 14,
+		"加工品 14 种（%d）" % ItemDB.of_category(ItemDef.Cat.CRAFTED).size())
 	_check(ItemDB.of_category(ItemDef.Cat.TOOL).size() == 6,
 		"工具升级 6 条（%d）" % ItemDB.of_category(ItemDef.Cat.TOOL).size())
 
