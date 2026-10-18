@@ -196,12 +196,15 @@ func consume_buff(name: StringName, day: int) -> bool:
 func add_gold(n: int) -> void:
 	gold += n
 	gold_changed.emit(gold)
+	# 模块 附1：金币是「入账音」的唯一入口 —— 音频系统只订阅，不改这里的任何逻辑
+	EventBus.gold_changed.emit(n, gold)
 
 func spend_gold(n: int) -> bool:
 	if gold < n:
 		return false
 	gold -= n
 	gold_changed.emit(gold)
+	EventBus.gold_changed.emit(-n, gold)
 	return true
 
 # ---------------- 槽位容量 ----------------

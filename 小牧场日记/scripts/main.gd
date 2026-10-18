@@ -187,6 +187,8 @@ func _ready() -> void:
 	# 模块 11：把自己登记进场景路由，并接住「从别处回来 / 读档进牧场」的那一局
 	_register_scene_hooks()
 	_enter_with_carry()
+	# 模块 附1：告诉音频系统「世界坐标 → 脚下地表」，脚步声才会分草地 / 泥地
+	AudioManager.set_terrain_provider(_terrain_at)
 
 ## 开局补给：
 ##   · 每季作物各 3 颗种子（模块 4 起种子是要消耗的背包物品，种子商店能补货）
@@ -208,13 +210,14 @@ func _give_starter_items() -> void:
 	if GameState.count_item(WOOD) == 0:
 		GameState.add_item(WOOD, 10)
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	_refresh_light()
 	_check_awakenings()          # 模块 5：觉醒要**立刻**弹对话，不能等到跨日
 	_update_zone()               # 模块 5：进出花园 → 换相机 limit
 	_refresh_stage()             # 模块 9：指标变了就升阶段（升了才播报，其余帧直接 return）
 	_update_npcs()               # 模块 10：按日程表摆人（每帧 move_toward，看得见走动）
 	_refresh_story()             # 模块 10：有可播节点就播（一次只播一段）
+	_tick_animal_voices(delta)   # 模块 附1：随机触发「附近动物的叫声」
 	var now := Time.get_ticks_msec() / 1000.0
 	if _tip_until > 0.0 and now > _tip_until:
 		_tip_until = 0.0
@@ -348,6 +351,52 @@ func _facing_step() -> Vector2i:
 
 # ---------------- 锄地（模块 3：顺带清理枯死作物；模块 7：范围随等级）----------------
 
+# ---------------- 音频挂点（模块 附1）----------------
+## 这些是「玩法正在发生的地方」，音效直接在这里点一下最省事；
+## 跨系统的（金币 / 动物叫 / UI）才走 EventBus，别把音效调用撒得到处都是。
+
+## 世界坐标 → 脚下地表。脚步声区分草地 / 泥土，房间场景自己注册「木地板」。
+func _terrain_at(world_pos: Vector2) -> StringName:
+	var cell := Vector2i(floori(world_pos.x / float(FarmGrid.TILE)),
+		floori(world_pos.y / float(FarmGrid.TILE)))
+	if _grid.in_bounds(cell):
+		var t := _grid.tile_at(cell)
+		if t != null and t.tilled:
+			return &"dirt"
+	return &"grass"
+
+## 收成音效按物种分：挤奶 / 剪毛 / 捡蛋（蜜蜂也是「捡」）
+func _harvest_sfx(species: StringName) -> StringName:
+	match String(species):
+		"cow", "goat":
+			return &"milk"
+		"sheep", "alpaca":
+			return &"shears"
+	return &"egg"
+
+## 随机动物叫：每 5–11 秒挑一只**离玩家最近**且不远的动物叫一声。
+## 不做「每只动物各自计时」——9 只动物各叫各的会变成菜市场；
+## 只让镜头附近的一只叫，既有生气又不吵（距离超过 520px 就这一次跳过）。
+var _animal_voice_timer: float = 3.0
+
+func _tick_animal_voices(delta: float) -> void:
+	if _herd.size() <= 0:
+		return
+	_animal_voice_timer -= delta
+	if _animal_voice_timer > 0.0:
+		return
+	_animal_voice_timer = randf_range(5.0, 11.0)
+	var p := _player.global_position
+	var best: AnimalState = null
+	var best_d := 520.0
+	for a in _herd.animals:
+		var d := a.pos.distance_to(p)
+		if d < best_d:
+			best_d = d
+			best = a
+	if best != null:
+		EventBus.animal_vocalized.emit(best.species, best.pos)
+
 func _hoe(cell: Vector2i) -> void:
 	var cells := _tool_cells(cell, GameState.tool_level(&"hoe"))
 	var tilled := 0
@@ -368,6 +417,7 @@ func _hoe(cell: Vector2i) -> void:
 			already += 1
 	if tilled > 0:
 		_player.play_hoe()
+		AudioManager.play_sfx(&"hoe")
 		if cleaned > 0:
 			_say("清理枯死作物 %d 格，又能种了" % cleaned)
 		else:
@@ -389,6 +439,7 @@ func _water(cell: Vector2i) -> void:
 			n += 1
 	if n > 0:
 		_player.play_watering()
+		AudioManager.play_sfx(&"water")
 		_say("浇水 %d 格" % n if n > 1 else "浇水")
 		_farm_layer.refresh()
 	elif WeatherSystem.is_wet():
@@ -413,6 +464,7 @@ func _plant(cell: Vector2i) -> void:
 				return
 			_grid.plant(cell, id)
 			GameState.remove_item(need, 1)
+			AudioManager.play_sfx(&"plant")
 			if WeatherSystem.is_wet():
 				_grid.water(cell)      # 雨天播种即浇水
 			_say("种下 %s（%d 天成熟 · 单株卖 %dG · 种子剩 %d）" % [
@@ -515,6 +567,8 @@ func _feed_animal(a: AnimalState, d: AnimalData) -> void:
 		return
 	GameState.remove_item(&"feed", need)
 	a.feed()
+	AudioManager.play_sfx(&"eat")
+	AudioManager.play_sfx_at(StringName("animal_" + String(a.species)), a.pos)
 	_say("喂了%s，好感 +%d（%s）" % [d.display_name, AnimalState.FEED_AFFECTION, a.heart_label()])
 
 ## 空手（工具 5）：
@@ -579,6 +633,7 @@ func _deliver(a: AnimalState, d: AnimalData, grade: int) -> void:
 		cnt = SeasonEffects.apply_milk_mult(cnt, GameClock.season, _storm_rng)
 	var item := ProductDB.item_id(pid, q)
 	GameState.add_item(item, cnt)
+	AudioManager.play_sfx(_harvest_sfx(a.species))
 	_say("收 %s ×%d%s（%s）" % [ProductDB.display_name(item), cnt, extra, a.heart_label()])
 
 # ---------------- 挤奶 / 剪毛节奏条（模块 4 需求 4）----------------

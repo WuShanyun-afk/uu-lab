@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://sseqiwpjhm2m"
+
+[deps]
+
+files=["res://data/audio.kind.translation", "res://data/audio.file.translation", "res://data/audio.category.translation", "res://data/audio.volume.translation", "res://data/audio.pitch.translation", "res://data/audio.pitch.translation", "res://data/audio.cooldown.translation", "res://data/audio.max.translation", "res://data/audio.loop.translation", "res://data/audio.note.translation"]
+
+source_file="res://data/audio.csv"
+dest_files=["res://data/audio.kind.translation", "res://data/audio.file.translation", "res://data/audio.category.translation", "res://data/audio.volume.translation", "res://data/audio.pitch.translation", "res://data/audio.pitch.translation", "res://data/audio.cooldown.translation", "res://data/audio.max.translation", "res://data/audio.loop.translation", "res://data/audio.note.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true
