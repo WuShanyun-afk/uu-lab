@@ -1,0 +1,17 @@
+npc,hearts,kind,id,value,text
+masa,3,price,seed,10,种子 9 折（-10%）
+masa,6,recipe,honey_butter,0,秘方：蜂蜜黄油
+zhou,4,price,tool,20,工具升级 8 折（-20%）
+zhou,8,tool,golden,0,黄金工具（工具铺开到 Lv3）
+kui,5,price,medicine,50,药剂半价（-50%）
+kui,9,perk,immune_once,0,动物免疫一次生病
+hai,4,perk,bait,0,每天白拿一份鱼饵
+hai,7,perk,rare_fish,0,解锁稀有鱼点
+lin,5,perk,quality_10,0,作物品质 +10%
+lin,8,recipe,herb_cheese,0,秘方：香草奶酪
+mia,3,perk,walk_pet,0,帮你遛动物
+mia,7,perk,daily_heart,0,动物好感 +5/天
+chen,6,recipe,smoked_cheese,0,秘方：烟熏奶酪
+chen,9,story,permit_expansion,0,牧场扩建许可（解锁第 5 阶段「小镇」）
+su,3,story,su_rumor,0,商人的耳语
+su,6,story,su_map,0,手绘矿脉图

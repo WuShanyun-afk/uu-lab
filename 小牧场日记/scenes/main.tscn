@@ -163,6 +163,9 @@ y_sort_enabled = true
 [node name="BuildRoot" type="Node2D" parent="World/YSortRoot"]
 y_sort_enabled = true
 
+[node name="NpcRoot" type="Node2D" parent="World/YSortRoot"]
+y_sort_enabled = true
+
 [node name="AnimalLayer" type="Node2D" parent="World/YSortRoot"]
 y_sort_enabled = true
 script = ExtResource("4_animals")

@@ -25,6 +25,7 @@ SUITES = [
     ("模块7 经济与背包", "res://tests/test_module7.tscn"),
     ("模块8 存档系统", "res://tests/test_module8.tscn"),
     ("模块9 建造扩建", "res://tests/test_module9.tscn"),
+    ("模块10 NPC剧情", "res://tests/test_module10.tscn"),
 ]
 
 def main() -> int:

@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://bcarujrhjuuox"
+
+[deps]
+
+files=["res://data/npcs.name.translation", "res://data/npcs.title.translation", "res://data/npcs.color.translation", "res://data/npcs.loved.translation", "res://data/npcs.liked.translation", "res://data/npcs.hated.translation"]
+
+source_file="res://data/npcs.csv"
+dest_files=["res://data/npcs.name.translation", "res://data/npcs.title.translation", "res://data/npcs.color.translation", "res://data/npcs.loved.translation", "res://data/npcs.liked.translation", "res://data/npcs.hated.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

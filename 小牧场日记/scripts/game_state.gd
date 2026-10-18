@@ -56,6 +56,15 @@ var famous: bool = false
 ## 和 inventory 的区别：inventory 是「现在有多少」，stats 是「一共来过多少」。
 var stats: Dictionary = {}
 
+## 模块 10：剧情标记（StringName -> bool）。和老的三个 flag 分开：
+## 那三个是「玩法开关」（花园解锁 / 繁殖棚盖好 / 名人），有专门的 setter；
+## 这里是**剧情数据**，键由 StoryData / NpcDB 的解锁表决定，只增不减。
+var story_flags: Dictionary = {}
+## 模块 10：已解锁的被动（NPC 好感奖励），StringName 数组
+var perks: Array = []
+## 模块 10：已解锁的秘方（RecipeDB 里 is_secret 的那些）
+var secret_recipes: Array = []
+
 ## 棚舍等级（模块 6）：StringName(housing_id) -> int(level)。0 / 缺省 = 没盖。
 ## 为什么不塞进 flag：flag 是 bool，棚舍是「有等级的容器」，必须能查等级。
 var barns: Dictionary = {}
@@ -90,6 +99,35 @@ func bump_stat(key: StringName, n: int = 1) -> void:
 
 func stat(key: StringName) -> int:
 	return int(stats.get(key, 0))
+
+# ---------------- 剧情标记 / 被动 / 秘方（模块 10）----------------
+
+func set_story_flag(name: StringName, value: bool = true) -> void:
+	story_flags[name] = value
+	flag_changed.emit(StringName("story:" + String(name)), value)
+
+func story_flag(name: StringName) -> bool:
+	return bool(story_flags.get(name, false))
+
+func add_perk(name: StringName) -> bool:
+	if perks.has(name):
+		return false
+	perks.append(name)
+	flag_changed.emit(StringName("perk:" + String(name)), true)
+	return true
+
+func has_perk(name: StringName) -> bool:
+	return perks.has(name)
+
+func unlock_recipe(id: StringName) -> bool:
+	if secret_recipes.has(id):
+		return false
+	secret_recipes.append(id)
+	flag_changed.emit(StringName("recipe:" + String(id)), true)
+	return true
+
+func is_recipe_unlocked(id: StringName) -> bool:
+	return secret_recipes.has(id)
 
 # ---------------- 金币 ----------------
 
@@ -360,6 +398,9 @@ func reset() -> void:
 	famous = false
 	barns.clear()
 	_reset_stats()
+	story_flags.clear()
+	perks.clear()
+	secret_recipes.clear()
 	gold_changed.emit(gold)
 	slots_changed.emit()
 
@@ -368,6 +409,13 @@ func reset() -> void:
 # 只存**真源**：gold / slots / tool_levels / barns / flags。
 # inventory 是派生索引（每次 _rebuild_index 重建），不进存档 —— 存了反而会有两份真值。
 
+## JSON 的对象键只能是字符串 —— StringName 键在存档前统一转一次（模块 10）
+func _stringify_keys(src: Dictionary) -> Dictionary:
+	var out: Dictionary = {}
+	for k in src:
+		out[String(k)] = src[k]
+	return out
+
 func to_dict() -> Dictionary:
 	return {
 		"gold": gold,
@@ -375,6 +423,9 @@ func to_dict() -> Dictionary:
 		"tool_levels": tool_levels.duplicate(),
 		"barns": barns.duplicate(),
 		"stats": stats.duplicate(),
+		"story_flags": _stringify_keys(story_flags),
+		"perks": perks.duplicate(),
+		"secret_recipes": secret_recipes.duplicate(),
 		"flags": {
 			"garden_unlocked": garden_unlocked,
 			"shed_built": shed_built,
@@ -415,6 +466,17 @@ func from_dict(d: Dictionary) -> void:
 	var st: Dictionary = d.get("stats", {})
 	for k in st:
 		stats[StringName(str(k))] = maxi(0, int(st[k]))
+	# 模块 10：剧情标记 / 被动 / 秘方（老档没有 = 空，语义正确）
+	story_flags.clear()
+	var sf: Dictionary = d.get("story_flags", {})
+	for k in sf:
+		story_flags[StringName(str(k))] = bool(sf[k])
+	perks.clear()
+	for k in d.get("perks", []):
+		perks.append(StringName(str(k)))
+	secret_recipes.clear()
+	for k in d.get("secret_recipes", []):
+		secret_recipes.append(StringName(str(k)))
 	var fl: Dictionary = d.get("flags", {})
 	garden_unlocked = bool(fl.get("garden_unlocked", false))
 	shed_built = bool(fl.get("shed_built", false))

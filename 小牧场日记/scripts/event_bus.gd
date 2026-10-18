@@ -119,3 +119,26 @@ var build_mode: bool = false
 func set_build_mode(on: bool) -> void:
 	build_mode = on
 
+# ---------------- 模块 10（NPC 与剧情）----------------
+
+## 玩家和某位村民说话（npc_id）
+signal npc_interacted(npc_id: StringName)
+
+## 玩家要把手里（背包里）的东西送给某位村民
+signal npc_gift_requested(npc_id: StringName)
+
+## 好感度变化（npc_id, 新心数, 实际加点）—— 负数是送错礼
+signal npc_hearts_changed(npc_id: StringName, hearts: int, delta: int)
+
+## 好感解锁（npc_id, 心数门槛, kind, id, 文案）
+signal npc_unlocked(npc_id: StringName, hearts: int, kind: StringName, id: StringName, text: String)
+
+## 某段剧情开始播（节点 id, 主线）
+signal story_node_started(node_id: StringName, quest: StringName)
+
+## 某段剧情播完（节点 id）
+signal story_node_done(node_id: StringName)
+
+## 触发结局（节点 id：ending_* / heart_of_ranch）
+signal story_ending(node_id: StringName)
+

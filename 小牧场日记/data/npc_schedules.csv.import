@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://bxywjy6k5w46s"
+
+[deps]
+
+files=["res://data/npc_schedules.from.translation", "res://data/npc_schedules.to.translation", "res://data/npc_schedules.x.translation", "res://data/npc_schedules.y.translation", "res://data/npc_schedules.action.translation", "res://data/npc_schedules.visible.translation", "res://data/npc_schedules.days.translation"]
+
+source_file="res://data/npc_schedules.csv"
+dest_files=["res://data/npc_schedules.from.translation", "res://data/npc_schedules.to.translation", "res://data/npc_schedules.x.translation", "res://data/npc_schedules.y.translation", "res://data/npc_schedules.action.translation", "res://data/npc_schedules.visible.translation", "res://data/npc_schedules.days.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

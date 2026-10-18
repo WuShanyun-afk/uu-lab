@@ -21,7 +21,8 @@ extends RefCounted
 
 ## v1 = 模块 8（8 段：clock/weather/state/farm/herd/orders/processor/player）
 ## v2 = 模块 9：多了 buildings（建筑账本 + 阶段）一段
-const VERSION := 2
+## v3 = 模块 10：多了 npcs（好感 / 送礼记录）与 story（剧情进度）两段
+const VERSION := 3
 
 ## 槽位：0 = 自动存档（每天 2:00 跨日），1 = 快速存档（F5 / F9），2–3 = 预留给以后的标题页
 const SLOT_AUTO := 0
@@ -180,6 +181,13 @@ static func migrate(d: Dictionary, from_version: int) -> Dictionary:
 	if from_version < 2:
 		if typeof(out.get("buildings")) != TYPE_DICTIONARY:
 			out["buildings"] = {"stage": 0, "items": []}
+	if from_version < 3:
+		# 模块 10：老档没有 NPC / 剧情 = 谁都没见过、一段剧情都没播。
+		# 这是正确语义：读档后从「第一次见到村民」开始，而不是报错。
+		if typeof(out.get("npcs")) != TYPE_DICTIONARY:
+			out["npcs"] = {}
+		if typeof(out.get("story")) != TYPE_DICTIONARY:
+			out["story"] = {"done": {}, "acts": {}, "counters": {}, "endings": []}
 	out["version"] = VERSION
 	return out
 
