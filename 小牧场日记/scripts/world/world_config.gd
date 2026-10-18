@@ -204,6 +204,9 @@ static func build_keepers() -> Array[Rect2]:
 		Rect2(456, 302, 48, 36),                                # 加工坊 CraftWorkshop
 		Rect2(572, 270, 56, 38),                                # 繁殖棚 BreedingShed
 		Rect2(724, 262, 40, 50),                                # 藤蔓门 GardenGate
+		Rect2(284, 134, 32, 32),                                # 模块 11：小屋门（进屋内）
+		Rect2(674, 384, 32, 32),                                # 模块 11：镇口（去镇上）
+		Rect2(64, 224, 32, 32),                                 # 模块 11：矿洞口
 	]
 
 ## 格子在可建造范围内吗

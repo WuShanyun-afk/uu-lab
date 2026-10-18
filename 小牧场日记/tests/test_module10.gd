@@ -531,7 +531,7 @@ func _test_endings() -> void:
 
 func _test_persistence() -> void:
 	print("[9] 存档 v3：好感 / 剧情两段往返")
-	_check(SaveSystem.VERSION == 3, "存档版本 = 3（%d）" % SaveSystem.VERSION)
+	_check(SaveSystem.VERSION >= 3, "存档版本 >= 3（现在是 v%d）" % SaveSystem.VERSION)
 
 	var reg := NpcRegistry.new()
 	reg.state(&"masa").points = 173
@@ -571,7 +571,7 @@ func _test_persistence() -> void:
 
 	# 迁移：v2 老档 → v3 补两段
 	var migrated := SaveSystem.migrate({"meta": {}, "buildings": {"stage": 2}}, 2)
-	_check(int(migrated["version"]) == 3, "v2 → v3")
+	_check(int(migrated["version"]) == SaveSystem.VERSION, "老档迁到当前版本（v%d）" % SaveSystem.VERSION)
 	_check(typeof(migrated.get("npcs")) == TYPE_DICTIONARY, "补了 npcs 段")
 	_check((migrated["npcs"] as Dictionary).is_empty(), "老档谁都没见过")
 	_check(typeof(migrated.get("story")) == TYPE_DICTIONARY, "补了 story 段")

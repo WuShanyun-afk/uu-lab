@@ -176,7 +176,11 @@ func _ready() -> void:
 		_say("检测到%s：第 %d 天 · F9 继续 · F5 存档" % [SaveSystem.slot_label(slot),
 			int(info.get("day", 0))])
 	else:
-		_say("WASD 移动 · E 用工具/交互 · 1-7 换工具 · Tab 换种子 · I 背包 · F5 存/F9 读 · F11 全屏")
+		_say("WASD 移动 · E 用工具/交互 · 1-7 换工具 · Tab 换种子 · I 背包 · F5/F6/F9 存读档 · F11 全屏")
+
+	# 模块 11：把自己登记进场景路由，并接住「从别处回来 / 读档进牧场」的那一局
+	_register_scene_hooks()
+	_enter_with_carry()
 
 ## 开局补给：
 ##   · 每季作物各 3 颗种子（模块 4 起种子是要消耗的背包物品，种子商店能补货）
@@ -227,10 +231,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			_try_open_gift()          # 模块 10：对着村民按 G 送礼
 		elif event.keycode == KEY_F11:
 			_toggle_fullscreen()
-		elif event.keycode == KEY_F5:
-			_save_game(SaveSystem.SLOT_QUICK)        # 模块 8
-		elif event.keycode == KEY_F9:
-			_load_latest()                            # 模块 8
 		elif event.keycode == KEY_I:
 			# 背包自己会吃掉「关」的那一次（它在树里更靠后，先收到 unhandled_input），
 			# 所以这里只负责「开」。商店 / 对话弹着的时候不许开背包。
@@ -1915,36 +1915,42 @@ func _build_save() -> Dictionary:
 	}
 
 ## 存档。quiet = true 时不弹提示（自动存档用，别每天 2:00 怼玩家一句）
+## ⚠️ 模块 11：从「直接写 SaveSystem」改成走 SceneRouter.save_session ——
+##    这样在房间里按 F6 存、和在牧场按 F5 存，写出来的是**同一种格式**的档
+##    （农场那一局 + scene 块 + meta），读档才不会出现「一半有场景一半没有」。
 func _save_game(slot: int, quiet: bool = false) -> bool:
-	var res := SaveSystem.save(slot, _build_save())
+	var res := SceneRouter.save_session(slot)
 	if bool(res["ok"]):
 		if not quiet:
-			_say("已存档 · 第 %d 天 %s · %s" % [GameClock.day, GameClock.clock_text(),
-				SaveSystem.slot_label(slot)])
+			_say("已存档 · 第 %d 天 %s · %s（%s）" % [GameClock.day, GameClock.clock_text(),
+				SaveSystem.slot_label(slot), SceneRouter.current_scene_name()])
 		return true
 	_say("存档失败：%s" % res["error"])
 	return false
 
 ## 读档。返回是否成功。
+## 同场景 → 原地灌（模块 8 的老行为）；不同场景 → 交给 SceneRouter 换场，
+## 新场景 _ready 里自己接 carry（这时本函数返回 true 但**不会有提示条**，
+## 因为提示条属于即将被 free 的旧场景）。
 func _load_game(slot: int) -> bool:
-	var res := SaveSystem.load_slot(slot)
+	var res := SceneRouter.load_session(slot)
 	if not bool(res["ok"]):
 		_say("读档失败：%s" % res["error"])
 		return false
-	_apply_save(res["data"])
+	if bool(res.get("switched", false)):
+		return true
 	_say("已读档 · 第 %d 天 %s · %s（%d 只动物 · %dG）" % [
 		GameClock.day, GameClock.clock_text(), SaveSystem.slot_label(slot),
 		_herd.size(), GameState.gold])
 	return true
 
-## F9：优先快速存档（F5 手存的），没有就退回自动存档
+## F9：优先快速存档（F5 手存的），没有就退回自动存档 / 最新的手动档
 func _load_latest() -> void:
-	if SaveSystem.exists(SaveSystem.SLOT_QUICK):
-		_load_game(SaveSystem.SLOT_QUICK)
-	elif SaveSystem.exists(SaveSystem.SLOT_AUTO):
-		_load_game(SaveSystem.SLOT_AUTO)
-	else:
+	var slot := SceneRouter.latest_slot()
+	if slot < 0:
 		_say("还没有存档 —— 先按 F5 存一个")
+		return
+	_load_game(slot)
 
 ## 把字典灌回每个系统，然后把画面从头同步一遍。
 ## ⚠️ 顺序：先数据后视觉。_sync_garden() 要读 herd + GameState 的 flag，
@@ -2658,3 +2664,59 @@ func _npc_met_count() -> int:
 		if st != null and st.met:
 			n += 1
 	return n
+
+# ============================================================================
+# 模块 11 · 存档与场景管理（牧场这一侧）
+# ============================================================================
+#
+# 牧场是**唯一持有农场数据**的场景（农田 / 牧群 / 建筑 / 订单 / 加工 / 好感 / 剧情）。
+# 它和 SceneRouter 的契约只有四条：
+#
+#   capture  :离开牧场前 → 把这一局摊平成 _build_save() 的字典（SceneRouter 存进 carry）
+#   apply    :回到牧场 / 原地读档 → _apply_save(字典) 把一切灌回去
+#   get_pos  :我从哪出去（存进 scene 块）
+#   set_pos  :把我放哪（读档 / 从房间回来时的落点）
+#
+# 为什么 capture 直接复用 _build_save()：
+#   模块 8 的三层存档已经把「一局 = 哪几坨」定死了。场景切换要的就是同一个东西 ——
+#   再写一份「换场专用快照」只会有两套字段，迟早对不上（少存一个导致读档回牧场丢进度）。
+
+## 把自己登记进场景路由（每次进牧场场景都要重新登记：旧场景的回调已经随节点 free 掉了）
+func _register_scene_hooks() -> void:
+	SceneRouter.register_scene(&"farm", Callable(self, "_build_save"),
+		Callable(self, "_apply_save_from_router"),
+		Callable(self, "_player_global_pos"),
+		Callable(self, "_set_player_global_pos"))
+
+func _player_global_pos() -> Vector2:
+	return _player.global_position
+
+func _set_player_global_pos(pos: Vector2) -> void:
+	_player.global_position = pos
+	_player.position = pos
+	var cam := _player.get_node_or_null("Camera2D") as Camera2D
+	if cam != null:
+		cam.reset_smoothing()
+
+## 原地读档（同场景）：_apply_save + 可选落点
+func _apply_save_from_router(d: Dictionary, pos: Variant) -> void:
+	_apply_save(d)
+	if pos != null:
+		_set_player_global_pos(pos)
+
+## 从房间回来 / 读档进牧场：把 carry 接过来。
+## 落点规则：读档坐标 > 入口名对应的牧场落点（RoomData.FARM_ENTRIES）> 不动。
+func _enter_with_carry() -> void:
+	var incoming := SceneRouter.take_carry()
+	if incoming.is_empty():
+		return
+	_apply_save(incoming)
+	if SceneRouter.has_pending_pos:
+		_set_player_global_pos(SceneRouter.pending_pos)
+	else:
+		_set_player_global_pos(RoomData.farm_entry_pos(SceneRouter.pending_entry))
+	SceneRouter.has_pending_pos = false
+	_refresh_hud()
+	_refresh_toolbar()
+	_say("回到牧场 · 第 %d 天 %s · %s" % [GameClock.day, GameClock.clock_text(),
+		"按 E 进门/去镇上/进矿洞"])

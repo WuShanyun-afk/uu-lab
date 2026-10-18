@@ -142,3 +142,11 @@ signal story_node_done(node_id: StringName)
 ## 触发结局（节点 id：ending_* / heart_of_ranch）
 signal story_ending(node_id: StringName)
 
+# ---------------- 模块 11（存档与场景管理）----------------
+
+## 房间里某个可交互物被用（prop_id, action：save / shop / bed / machine / info）
+signal room_prop_used(prop_id: StringName, action: StringName)
+
+## 换场景完成（新场景 _ready 之后）
+signal scene_entered(scene_id: StringName)
+

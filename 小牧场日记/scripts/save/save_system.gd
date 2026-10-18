@@ -22,12 +22,15 @@ extends RefCounted
 ## v1 = 模块 8（8 段：clock/weather/state/farm/herd/orders/processor/player）
 ## v2 = 模块 9：多了 buildings（建筑账本 + 阶段）一段
 ## v3 = 模块 10：多了 npcs（好感 / 送礼记录）与 story（剧情进度）两段
-const VERSION := 3
+## v4 = 模块 11：多了 scene（在哪个场景 / 哪个入口 / 坐标）—— 场景切换要能存读档
+const VERSION := 4
 
 ## 槽位：0 = 自动存档（每天 2:00 跨日），1 = 快速存档（F5 / F9），2–3 = 预留给以后的标题页
 const SLOT_AUTO := 0
 const SLOT_QUICK := 1
-const SLOT_MAX := 3
+## 模块 11：多存档位。2–5 是手动槽（存档面板里能选的那 4 个）
+const SLOT_MANUAL_START := 2
+const SLOT_MAX := 5
 
 const DEFAULT_DIR := "user://saves"
 
@@ -41,7 +44,7 @@ static func slot_label(slot: int) -> String:
 			return "自动存档"
 		SLOT_QUICK:
 			return "快速存档"
-	return "存档 %d" % slot
+	return "存档 %d" % (slot - SLOT_MANUAL_START + 1)
 
 static func slot_path(slot: int) -> String:
 	return "%s/slot_%d.json" % [save_dir, slot]
@@ -181,6 +184,10 @@ static func migrate(d: Dictionary, from_version: int) -> Dictionary:
 	if from_version < 2:
 		if typeof(out.get("buildings")) != TYPE_DICTIONARY:
 			out["buildings"] = {"stage": 0, "items": []}
+	if from_version < 4:
+		# 模块 11：老档没有场景信息 —— 一律当「在牧场」，语义正确（那时只有牧场一个场景）
+		if typeof(out.get("scene")) != TYPE_DICTIONARY:
+			out["scene"] = {"id": "farm", "entry": "", "pos": []}
 	if from_version < 3:
 		# 模块 10：老档没有 NPC / 剧情 = 谁都没见过、一段剧情都没播。
 		# 这是正确语义：读档后从「第一次见到村民」开始，而不是报错。
@@ -209,6 +216,9 @@ static func info(slot: int) -> Dictionary:
 		"day": int(meta.get("day", 0)),
 		"season": int(meta.get("season", 0)),
 		"gold": int(meta.get("gold", 0)),
+		# 模块 11：摘要里带上「这份档是在哪个场景存的」，读档前就能看出来
+		"scene": str(meta.get("scene", "farm")),
+		"scene_name": str(meta.get("scene_name", "牧场")),
 	}
 
 static func delete_slot(slot: int) -> bool:
