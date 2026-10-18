@@ -53,17 +53,25 @@ static func count_in(herd: Herd, housing_id: StringName) -> int:
 static func level_of(barns: Dictionary, housing_id: StringName) -> int:
 	return int(barns.get(housing_id, 0))
 
-static func capacity(barns: Dictionary, housing_id: StringName) -> int:
-	return HousingDB.capacity_at(housing_id, level_of(barns, housing_id))
+## 容量 = 棚舍等级给的 + 地上额外盖的同类建筑给的（模块 9）。
+## bonus 是 `{housing_id: 额外容量}`，来自 BuildingGrid.capacity_bonus()。
+## 为什么用参数而不是直接读 BuildingGrid：这个文件要在没有 autoload 的纯逻辑测试里跑。
+static func capacity(barns: Dictionary, housing_id: StringName, bonus: int = 0) -> int:
+	return HousingDB.capacity_at(housing_id, level_of(barns, housing_id)) + maxi(0, bonus)
+
+static func bonus_of(bonus: Dictionary, housing_id: StringName) -> int:
+	return maxi(0, int(bonus.get(housing_id, 0)))
 
 ## 还能不能再养一只这种动物？返回 Reason。
-static func can_house(species: StringName, herd: Herd, barns: Dictionary) -> int:
+static func can_house(species: StringName, herd: Herd, barns: Dictionary,
+		bonus: Dictionary = {}) -> int:
 	var h := housing_of(species)
 	if h == &"" or not HousingDB.has(h):
 		return Reason.UNKNOWN
-	if level_of(barns, h) <= 0:
+	var b := bonus_of(bonus, h)
+	if level_of(barns, h) <= 0 and b <= 0:
 		return Reason.NO_BUILDING
-	if count_in(herd, h) >= capacity(barns, h):
+	if count_in(herd, h) >= capacity(barns, h, b):
 		return Reason.FULL
 	return Reason.OK
 
@@ -76,12 +84,12 @@ static func slot_pos(housing_id: StringName) -> Vector2:
 	return WorldConfig.barn_slot(housing_id)
 
 ## "畜 3/4 禽 5/5 蜂 1/2" —— HUD 一行摘要（省地方，用单字前缀）
-static func summary_text(herd: Herd, barns: Dictionary) -> String:
+static func summary_text(herd: Herd, barns: Dictionary, bonus: Dictionary = {}) -> String:
 	var parts: Array[String] = []
 	for id in HousingDB.all_ids():
 		var lv := level_of(barns, id)
 		var used := count_in(herd, id)
-		var cap := HousingDB.capacity_at(id, lv)
+		var cap := capacity(barns, id, bonus_of(bonus, id))
 		parts.append("%s%d/%d" % [short_name(id), used, cap])
 	return " ".join(parts)
 
@@ -97,8 +105,8 @@ static func short_name(housing_id: StringName) -> String:
 	return String(housing_id).substr(0, 1)
 
 ## 牧场里所有棚舍的总容量（Herd.MAX_ANIMALS 之外的第二道闸）
-static func total_capacity(barns: Dictionary) -> int:
+static func total_capacity(barns: Dictionary, bonus: Dictionary = {}) -> int:
 	var n := 0
 	for id in HousingDB.all_ids():
-		n += HousingDB.capacity_at(id, level_of(barns, id))
+		n += capacity(barns, id, bonus_of(bonus, id))
 	return n

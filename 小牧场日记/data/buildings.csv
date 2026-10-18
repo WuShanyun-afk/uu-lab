@@ -1,2 +1,9 @@
-id,name,price,material,material_count,gestation_days,note
-breeding_shed,繁殖棚,1200,wood,20,3,同种成年动物两只 · 各需 8 心以上
+id,name,category,size_x,size_y,price,material,material_count,gestation_days,max_level,capacity_housing,capacity_base,capacity_step,efficiency,stage_required,note
+breeding_shed,繁殖棚,special,3,2,1200,wood,20,3,1,,0,0,0,0,一次性建筑：两只成年同种动物各 8 心以上才能繁殖
+fence,木栅栏,fence,1,1,30,wood,1,0,1,,0,0,0,0,围出一块地 · 1 格宽 · 可拆可重铺
+hive,蜂箱,housing,2,2,400,wood,8,0,3,hive,3,2,0,1,蜂蜜产地 · 每级 +2 只容量
+coop,鸡舍,housing,3,2,900,wood,15,0,3,coop,4,3,0,1,鸡鸭火鸡的家 · 每级 +3 只容量
+barn,畜棚,housing,3,2,1500,wood,25,0,3,barn,4,3,0,2,牛羊的家 · 每级 +3 只容量
+workshop,加工坊,workshop,3,2,2500,wood,30,0,3,,0,0,15,3,加工速度每级 +15%
+market,农贸市场,market,4,3,6000,wood,50,0,3,,0,0,5,4,出货售价每级 +5%
+town_square,小镇广场,town,4,3,15000,wood,80,0,3,,0,0,0,5,小镇的落脚点 · 升到这一步才有「镇长」称号

@@ -166,3 +166,64 @@ static func stele_pos(i: int, total: int) -> Vector2:
 	var a := -PI * 0.5 + TAU * float(i) / float(total)
 	return GARDEN_FOUNTAIN + Vector2(cos(a), sin(a)) * GARDEN_STELE_RADIUS
 
+# ============================================================================
+# 建造用地（模块 9 需求 4：布局自由摆放）
+# ============================================================================
+#
+# 「自由摆放」不等于「随便哪里都能塞」。这条链上有三样东西**绝对不能压**：
+#   ① 牧场围栏（PEN）—— 里面是三块棚舍分栏，动物按 zone 活动；
+#      在栏中间盖个鸡舍，动物会站在墙里，而且 _clamp_animals_to_zones 每跨日
+#      都会把它拽回去，看上去像「建筑会跑」。
+#   ② 现有商店 / 出货箱 / 繁殖棚 / 藤蔓门 —— 它们的位置定死在 main.tscn 里，
+#      再盖一栋上去会两个 Area2D 重叠，玩家按 E 触发哪个看运气。
+#   ③ 已耕的地 —— 玩家花钱锄过的地不能被建筑吃掉，这跟「别压作物」是同一条。
+#
+# 剩下的整块草地随便摆。地图 24×14 格，四边各留 1 格当围墙缓冲，
+# 所以可用范围是 x 1..22、y 1..12 —— 扣掉上面三样之后仍有 ~40 格空地。
+
+## 可建造的像素范围（地图向内缩 1 格）
+const BUILD_INSET := TILE
+
+static func build_area() -> Rect2:
+	return Rect2(Vector2(BUILD_INSET, BUILD_INSET),
+		Vector2(MAP_PX - Vector2i(BUILD_INSET * 2, BUILD_INSET * 2)))
+
+## 已有建筑物占地的近似矩形（比碰撞体略大一圈，留出「别贴着盖」的余量）。
+## 数值来自 scenes/main.tscn 里的 position + CollisionShape2D.size，
+## 改那棵树的时候**必须**回来改这里 —— 所以测试会断言每个 keepout 都落在 build_area 内。
+static func build_keepers() -> Array[Rect2]:
+	return [
+		PEN,                                                    # 牧场围栏（含三栋棚舍）
+		Rect2(334, 160, 36, 32),                                # 告示牌 SignPost
+		Rect2(400, 160, 32, 32),                                # 种子商店 SeedShop
+		Rect2(464, 160, 32, 32),                                # 出货箱 ShippingBin
+		Rect2(400, 232, 32, 32),                                # 动物商店 AnimalShop
+		Rect2(464, 232, 32, 32),                                # 杂货铺 SupplyShop
+		Rect2(336, 304, 32, 32),                                # 工具铺 ToolShop
+		Rect2(400, 304, 32, 32),                                # 订单板 OrderPost
+		Rect2(456, 302, 48, 36),                                # 加工坊 CraftWorkshop
+		Rect2(572, 270, 56, 38),                                # 繁殖棚 BreedingShed
+		Rect2(724, 262, 40, 50),                                # 藤蔓门 GardenGate
+	]
+
+## 格子在可建造范围内吗
+static func buildable_cell(cell: Vector2i) -> bool:
+	var r := build_area()
+	var px := Rect2(Vector2(cell) * float(TILE), Vector2(TILE, TILE))
+	return r.encloses(px)
+
+## 这个格子压到已有建筑 / 围栏了吗
+static func keepout_cell(cell: Vector2i) -> bool:
+	var px := Rect2(Vector2(cell) * float(TILE), Vector2(TILE, TILE))
+	for r in build_keepers():
+		if r.intersects(px):
+			return true
+	return false
+
+## 像素坐标 → 格子（负数向下取整也要正确，所以用 floori 而不是 int 强转）
+static func px_to_cell(px: Vector2) -> Vector2i:
+	return Vector2i(floori(px.x / float(TILE)), floori(px.y / float(TILE)))
+
+static func cell_to_px(cell: Vector2i) -> Vector2:
+	return Vector2(cell) * float(TILE)
+

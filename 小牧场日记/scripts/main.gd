@@ -77,6 +77,8 @@ const WOOD := &"wood"
 @onready var _decor: GardenDecor = $World/GardenDecor
 @onready var _order_post: OrderPost = $World/OrderPost
 @onready var _workshop: CraftWorkshop = $World/CraftWorkshop
+@onready var _build_root: Node2D = $World/YSortRoot/BuildRoot     # 模块 9：落地建筑的父节点
+@onready var _cursor: BuildCursor = $World/BuildCursor            # 模块 9：幽灵预览
 
 var _grid: FarmGrid
 var _herd: Herd
@@ -96,6 +98,15 @@ var _storm_rng := RandomNumberGenerator.new()
 var _orders := OrderBoard.new(20261101)
 ## 模块 7：加工坊（纯逻辑，槽位 2 个；Lv2/Lv3 的 4/6 槽接口已在 Processor 里）
 var _proc := Processor.new(1)
+## 模块 9：建造网格（真源 = 地上有哪些建筑 + 当前牧场阶段）
+var _builds := BuildingGrid.new()
+## 模块 9：锚点格 -> BuildingNode（只是视图，删建筑时一起 queue_free）
+var _build_nodes: Dictionary = {}
+## 模块 9：建造菜单里当前选中的是第几项（下标进 _build_catalog()）
+var _build_pick: int = 0
+## 模块 9：排队等提示条的播报（阶段达成这种「迟早要说」的话，
+## 不能当场抢掉玩家刚看到的「木材不够」—— 等提示条空了再说）
+var _tip_queue: Array[String] = []
 
 func _ready() -> void:
 	_storm_rng.seed = 20261022
@@ -140,6 +151,7 @@ func _ready() -> void:
 	_refresh_barns()             # 模块 6：三栋棚舍的「住了几只」开局就填上
 	_init_workshop()             # 模块 7：加工坊等级 + 节点状态
 	_tick_orders()               # 模块 7：开局就刷 2 单（day 1 - (-999) >= 3）
+	_init_buildings()            # 模块 9：建造网格 + 阶段（开局一片空地，阶段 0）
 	_refresh_hud()
 	_refresh_toolbar()
 	# 模块 8：有档就告诉玩家 F9 能续，没档就把键位一次性说清楚（只占 2.5 秒提示条）
@@ -175,16 +187,26 @@ func _process(_delta: float) -> void:
 	_refresh_light()
 	_check_awakenings()          # 模块 5：觉醒要**立刻**弹对话，不能等到跨日
 	_update_zone()               # 模块 5：进出花园 → 换相机 limit
+	_refresh_stage()             # 模块 9：指标变了就升阶段（升了才播报，其余帧直接 return）
 	var now := Time.get_ticks_msec() / 1000.0
 	if _tip_until > 0.0 and now > _tip_until:
 		_tip_until = 0.0
 		_tip.text = ""
 	if _tip_until == 0.0:
 		_show_hint()
+	# 模块 9：提示条空了就把排队的话说出来（阶段播报走这条路，不抢话）
+	if _tip_until == 0.0 and not _tip_queue.is_empty():
+		_say(_tip_queue.pop_front())
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_F11:
+		# 模块 9：建造模式下键盘全归建造用（player.gd 那边已经让位）。
+		# F11 / F5 / F9 这类全局键由 _handle_build_key 返回 false 放行。
+		if EventBus.build_mode and _handle_build_key(event.keycode):
+			return
+		if event.keycode == KEY_B:
+			_toggle_build_mode()
+		elif event.keycode == KEY_F11:
 			_toggle_fullscreen()
 		elif event.keycode == KEY_F5:
 			_save_game(SaveSystem.SLOT_QUICK)        # 模块 8
@@ -555,6 +577,9 @@ func _on_minigame_cancelled() -> void:
 
 ## 空手站在动物旁边时，底部提示当前动物的状态
 func _show_hint() -> void:
+	if EventBus.build_mode:          # 模块 9：建造模式底部提示条显示建造信息，不显示动物
+		_refresh_build_hint()
+		return
 	var a := _herd.nearest(_player.interact_point(), 46.0)
 	if a == null:
 		_tip.text = ""
@@ -577,6 +602,8 @@ func _show_hint() -> void:
 # ---------------- 商店（模块 4 + 模块 5）----------------
 
 func _open_shop(shop_id: StringName) -> void:
+	if EventBus.build_mode:      # 模块 9：建造模式下不开面板（键盘已经全让给建造了）
+		return
 	if _shop.is_open() or _minigame.is_active() or _dialogue.is_open() or _inv.is_open():
 		return
 	_shop_kind = shop_id
@@ -637,17 +664,19 @@ func _seed_entries() -> Array:
 func _animal_entries() -> Array:
 	var out: Array = []
 	var barns := GameState.barn_levels()
+	var bonus := _builds.capacity_bonus()          # 模块 9：地上多盖的棚舍也算床位
 	for id in AnimalDB.ids_by_price():
 		var a: AnimalData = AnimalDB.get_animal(id)
 		var afford := GameState.gold >= a.price
-		var room := Housing.can_house(id, _herd, barns)
+		var room := Housing.can_house(id, _herd, barns, bonus)
 		var h := Housing.housing_of(id)
 		var note := "%s·%s·%s·成年%d天·有%d" % [
 			a.housing_name(), a.action_name(), a.period_text(),
 			a.mature_days, _herd.count_species(id)]
 		if room != Housing.Reason.OK:
 			note += "·%s %d/%d" % [HousingDB.name_of(h),
-				Housing.count_in(_herd, h), Housing.capacity(barns, h)]
+				Housing.count_in(_herd, h),
+				Housing.capacity(barns, h, Housing.bonus_of(bonus, h))]
 		var why := ""
 		if not afford:
 			why = "钱不够"
@@ -969,14 +998,20 @@ func _collect_crafts() -> void:
 		var put := GameState.add_item(item, int(g["count"]))
 		parts.append(ItemDB.display_name(item) if put > 0
 			else "%s（背包满了）" % ItemDB.display_name(item))
+		GameState.bump_stat(GameState.ST_CRAFTED, put)   # 模块 9：阶段门槛「加工出件」
 	_say("取货：%s" % "、".join(parts))
 	_refresh_workshop()
 	_refresh_hud()
 	_refresh_toolbar()
 
 ## 每个 tick 推进加工槽（时间单位是游戏分钟，和时钟天然对齐）
+## 模块 9：地上有加工坊就按等级加速（Lv1 +15% / Lv2 +30% / Lv3 +45%）。
+## 加速实现成「多走几分钟」而不是改 Processor 的 remain —— 改造价最低，
+## 而且加工坊拆了以后速度自然回落，不会在槽里留下一个改不回来的快进标记。
 func _advance_workshop(minutes: int) -> void:
-	var done := _proc.advance_minutes(minutes)
+	var boost := _builds.craft_speed()
+	var real := minutes if boost <= 1.0 else int(round(float(minutes) * boost))
+	var done := _proc.advance_minutes(real)
 	if not done.is_empty():
 		var names: Array[String] = []
 		for d in done:
@@ -1038,7 +1073,7 @@ func _sell_entries() -> Array:
 		var n := GameState.count_item(id)
 		if n <= 0:
 			continue
-		var unit := Market.price(id, GameClock.season, GameClock.day)
+		var unit := _sell_unit_price(id)
 		var delta := Market.delta_percent(id, GameClock.season, GameClock.day)
 		out.append({
 			"id": id,
@@ -1060,10 +1095,11 @@ func _on_sell(entry_id: StringName, all: bool) -> void:
 		_refresh_shop()
 		return
 	var n := have if all else 1
-	var unit := Market.price(entry_id, GameClock.season, GameClock.day)
+	var unit := _sell_unit_price(entry_id)
 	var total := unit * n
 	GameState.remove_item(entry_id, n)
 	GameState.add_gold(total)
+	GameState.bump_stat(GameState.ST_SOLD, n)        # 模块 9：阶段门槛「售出件数」
 	_say("卖出 %s×%d · +%dG（%dG/个）" % [ItemDB.display_name(entry_id), n, total, unit])
 	EventBus.shop_purchased.emit(_shop_kind, entry_id, -total)
 	_refresh_shop()
@@ -1166,7 +1202,8 @@ func _do_breed(a: AnimalState, b: AnimalState) -> void:
 		fail = Breeding.reason_text(reason)
 	else:
 		# 模块 6：繁殖前也要看棚舍还有没有床位（生下来没地方住就是白配）
-		var room := Housing.can_house(a.species, _herd, GameState.barn_levels())
+		var room := Housing.can_house(a.species, _herd, GameState.barn_levels(),
+			_builds.capacity_bonus())
 		if room != Housing.Reason.OK:
 			fail = "%s%s" % [HousingDB.name_of(Housing.housing_of(a.species)),
 				Housing.reason_text(room)]
@@ -1239,7 +1276,8 @@ func _on_buy(entry_id: StringName) -> void:
 			bought = true
 	elif animal != null:
 		spent = animal.price
-		var room := Housing.can_house(entry_id, _herd, GameState.barn_levels())
+		var room := Housing.can_house(entry_id, _herd, GameState.barn_levels(),
+			_builds.capacity_bonus())
 		if room != Housing.Reason.OK:
 			_say("%s：%s（对着棚舍按 E 扩建）" % [animal.display_name,
 				Housing.reason_text(room)])
@@ -1704,20 +1742,25 @@ func _refresh_hud() -> void:
 	# 分四行：资源 / 牧群与地 / 行情与订单与加工 / 背包。
 	# ⚠️ HUD 的右边界是 442（不是 632）—— 再往右是 ClockBg 的地盘，模块 4 踩过。
 	var garden := " 🌸秘密花园" if GameState.garden_unlocked else ""
-	var barns := Housing.summary_text(_herd, GameState.barn_levels())
-	_hud.text = "💰%dG  工具[%s]  觉醒 %d/%d%s  棚舍 %s\n动物[%s] 总心 %d  地[%d株 肥%d格]\n%s\n订单 %d/%d · 加工 %d/%d槽\n背包 %d/%d格: %s" % [
+	var barns := Housing.summary_text(_herd, GameState.barn_levels(), _builds.capacity_bonus())
+	_hud.text = "💰%dG  工具[%s]  觉醒 %d/%d%s  棚舍 %s\n动物[%s] 总心 %d  地[%d株 肥%d格]\n%s\n阶段 %d/%d %s · 订单 %d/%d · 加工 %d/%d槽\n背包 %d/%d格: %s" % [
 		GameState.gold, Player.TOOL_LABEL[_player.current_tool],
 		_herd.awakened_species_count(), AnimalDB.all_ids().size(), garden, barns,
 		_animal_summary(), _herd.total_hearts(),
 		_grid.crop_count(), _grid.fertilized_count(),
 		Market.summary(GameClock.day, GameClock.season),
+		_builds.stage, RanchStage.last_stage(), RanchStage.stage_name(_builds.stage),
 		_orders.active_count(), OrderBoard.MAX_ACTIVE,
 		_proc.ready_count(), _proc.slot_count(),
 		GameState.used_slot_count(), GameState.slot_capacity(), inv,
 	]
 
 ## 左下角工具条：工具 1-7 + 当前种子 + 消耗品 + 工具等级 / 背包 / 订单 / 加工
+## 模块 9：建造模式下整条换成建造菜单（工具条位置有限，不能两套拼在一起）
 func _refresh_toolbar() -> void:
+	if EventBus.build_mode:
+		_toolbar.text = _build_toolbar_text()
+		return
 	var parts: Array[String] = []
 	for i in range(Player.TOOL_LABEL.size()):
 		var t: String = Player.TOOL_LABEL[i]
@@ -1820,6 +1863,7 @@ func _build_save() -> Dictionary:
 		"orders": _orders.to_dict(),
 		"processor": _proc.to_dict(),
 		"player": _player.to_dict(),
+		"buildings": _builds.to_dict(),     # 模块 9：建筑账本 + 牧场阶段
 	}
 
 ## 存档。quiet = true 时不弹提示（自动存档用，别每天 2:00 怼玩家一句）
@@ -1871,6 +1915,7 @@ func _apply_save(d: Dictionary) -> void:
 	_proc = Processor.new(1)
 	_proc.from_dict(d.get("processor", {}))
 	_player.from_dict(d.get("player", {}))
+	_builds.from_dict(d.get("buildings", {}))        # 模块 9：建筑先落数据（阶段也在里面）
 	_zone_garden = WorldConfig.in_garden(_player.global_position)
 
 	Market.clear_cache()                     # 行情按读回来的天数重算
@@ -1892,3 +1937,354 @@ func _apply_save(d: Dictionary) -> void:
 	_refresh_light()
 	_refresh_hud()
 	_refresh_toolbar()
+
+	# 模块 9：建筑节点是纯视图，数据灌完再整批重建（比 diff 简单，也不会漏）
+	_rebuild_build_nodes()
+	EventBus.set_build_mode(false)
+	_cursor.hide_cursor()
+
+# ============================================================================
+# 模块 9 · 建造与牧场扩建
+# ============================================================================
+#
+# 四条链路（需求 1 / 2 / 3 / 4）：
+#   ① 放置：B 进建造模式 → J/K 选建筑 → 幽灵预览绿/红 → E 落地（扣钱扣木材）
+#   ② 拆建：X 拆光标下的建筑，按**实际投入**返还 50%（升级过的拆得更多）
+#   ③ 升级：E 对着已有建筑 = 扩建；棚舍类加容量、加工坊加速度、市场加售价
+#   ④ 阶段：RanchStage 纯逻辑判定 0→5，只升不降；阶段决定建造菜单里能选什么
+#
+# 分层（和前面八个模块一套）：
+#   BuildingDef     CSV 一行 → 静态定义
+#   PlacedBuilding  地上的一栋 → 等级 + 账本
+#   BuildingGrid    能不能放 / 拆了退什么 / 升级要多少钱（纯逻辑，可 headless 断言）
+#   BuildingNode    画 + 碰撞（纯视图）
+#   BuildCursor     幽灵预览（纯视图）
+#   本文件          钱 / 木材 / 提示条 / 存档 / 把加成交给别的系统
+#
+# 键位：B 开关建造模式 · J/K 选建筑 · E 放置或升级 · X 拆除 · Esc 退出
+# 为什么不占用 1-7：那是工具键（player.gd 收得更早），改用 J/K 才不用改玩家的手感。
+
+## 建造网格挂上农场（放置时不许压已耕的地）+ 阶段从存档里恢复
+func _init_buildings() -> void:
+	_builds.farm = _grid
+	_builds.stage = RanchStage.clamp_stage(_builds.stage)
+	_cursor.position = Vector2.ZERO
+	_cursor.hide_cursor()
+	EventBus.building_interacted.connect(_on_building_interacted)
+	_rebuild_build_nodes()
+	_refresh_build_effects()
+
+## 当前阶段能盖哪些（按 阶段 → 价格 排序，BuildingDB 里排好）
+func _build_catalog() -> Array:
+	return BuildingDB.ids_unlocked_at(_builds.stage)
+
+func _build_selected_id() -> StringName:
+	var cat := _build_catalog()
+	if cat.is_empty():
+		return &""
+	_build_pick = clampi(_build_pick, 0, cat.size() - 1)
+	return cat[_build_pick]
+
+## 光标位置 = 玩家面朝的那一格；多格建筑以它为中心往外摊开
+## （3×2 的鸡舍以面朝格为中心，而不是把左上角放在面朝格 —— 否则手感永远偏右下）
+func _build_anchor_for(id: StringName) -> Vector2i:
+	var cell := _player.target_cell()
+	var d: BuildingDef = BuildingDB.def_of(id)
+	if d == null:
+		return cell
+	return cell - Vector2i((d.size.x - 1) / 2, (d.size.y - 1) / 2)
+
+func _toggle_build_mode() -> void:
+	if _shop.is_open() or _inv.is_open() or _dialogue.is_open() or _minigame.is_active():
+		return
+	var on := not EventBus.build_mode
+	EventBus.set_build_mode(on)
+	if on:
+		_build_pick = 0
+		if _build_catalog().is_empty():
+			_say("建造模式 · 这个阶段还没有可建造的东西")
+		else:
+			_say("建造模式 · J/K 选建筑 · E 放置（对着已有建筑 = 升级）· X 拆除 · B 退出")
+	else:
+		_cursor.hide_cursor()
+	_refresh_toolbar()
+	_refresh_build_hint()
+
+## 建造模式的键盘。返回 true = 这次按键已经被吃掉（不再落到 F11 / F5 / F9 上）
+func _handle_build_key(key: int) -> bool:
+	match key:
+		KEY_B, KEY_ESCAPE:
+			_toggle_build_mode()
+			return true
+		KEY_J:
+			_cycle_build_pick(-1)
+			return true
+		KEY_K:
+			_cycle_build_pick(1)
+			return true
+		KEY_E, KEY_ENTER, KEY_SPACE:
+			_build_confirm()
+			return true
+		KEY_X, KEY_DELETE:
+			_try_demolish()
+			return true
+	return false
+
+func _cycle_build_pick(step: int) -> void:
+	var cat := _build_catalog()
+	if cat.is_empty():
+		return
+	_build_pick = posmod(_build_pick + step, cat.size())
+	_say("选中：%s" % BuildingDB.name_of(cat[_build_pick]))
+	_refresh_toolbar()
+	_refresh_build_hint()
+
+## E：光标下有建筑就升级它，没有就把选中的建筑放下去
+func _build_confirm() -> void:
+	var existing := _builds.building_at(_player.target_cell())
+	if existing != null:
+		_try_upgrade(existing.anchor)
+		return
+	var id := _build_selected_id()
+	if id == &"":
+		_say("这个阶段还没有可建造的东西")
+		return
+	_try_place(id, _build_anchor_for(id))
+
+# ---------------- 放置 ----------------
+
+func _try_place(id: StringName, anchor: Vector2i) -> void:
+	var reason := _builds.can_place(id, anchor)
+	if reason != BuildingGrid.OK:
+		_say("放不下 · %s" % _builds.reason_text(reason))
+		return
+	var d: BuildingDef = BuildingDB.def_of(id)
+	if d == null:
+		return
+	if GameState.gold < d.price:
+		_say("%s 要 %dG，还差 %dG" % [d.display_name, d.price, d.price - GameState.gold])
+		return
+	if GameState.count_item(d.material) < d.material_count:
+		_say("还缺 %s×%d（杂货铺有卖）" % [ProductDB.display_name(d.material),
+			d.material_count - GameState.count_item(d.material)])
+		return
+	GameState.spend_gold(d.price)
+	GameState.remove_item(d.material, d.material_count)
+	var b := _builds.place(id, anchor, GameClock.day)
+	if b == null:
+		# 走到这里说明 can_place 和 place 的判定不同步（改代码改出来的 bug）——
+		# 钱退回去，别让玩家白白损失一笔。
+		GameState.add_gold(d.price)
+		GameState.add_item(d.material, d.material_count)
+		_say("放不下 · 换个位置试试")
+		return
+	_spawn_building_node(b)
+	GameState.bump_stat(GameState.ST_BUILT)
+	EventBus.building_placed.emit(id, anchor)
+	_refresh_build_effects()
+	_say("%s 落成（-%dG 木材×%d）· %s" % [d.display_name, d.price,
+		d.material_count, d.stat_text(1)])
+	_refresh_build_hint()
+
+# ---------------- 升级 ----------------
+
+func _try_upgrade(cell: Vector2i) -> void:
+	var b := _builds.building_at(cell)
+	if b == null:
+		_say("这格上没有建筑")
+		return
+	var cost := _builds.upgrade_cost(b.anchor)
+	if cost.is_empty():
+		_say("%s 已经满级 Lv%d" % [b.display_name(), b.level])
+		return
+	var d: BuildingDef = cost["def"]
+	var gold := int(cost["gold"])
+	var wood := int(cost["wood"])
+	if GameState.gold < gold:
+		_say("扩建 %s 要 %dG，还差 %dG" % [d.display_name, gold, gold - GameState.gold])
+		return
+	if GameState.count_item(d.material) < wood:
+		_say("还缺 %s×%d（杂货铺有卖）" % [ProductDB.display_name(d.material),
+			wood - GameState.count_item(d.material)])
+		return
+	GameState.spend_gold(gold)
+	GameState.remove_item(d.material, wood)
+	_builds.apply_upgrade(b.anchor, gold, wood)
+	_update_building_node(b.anchor)
+	_refresh_build_effects()
+	_say("%s 升到 Lv%d · %s（-%dG 木材×%d）" % [d.display_name, b.level,
+		d.stat_text(b.level), gold, wood])
+
+# ---------------- 拆除 ----------------
+
+func _try_demolish() -> void:
+	var res := _builds.remove_at(_player.target_cell())
+	if not bool(res["ok"]):
+		_say("拆除失败 · %s" % _builds.reason_text(StringName(str(res["error"]))))
+		return
+	var b: PlacedBuilding = res["building"]
+	var d := b.def()
+	var gold := int(res["gold"])
+	var wood := int(res["wood"])
+	GameState.add_gold(gold)
+	if wood > 0 and d != null:
+		GameState.add_item(d.material, wood)
+	_remove_building_node(b.anchor)
+	EventBus.building_removed.emit(b.def_id, b.anchor, gold, wood)
+	_refresh_build_effects()
+	_say("拆掉 %s Lv%d · 返还 %dG + %s×%d" % [b.display_name(), b.level, gold,
+		ProductDB.display_name(d.material) if d != null else "木材", wood])
+	_refresh_build_hint()
+
+# ---------------- 视图同步 ----------------
+
+func _spawn_building_node(b: PlacedBuilding) -> void:
+	if _build_nodes.has(b.anchor):
+		_remove_building_node(b.anchor)
+	var n := BuildingNode.new()
+	n.name = "B_%d_%d" % [b.anchor.x, b.anchor.y]
+	_build_root.add_child(n)
+	n.setup(b)
+	n.refresh_state(b.can_upgrade())
+	_build_nodes[b.anchor] = n
+
+func _update_building_node(anchor: Vector2i) -> void:
+	var n := _build_nodes.get(anchor) as BuildingNode
+	if n == null or n.building == null:
+		return
+	n.setup(n.building)
+	n.refresh_state(n.building.can_upgrade())
+
+func _remove_building_node(anchor: Vector2i) -> void:
+	var n := _build_nodes.get(anchor) as BuildingNode
+	if n == null:
+		return
+	n.queue_free()
+	_build_nodes.erase(anchor)
+
+## 整批重建（读档 / 开局用）：先全清再接数据，比 diff 稳
+func _rebuild_build_nodes() -> void:
+	for anchor in _build_nodes.keys():
+		var old := _build_nodes[anchor] as BuildingNode
+		if old != null and is_instance_valid(old):
+			old.queue_free()
+	_build_nodes.clear()
+	for anchor in _builds.placed:
+		_spawn_building_node(_builds.placed[anchor])
+
+## 任何建筑变化后要刷的东西，收成一个口子（漏刷是这类系统最常见的 bug）
+func _refresh_build_effects() -> void:
+	for anchor in _build_nodes:
+		var n := _build_nodes[anchor] as BuildingNode
+		if n != null and n.building != null:
+			n.refresh_state(n.building.can_upgrade())
+	_refresh_barns()       # 棚舍床位变了，建筑上的「住了几只」要重画
+	_refresh_hud()
+	_refresh_toolbar()
+	_refresh_build_hint()
+
+## 玩家按 E 对着建筑（非建造模式）：走同一条升级路径
+func _on_building_interacted(cell: Vector2i) -> void:
+	if EventBus.build_mode:
+		return
+	_try_upgrade(cell)
+
+# ---------------- 阶段（需求 3）----------------
+
+## 给 RanchStage 的指标快照 —— 纯数据，规则那边不认识 GameState / Herd
+func _stage_metrics() -> Dictionary:
+	return {
+		RanchStage.M_COINS: GameState.gold,
+		RanchStage.M_ANIMALS: _herd.size(),
+		RanchStage.M_ORDERS: _orders.completed,
+		RanchStage.M_CRAFTED: GameState.stat(GameState.ST_CRAFTED),
+		RanchStage.M_SOLD: GameState.stat(GameState.ST_SOLD),
+	}
+
+## 每帧检查一次阶段（指标随时在变：卖货、买动物、加工）。
+## 只升不降 + 升了才播报，所以每帧调是安全的：绝大多数帧第一个 if 就 return。
+func _refresh_stage() -> void:
+	var nxt := RanchStage.next_stage(_builds.stage, _stage_metrics())
+	if nxt == _builds.stage:
+		return
+	_builds.stage = nxt
+	_build_pick = 0                   # 新解锁的建筑通常在最前面，光标回到第一项
+	EventBus.stage_advanced.emit(nxt)
+	# 为什么不直接 _say：阶段是「每帧检查」升上来的，直接抢提示条会把玩家
+	# 刚看到的「木材不够」盖掉（模块 5 的测试因此红过一次）。空闲了再说。
+	if _tip_until == 0.0:
+		_say(RanchStage.announce(nxt))
+	else:
+		_tip_queue.append(RanchStage.announce(nxt))
+	_refresh_hud()
+	_refresh_toolbar()
+
+# ---------------- 提示条 ----------------
+
+## 建造模式下用底部提示条代替「附近动物」那一行：显示选中建筑、钱料、光标处能不能放
+func _refresh_build_hint() -> void:
+	if not EventBus.build_mode:
+		return
+	var id := _build_selected_id()
+	if id == &"":
+		_tip.text = "建造模式 · 阶段 %d「%s」还没有可建造的东西" % [
+			_builds.stage, RanchStage.stage_name(_builds.stage)]
+		_cursor.hide_cursor()
+		return
+	var anchor := _build_anchor_for(id)
+	var existing := _builds.building_at(anchor)
+	if existing != null:
+		var cost := _builds.upgrade_cost(existing.anchor)
+		# 已有建筑：光标永远绿（升级 / 拆除动作本身是合法的，钱不够由提示条说）
+		_cursor.show_at(existing.anchor, existing.def_id,
+			BuildingGrid.OK if not cost.is_empty() else BuildingGrid.MAX_LEVEL)
+		if cost.is_empty():
+			_tip.text = "%s Lv%d 已满级 · X 拆除（返还 %dG）" % [existing.display_name(),
+				existing.level, existing.refund_gold()]
+		else:
+			_tip.text = "%s Lv%d → Lv%d ｜ E 升级 %dG + 木材×%d ｜ X 拆除" % [
+				existing.display_name(), existing.level, int(cost["to"]),
+				int(cost["gold"]), int(cost["wood"])]
+		return
+	var reason := _builds.can_place(id, anchor)
+	_cursor.show_at(anchor, id, reason)
+	var d: BuildingDef = BuildingDB.def_of(id)
+	if reason != BuildingGrid.OK:
+		_tip.text = "%s ｜ %s" % [d.display_name, _builds.reason_text(reason)]
+		return
+	var short := ""
+	if GameState.gold < d.price:
+		short = " ｜ 钱还差 %dG" % (d.price - GameState.gold)
+	elif GameState.count_item(d.material) < d.material_count:
+		short = " ｜ 还缺 %s×%d" % [ProductDB.display_name(d.material),
+			d.material_count - GameState.count_item(d.material)]
+	_tip.text = "%s ｜ E 放置 %dG + 木材×%d ｜ %s%s" % [d.display_name, d.price,
+		d.material_count, d.stat_text(1), short]
+
+## 左下角工具条在建造模式下的内容（四行，和工具条高度对齐）
+func _build_toolbar_text() -> String:
+	var cat := _build_catalog()
+	# 阶段摘要复用 RanchStage.hud_text —— 别在这里再拼一遍（拼过就会拼出两个「阶段 5/5」）
+	var head := "建造 · " + RanchStage.hud_text(_builds.stage, _stage_metrics())
+	if cat.is_empty():
+		return head + "\n本阶段没有可建造物\nB 退出建造\n"
+	var line := ""
+	for i in range(cat.size()):
+		var d: BuildingDef = BuildingDB.def_of(cat[i])
+		line += "%s[%s %dG]%s" % ["▶" if i == _build_pick else "", d.display_name,
+			d.price, " " if i < cat.size() - 1 else ""]
+	var cur: BuildingDef = BuildingDB.def_of(cat[_build_pick])
+	var detail := "选中 %s · 占地 %d×%d · %s · %s" % [cur.display_name,
+		cur.size.x, cur.size.y, cur.stat_text(1), cur.note]
+	var help := "J/K 选 · E 放置或升级 · X 拆除 · B 退出"
+	return head + "\n" + line + "\n" + detail + "\n" + help
+
+# ---------------- 出货价（模块 9：农贸市场加成）----------------
+
+## 一格物品的成交单价 = Market 行情 × (1 + 农贸市场加成)。
+## 所有「卖东西」的地方都读这个函数，不要各自去乘 —— 否则货架价和成交价会不一样。
+func _sell_unit_price(id: StringName) -> int:
+	var base := Market.price(id, GameClock.season, GameClock.day)
+	if base <= 0:
+		return base
+	return int(round(float(base) * (1.0 + _builds.sell_bonus())))

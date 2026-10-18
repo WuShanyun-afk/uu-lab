@@ -19,7 +19,9 @@ extends RefCounted
 ##    必须自己 StringName() 回来，否则 GameState.count_item() 用 StringName 查表会全查不到。
 ##    （模块 7 的 OrderBoard 就踩过这个：订单里的 item 读回来是 String。）
 
-const VERSION := 1
+## v1 = 模块 8（8 段：clock/weather/state/farm/herd/orders/processor/player）
+## v2 = 模块 9：多了 buildings（建筑账本 + 阶段）一段
+const VERSION := 2
 
 ## 槽位：0 = 自动存档（每天 2:00 跨日），1 = 快速存档（F5 / F9），2–3 = 预留给以后的标题页
 const SLOT_AUTO := 0
@@ -166,12 +168,18 @@ static func load_slot(slot: int) -> Dictionary:
 	d = migrate(d, v)
 	return {"ok": true, "error": "", "data": d}
 
-## 版本迁移：老档补齐缺失字段。目前只有 v1，留好钩子。
+## 版本迁移：老档补齐缺失字段，**只加不改**（老档里已有的键一个都不许动）。
+##   v0（手工改过的 JSON）→ v1：保证 meta 是字典
+##   v1 → v2（模块 9）：补 buildings 段。老档没有建筑，就是一片空地 + 阶段 0，
+##        这是正确的语义 —— 玩家读档后从「一块地」重新扩建，而不是报错。
 static func migrate(d: Dictionary, from_version: int) -> Dictionary:
 	var out := d.duplicate(true)
 	if from_version < 1:
 		if typeof(out.get("meta")) != TYPE_DICTIONARY:
 			out["meta"] = {}
+	if from_version < 2:
+		if typeof(out.get("buildings")) != TYPE_DICTIONARY:
+			out["buildings"] = {"stage": 0, "items": []}
 	out["version"] = VERSION
 	return out
 

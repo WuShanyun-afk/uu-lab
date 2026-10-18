@@ -82,7 +82,9 @@ func _physics_process(_delta: float) -> void:
 	_scan_interactables()
 
 func _unhandled_input(event: InputEvent) -> void:
-	if EventBus.ui_modal:
+	# 模块 9：建造模式下工具键（1-7 / E / 滚轮）要让位给「选建筑 / 放置 / 拆除」。
+	# 只挡**输入**，不挡移动 —— 玩家要能走着看位置；这是和 ui_modal 的区别。
+	if EventBus.ui_modal or EventBus.build_mode:
 		return
 	if _busy:
 		return

@@ -50,6 +50,12 @@ var shed_built: bool = false
 ## 成就：完成 10 张订单（模块 7 需求 3）
 var famous: bool = false
 
+## 累计统计（模块 9）：StringName -> int。
+## 牧场阶段门槛里有「累计加工 10 件」「累计售出 100 件」这类**只能涨不能跌**的指标，
+## 放这里而不是塞进 flag（flag 是 bool）也不塞进 main（main 会重建，统计得跟着存档走）。
+## 和 inventory 的区别：inventory 是「现在有多少」，stats 是「一共来过多少」。
+var stats: Dictionary = {}
+
 ## 棚舍等级（模块 6）：StringName(housing_id) -> int(level)。0 / 缺省 = 没盖。
 ## 为什么不塞进 flag：flag 是 bool，棚舍是「有等级的容器」，必须能查等级。
 var barns: Dictionary = {}
@@ -61,9 +67,29 @@ var tool_levels: Dictionary = {}
 func _ready() -> void:
 	_ensure_slots()
 	_reset_tool_levels()
+	_reset_stats()
 
 func _reset_tool_levels() -> void:
 	tool_levels = {&"hoe": 1, &"can": 1, &"bag": 1}
+
+# ---------------- 累计统计（模块 9）----------------
+
+## 统计键（用常量，别写字面量 —— 拼错了是 0 而不是报错，最难查）
+const ST_ORDERS := &"orders"      ## 完成订单数
+const ST_CRAFTED := &"crafted"    ## 加工出件数
+const ST_SOLD := &"sold"          ## 售出件数
+const ST_BUILT := &"built"        ## 盖过的建筑数（统计用，不进阶段门槛）
+
+func _reset_stats() -> void:
+	stats = {ST_ORDERS: 0, ST_CRAFTED: 0, ST_SOLD: 0, ST_BUILT: 0}
+
+func bump_stat(key: StringName, n: int = 1) -> void:
+	if n == 0:
+		return
+	stats[key] = maxi(0, int(stats.get(key, 0)) + n)
+
+func stat(key: StringName) -> int:
+	return int(stats.get(key, 0))
 
 # ---------------- 金币 ----------------
 
@@ -333,6 +359,7 @@ func reset() -> void:
 	shed_built = false
 	famous = false
 	barns.clear()
+	_reset_stats()
 	gold_changed.emit(gold)
 	slots_changed.emit()
 
@@ -347,6 +374,7 @@ func to_dict() -> Dictionary:
 		"slots": slots.duplicate(true),
 		"tool_levels": tool_levels.duplicate(),
 		"barns": barns.duplicate(),
+		"stats": stats.duplicate(),
 		"flags": {
 			"garden_unlocked": garden_unlocked,
 			"shed_built": shed_built,
@@ -382,6 +410,11 @@ func from_dict(d: Dictionary) -> void:
 		var lv := int(bn[k])
 		if lv > 0:
 			barns[StringName(str(k))] = lv
+	# 累计统计：老档（v1）里没有这一段，缺省全 0 是正确语义
+	_reset_stats()
+	var st: Dictionary = d.get("stats", {})
+	for k in st:
+		stats[StringName(str(k))] = maxi(0, int(st[k]))
 	var fl: Dictionary = d.get("flags", {})
 	garden_unlocked = bool(fl.get("garden_unlocked", false))
 	shed_built = bool(fl.get("shed_built", false))
