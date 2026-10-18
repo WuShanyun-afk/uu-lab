@@ -43,3 +43,8 @@ mead,蜂蜜酒,380,crafted
 honey_butter,蜂蜜黄油,300,crafted
 herb_cheese,香草奶酪,560,crafted
 smoked_cheese,烟熏奶酪,680,crafted
+permit,建造许可证,600,material
+stone,石头,40,material
+home_cooked,家常菜,320,consumable
+rug,地毯,180,material
+plant,盆栽,150,material

@@ -26,6 +26,7 @@ const OCCUPIED := &"occupied"          ## 压到别的建筑
 const FARM := &"farm"                  ## 压到已耕的地
 const NOT_FOUND := &"not_found"        ## 那格上没有建筑
 const MAX_LEVEL := &"max_level"        ## 已经满级
+const SITE := &"site"                  ## 模块 12：这块地上正在施工
 
 ## Vector2i(anchor) -> PlacedBuilding
 var placed: Dictionary = {}
@@ -33,6 +34,9 @@ var placed: Dictionary = {}
 var stage: int = 0
 ## 农场网格（可选）。null = 不检查农田（纯逻辑测试里常常没有 FarmGrid）
 var farm: FarmGrid = null
+## 施工队列（可选）。有的话，施工中的 footprint 也算「被占」——
+## 否则玩家能在脚手架里再叠一栋，工期就白等了。
+var sites: Construction = null
 
 # ---------------- 查询 ----------------
 
@@ -93,6 +97,8 @@ func can_place(def_id: StringName, anchor: Vector2i) -> StringName:
 			return OUT_OF_BOUNDS
 		if WorldConfig.keepout_cell(cell):
 			return KEEPOUT
+		if sites != null and sites.blocks(cell):
+			return SITE
 		if building_at(cell) != null:
 			return OCCUPIED
 		if farm != null:
@@ -152,6 +158,8 @@ func reason_text(r: StringName) -> String:
 			return "这格上没有建筑"
 		"max_level":
 			return "已经满级了"
+		"site":
+			return "这里正在施工 · 等工期"
 	return "放不下"
 
 # ---------------- 拆除 ----------------

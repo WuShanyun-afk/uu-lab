@@ -262,7 +262,7 @@ func _test_room_scene() -> void:
 		elif child is RoomProp:
 			props += 1
 	_check(exits == 1, "小屋 1 个出口节点（%d）" % exits)
-	_check(props == 2, "小屋 2 个可交互物节点（%d）" % props)
+	_check(props == 3, "小屋 3 个可交互物节点（床/存档柜/工作台）：%d" % props)
 
 	# 可交互物：床 → 弹对话；存档柜 → 开存档面板
 	var bed: RoomProp = null
@@ -275,10 +275,11 @@ func _test_room_scene() -> void:
 				chest = child
 	_check(bed != null and chest != null, "找到床和存档柜")
 	_check(bed.prompt().contains("床"), "床的提示文案（%s）" % bed.prompt())
+	var day_before := GameClock.day
 	bed.interact(null)
-	_check(room._dialogue.is_open(), "按床弹对话")
-	while room._dialogue.is_open():
-		room._dialogue.skip()
+	_check(GameClock.day == day_before + 1, "模块 12 起：床 = 睡觉，推进到次日（%d → %d）"
+		% [day_before, GameClock.day])
+	_check(SaveSystem.exists(SaveSystem.SLOT_AUTO), "睡觉自动存档")
 	chest.interact(null)
 	_check(SavePanel.is_open(), "按存档柜打开存档面板")
 	SavePanel.close()

@@ -114,7 +114,7 @@ func _test_building_db() -> void:
 	# 建造菜单：按阶段过滤 + 排序
 	var all_menu := BuildingDB.buildable_ids()
 	_check(not all_menu.has(&"breeding_shed"), "菜单里没有繁殖棚")
-	_check(all_menu.size() == 7, "菜单共 7 种（%d）" % all_menu.size())
+	_check(all_menu.size() == 9, "菜单共 9 种（%d）" % all_menu.size())
 	var at0 := BuildingDB.ids_unlocked_at(0)
 	_check(at0.size() == 1 and at0[0] == &"fence", "第 0 阶段只能盖栅栏（%s）" % str(at0))
 	var at1 := BuildingDB.ids_unlocked_at(1)
@@ -510,6 +510,9 @@ func _test_main_integration() -> void:
 	# 给足钱料，把阶段抬到 5 好测所有建筑
 	GameState.add_gold(100000)
 	GameState.add_item(&"wood", 500)
+	# 模块 12 起，建造要许可证 + 石头，且有 1–3 天工期（测试里直接快进）
+	GameState.add_item(&"permit", 20)
+	GameState.add_item(&"stone", 100)
 	m._builds.stage = 5
 	await get_tree().process_frame
 
@@ -535,6 +538,7 @@ func _test_main_integration() -> void:
 	await get_tree().process_frame
 	_check(m._player.target_cell() == Vector2i(3, 10), "玩家面朝的格子 = (3,10)")
 	m._try_place(&"fence", Vector2i(3, 10))
+	_flush_sites(m)
 	_check(m._builds.count() == 1, "栅栏落地")
 	_check(GameState.gold == gold0 - fence_def.price, "扣了 %dG（%d → %d）"
 		% [fence_def.price, gold0, GameState.gold])
@@ -546,11 +550,13 @@ func _test_main_integration() -> void:
 	# 9.3 重复放置被拒（钱不能白扣）
 	var gold1 := GameState.gold
 	m._try_place(&"fence", Vector2i(3, 10))
+	_flush_sites(m)
 	_check(m._builds.count() == 1, "同一格放不了第二栋")
 	_check(GameState.gold == gold1, "被拒时不扣钱")
 
 	# 9.4 放一栋鸡舍并升级：容量加成接进 Housing
 	m._try_place(&"coop", Vector2i(6, 8))
+	_flush_sites(m)
 	var coop: PlacedBuilding = m._builds.building_at(Vector2i(6, 8))
 	_check(coop != null, "鸡舍落地")
 	_check(int(m._builds.capacity_bonus().get(&"coop", 0)) == 4, "禽舍容量 +4")
@@ -564,8 +570,10 @@ func _test_main_integration() -> void:
 
 	# 9.5 加工坊加速 / 农贸市场加价
 	m._try_place(&"workshop", Vector2i(10, 11))
+	_flush_sites(m)
 	_check(m._builds.craft_speed() == 1.15, "地上有 Lv1 加工坊 → 加工快 15%")
 	m._try_place(&"market", Vector2i(6, 1))
+	_flush_sites(m)
 	_check(m._builds.sell_bonus() == 0.05, "地上有农贸市场 → 售价 +5%")
 	var item := CropQuality.item_id(&"turnip", 0)
 	GameState.add_item(item, 1)
@@ -627,3 +635,10 @@ func _test_main_integration() -> void:
 	await get_tree().process_frame
 	EventBus.set_build_mode(false)
 	SaveSystem.save_dir = "user://saves_test9"
+
+## 模块 12：把所有工地快进到竣工（工期 1–3 天）
+func _flush_sites(m: Node) -> void:
+	var guard := 0
+	while not m._sites.is_empty() and guard < 20:
+		m._tick_construction()
+		guard += 1

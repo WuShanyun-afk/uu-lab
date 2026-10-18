@@ -65,6 +65,20 @@ var perks: Array = []
 ## 模块 10：已解锁的秘方（RecipeDB 里 is_secret 的那些）
 var secret_recipes: Array = []
 
+# ---------------- 模块 12（7.5）：住宅 / 家具 / buff ----------------
+
+## 住宅等级 1–3（真源；HouseDB 管每级的成本与解锁）
+var house_level: int = 1
+## 室内家具：[{id, x, y}]。摆在哪是玩家自己的事，存坐标就好。
+var furniture: Array = []
+## 当日生效的 buff：StringName -> int(生效到第几天)
+var buffs: Dictionary = {}
+## 谷仓给的额外背包格（派生值：每次建筑变化由 main 重算，不进存档）
+var bonus_slots: int = 0
+## 住宅升级工地（模块 12）：目标等级 + 剩余天数。0 天 = 没在施工。
+var house_upgrade_target: int = 0
+var house_upgrade_days: int = 0
+
 ## 棚舍等级（模块 6）：StringName(housing_id) -> int(level)。0 / 缺省 = 没盖。
 ## 为什么不塞进 flag：flag 是 bool，棚舍是「有等级的容器」，必须能查等级。
 var barns: Dictionary = {}
@@ -129,6 +143,54 @@ func unlock_recipe(id: StringName) -> bool:
 func is_recipe_unlocked(id: StringName) -> bool:
 	return secret_recipes.has(id)
 
+# ---------------- 住宅 / 家具 / buff（模块 12）----------------
+
+func set_house_level(lv: int) -> void:
+	house_level = clampi(lv, 1, HouseDB.MAX_LEVEL)
+	flag_changed.emit(&"house_level", true)
+
+## 加一件家具（同一格只能有一件）
+func add_furniture(id: StringName, cell: Vector2i) -> bool:
+	if cell.x < 0 or cell.y < 0:
+		return false
+	if furniture_at(cell) != StringName(""):
+		return false
+	furniture.append({"id": String(id), "x": cell.x, "y": cell.y})
+	return true
+
+func furniture_at(cell: Vector2i) -> StringName:
+	for f in furniture:
+		if int(f["x"]) == cell.x and int(f["y"]) == cell.y:
+			return StringName(str(f["id"]))
+	return &""
+
+## 收走某格家具，返回家具 id（没有返回 &""）
+func take_furniture(cell: Vector2i) -> StringName:
+	for i in range(furniture.size()):
+		var f: Dictionary = furniture[i]
+		if int(f["x"]) == cell.x and int(f["y"]) == cell.y:
+			var id := StringName(str(f["id"]))
+			furniture.remove_at(i)
+			return id
+	return &""
+
+func furniture_count() -> int:
+	return furniture.size()
+
+## 设一个「到第 day 天为止生效」的 buff
+func set_buff(name: StringName, day: int) -> void:
+	buffs[name] = day
+
+func has_buff(name: StringName, day: int) -> bool:
+	return int(buffs.get(name, -999)) >= day
+
+## 消费 buff（用掉就删，保证一天只吃一次效果）
+func consume_buff(name: StringName, day: int) -> bool:
+	if not has_buff(name, day):
+		return false
+	buffs.erase(name)
+	return true
+
 # ---------------- 金币 ----------------
 
 func add_gold(n: int) -> void:
@@ -148,7 +210,16 @@ func bag_level() -> int:
 	return clampi(int(tool_levels.get(&"bag", 1)), 1, BAG_MAX_LEVEL)
 
 func slot_capacity() -> int:
-	return BAG_BASE + (bag_level() - 1) * BAG_PER_LEVEL
+	return BAG_BASE + (bag_level() - 1) * BAG_PER_LEVEL + maxi(0, bonus_slots)
+
+## 谷仓给的额外格（模块 12）。派生值：建筑变了就重算，不进存档。
+func set_bonus_slots(n: int) -> void:
+	var v := maxi(0, n)
+	if v == bonus_slots:
+		return
+	bonus_slots = v
+	_ensure_slots()
+	slots_changed.emit()
 
 ## 扩容：加格子（升到 Lv2 时 40 → 48）
 func set_bag_level(lv: int) -> void:
@@ -401,6 +472,12 @@ func reset() -> void:
 	story_flags.clear()
 	perks.clear()
 	secret_recipes.clear()
+	house_level = 1
+	furniture.clear()
+	buffs.clear()
+	bonus_slots = 0
+	house_upgrade_target = 0
+	house_upgrade_days = 0
 	gold_changed.emit(gold)
 	slots_changed.emit()
 
@@ -426,6 +503,11 @@ func to_dict() -> Dictionary:
 		"story_flags": _stringify_keys(story_flags),
 		"perks": perks.duplicate(),
 		"secret_recipes": secret_recipes.duplicate(),
+		"house_level": house_level,
+		"furniture": furniture.duplicate(true),
+		"buffs": _stringify_keys(buffs),
+		"house_upgrade_target": house_upgrade_target,
+		"house_upgrade_days": house_upgrade_days,
 		"flags": {
 			"garden_unlocked": garden_unlocked,
 			"shed_built": shed_built,
@@ -477,6 +559,22 @@ func from_dict(d: Dictionary) -> void:
 	secret_recipes.clear()
 	for k in d.get("secret_recipes", []):
 		secret_recipes.append(StringName(str(k)))
+	# 模块 12：住宅等级 / 家具 / buff（老档缺省 = 1 级小木屋，语义正确）
+	house_level = clampi(int(d.get("house_level", 1)), 1, HouseDB.MAX_LEVEL)
+	furniture.clear()
+	for f in d.get("furniture", []):
+		if typeof(f) != TYPE_DICTIONARY:
+			continue
+		var fid := StringName(str(f.get("id", "")))
+		if fid == &"":
+			continue
+		furniture.append({"id": String(fid), "x": int(f.get("x", 0)), "y": int(f.get("y", 0))})
+	buffs.clear()
+	var bf: Dictionary = d.get("buffs", {})
+	for k in bf:
+		buffs[StringName(str(k))] = int(bf[k])
+	house_upgrade_target = clampi(int(d.get("house_upgrade_target", 0)), 0, HouseDB.MAX_LEVEL)
+	house_upgrade_days = maxi(0, int(d.get("house_upgrade_days", 0)))
 	var fl: Dictionary = d.get("flags", {})
 	garden_unlocked = bool(fl.get("garden_unlocked", false))
 	shed_built = bool(fl.get("shed_built", false))

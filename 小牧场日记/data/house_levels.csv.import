@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://doqmlas8be20a"
+
+[deps]
+
+files=["res://data/house_levels.name.translation", "res://data/house_levels.wood.translation", "res://data/house_levels.stone.translation", "res://data/house_levels.gold.translation", "res://data/house_levels.unlock.translation", "res://data/house_levels.interior.translation"]
+
+source_file="res://data/house_levels.csv"
+dest_files=["res://data/house_levels.name.translation", "res://data/house_levels.wood.translation", "res://data/house_levels.stone.translation", "res://data/house_levels.gold.translation", "res://data/house_levels.unlock.translation", "res://data/house_levels.interior.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

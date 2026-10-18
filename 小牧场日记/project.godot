@@ -30,6 +30,8 @@ NpcDB="*res://scripts/data/npc_db.gd"
 GameState="*res://scripts/game_state.gd"
 SceneRouter="*res://scripts/world/scene_router.gd"
 SavePanel="*res://scripts/ui/save_panel.gd"
+HouseDB="*res://scripts/data/house_db.gd"
+DayCycle="*res://scripts/world/day_cycle.gd"
 
 [display]
 

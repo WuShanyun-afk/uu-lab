@@ -48,9 +48,21 @@ func _draw() -> void:
 			color = Color("#7A6EA8")      # 床：紫
 		"machine":
 			color = Color("#5E5580")      # 机器：暗紫
+		"cook":
+			color = Color("#C0622E")      # 灶台：暖橙
+		"brew":
+			color = Color("#8A5A2B")      # 地窖门：木色
+		"house_upgrade":
+			color = Color("#3C6E9E")      # 工作台：蓝
 	var r := Rect2(-16, -14, 32, 18)
 	draw_rect(r, color)
 	draw_rect(r, color.lightened(0.25), false, 1.0)
+	if action == &"cook":
+		draw_rect(Rect2(-14, -16, 28, 4), Color("#D8D2C0"))
+	if action == &"brew":
+		draw_rect(Rect2(-14, -16, 28, 4), Color("#3A2A1A"))
+	if action == &"house_upgrade":
+		draw_rect(Rect2(-14, -18, 28, 5), Color("#9AB8D8"))
 	if action == &"machine":
 		# 机器上那格「灯」：觉醒后是亮的（这部分是表现，状态在 GameState 里）
 		var lit := GameState.story_flag(&"secret_machine_awake")
