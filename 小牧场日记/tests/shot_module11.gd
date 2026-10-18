@@ -21,7 +21,10 @@ func _ready() -> void:
 	# ⚠️ _ready 里 root 正在初始化子节点，直接 add_child 会报
 	#    "Parent node is busy setting up children" —— 必须延迟一帧加
 	get_tree().root.add_child.call_deferred(driver)
-	queue_free()                     # 引导节点功成身退（它本来就是 current_scene）
+	# ⚠️ 不能 queue_free 自己：current_scene 被 free 成 null 之后，第一张「牧场」
+	#    截图会是一张空图（scene="" 那行就是警报）。必须**显式**切到牧场场景，
+	#    让 current_scene 是真正在跑的 main.tscn。
+	get_tree().change_scene_to_file.call_deferred("res://scenes/main.tscn")
 
 class Driver extends Node:
 	func _ready() -> void:
