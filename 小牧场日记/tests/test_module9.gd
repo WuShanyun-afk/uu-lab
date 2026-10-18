@@ -164,7 +164,7 @@ func _test_build_area() -> void:
 				or r.end.y > float(WorldConfig.MAP_PX.y):
 			out_of_map += 1
 	_check(out_of_map == 0, "所有禁区都在主地图内（越界 %d 个）" % out_of_map)
-	_check(WorldConfig.build_keepers().size() == 11, "禁区共 11 块（%d）"
+	_check(WorldConfig.build_keepers().size() == 14, "禁区共 14 块（%d）"
 		% WorldConfig.build_keepers().size())
 	_check(WorldConfig.px_to_cell(Vector2(33, 65)) == Vector2i(1, 2), "px → 格换算")
 	_check(WorldConfig.cell_to_px(Vector2i(3, 4)) == Vector2(96, 128), "格 → px 换算")

@@ -110,6 +110,15 @@ func skip() -> void:
 		return
 	_next()
 
+## 强制关掉（换场景 / 读档时用）：队列一起清，别让上一局的台词飘到新场景里
+func close() -> void:
+	_queue.clear()
+	_open = false
+	visible = false
+	EventBus.set_ui_modal(false)
+	queue_redraw()
+	closed.emit()
+
 func current_line() -> String:
 	if not _open or _lines.is_empty():
 		return ""
