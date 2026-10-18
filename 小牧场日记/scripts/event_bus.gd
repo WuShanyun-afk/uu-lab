@@ -98,3 +98,24 @@ signal tool_upgraded(tool: StringName, level: int)
 ## 背包槽位布局变化（拖拽 / 合并 / 增删后）—— 背包 UI 订阅它重绘
 signal inventory_slots_changed()
 
+# ---------------- 模块 9（建造与牧场扩建）----------------
+
+## 玩家按 E 点了某栋建筑（传它占地的锚点格）—— 建筑节点不自己扣钱，交给 main
+signal building_interacted(cell: Vector2i)
+
+## 建筑落成（def_id, 锚点格）
+signal building_placed(def_id: StringName, cell: Vector2i)
+
+## 建筑被拆（def_id, 锚点格, 返还金币, 返还木材）
+signal building_removed(def_id: StringName, cell: Vector2i, refund_gold: int, refund_wood: int)
+
+## 牧场扩建到新阶段（阶段序号）
+signal stage_advanced(stage: int)
+
+## 建造模式开关。玩家工具键在建造模式下要让位给「选建筑 / 放置 / 拆除」，
+## 所以 player.gd 也认这个开关（和 ui_modal 同一个思路：全局状态，不是谁给谁发消息）。
+var build_mode: bool = false
+
+func set_build_mode(on: bool) -> void:
+	build_mode = on
+

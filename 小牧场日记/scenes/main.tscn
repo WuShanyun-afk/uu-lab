@@ -1,4 +1,4 @@
-[gd_scene load_steps=36 format=3]
+[gd_scene load_steps=37 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://scenes/player.tscn" id="2_player"]
@@ -27,6 +27,7 @@
 [ext_resource type="Script" path="res://scripts/world/order_post.gd" id="25_orderpost"]
 [ext_resource type="Script" path="res://scripts/world/craft_workshop.gd" id="26_workshop"]
 [ext_resource type="Script" path="res://scripts/ui/inventory_ui.gd" id="27_inventory"]
+[ext_resource type="Script" path="res://scripts/build/build_cursor.gd" id="28_buildcursor"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_sign"]
 size = Vector2(26, 26)
@@ -159,6 +160,9 @@ shape = SubResource("RectangleShape2D_bin")
 [node name="YSortRoot" type="Node2D" parent="World"]
 y_sort_enabled = true
 
+[node name="BuildRoot" type="Node2D" parent="World/YSortRoot"]
+y_sort_enabled = true
+
 [node name="AnimalLayer" type="Node2D" parent="World/YSortRoot"]
 y_sort_enabled = true
 script = ExtResource("4_animals")
@@ -189,6 +193,10 @@ shape = SubResource("RectangleShape2D_housing")
 
 [node name="Player" parent="World/YSortRoot" instance=ExtResource("2_player")]
 position = Vector2(384, 224)
+
+[node name="BuildCursor" type="Node2D" parent="World"]
+z_index = 5
+script = ExtResource("28_buildcursor")
 
 [node name="CanvasModulate" type="CanvasModulate" parent="."]
 color = Color(1, 1, 1, 1)
