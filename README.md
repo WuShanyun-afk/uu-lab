@@ -74,39 +74,65 @@
 | `WASD` | 走动 |
 | `1` / `2` / `3` | 锄头 / 洒水壶 / 种子 |
 | `4` / `5` | 饲料 / 手（喂食、挤奶、捡蛋、抚摸） |
-| `E` 或 鼠标左键 | 对目标使用手上的东西 |
+| `6` / `7` | 基础肥料 / 高级肥料 |
+| `Tab` | 换种子 |
+| `E` 或 鼠标左键 | 对目标使用手上的东西 / 交互 |
+| `I` | 背包 |
+| `B` | 建造模式 |
+| `G` | 给村民送礼 |
+| `F` | 屋内摆家具 |
+| `F5` / `F6` / `F9` | 快速存档 / 存档面板（多存档位） / 读最近的档 |
+| `F3` | 音频调试面板（当前 BGM / 环境音 / 音效池状态） |
 | `F11` | 全屏切换 |
 
-### 已完成的里程碑
+### 已完成的模块
 
-| # | 内容 | 断言 |
-| --- | --- | --- |
-| 1 | 玩家移动 + 时间/昼夜（120 tick 一天、四段时段、光照「平台 + 交界短过渡」） | 28 |
-| 2 | 耕地 / 种植 / 收获（18 种作物，春夏秋冬全覆盖） | 42 |
-| 3 | 奶牛 + 鸡（好感 / 成长 / 产出 / 生病 / 牧群 / 背包） | 107 |
-| — | 玩家 LPC 精灵替换（`player.png` 832×3456、16 动画、credits 已随包） | 19 |
+| 轮次 | 内容 |
+| --- | --- |
+| 模块 1 | 玩家移动 + 时间/昼夜（120 tick 一天、四段时段、光照「平台 + 交界短过渡」） |
+| 模块 2 | 时间 / 季节 / 天气（晴 / 阴 / 雨 / 雷雨 / 雪，天气影响作物与动物） |
+| 模块 3 | 耕地 / 种植 / 收获（24 种作物，四季全覆盖，品质与肥料） |
+| 模块 4–6 | 9 种动物 / 好感成长繁殖 / 三栋棚舍与美术 |
+| 模块 7 | 经济与背包（真槽位拖拽、四因子定价、订单委托、加工坊、工具铺） |
+| 模块 8 | 存档系统（三层 JSON、原子写、版本迁移） |
+| 模块 9 | 建造与牧场扩建（10 种可建造物、自由摆放、阶段解锁） |
+| 模块 10 | NPC 与剧情（8 位村民、好感送礼日程、三条主线 + 隐藏结局） |
+| 模块 11 | 存档与场景管理（6 个存档位、5 个场景真实切换、跨场景 carry） |
+| 模块 12 | 建筑与房屋系统（许可证 + 工期、住宅三级、室内外切换、睡觉推进次日） |
+| 附属 1 | 全局音频与氛围（AudioManager + 音效池、35 个 16-bit 素材、7 首动态 BGM） |
 
-**四条测试全绿 = 196 项断言。** 跑法（`--headless`，不开窗口）：
+**18 个测试套件 / 2694 项断言全绿。** 一键跑法：
 
 ```bat
 set GODOT_MCP_UPDATE_CHECK=false
-"%USERPROFILE%\.godot-mcp\godot\4.7.2-stable\Godot_v4.7.2-stable_win64.exe" --headless --path 小牧场日记 res://tests/test_animals.tscn
+set PYTHONIOENCODING=utf-8
+python 小牧场日记\_uu\run_tests.py
 ```
 
-测试场景：`test_milestone1` / `test_player_sprite` / `test_farm` / `test_animals`。
+单跑一个套件：
+
+```bat
+set GODOT_MCP_UPDATE_CHECK=false
+"%USERPROFILE%\.godot-mcp\godot\4.7.2-stable\Godot_v4.7.2-stable_win64.exe" --headless --path 小牧场日记 res://tests/test_module13.tscn
+```
+
+**新接手先读**：[`小牧场日记/_uu/交接备忘录.md`](小牧场日记/_uu/交接备忘录.md) ——
+15 分钟验收流程、架构速查、模块编号对照、这台机器的坑、下一步优先级。
 
 ### 目录
 
 ```
 小牧场日记/
-├─ data/            作物 / 动物 / 产物的 CSV 平衡表（加一行 = 加一种作物）
-├─ scripts/data/    CSV → 数据对象
-├─ scripts/farm/    FarmGrid 纯逻辑（可 headless 断言）+ FarmLayer 渲染
-├─ scripts/animal/  AnimalState 单只逻辑 / Herd 牧群 / AnimalNode 场景节点
-├─ scenes/          main / player / animal
-├─ tests/           四个测试场景
-└─ _uu/             设计笔记、LPC 工具链、踩坑记录
+├─ data/            13 张 CSV 平衡表（作物 / 动物 / 产物 / 建筑 / 住宅 / NPC / 配方 / 音频…）
+├─ scripts/         data 数据层 / farm 农田 / animal 动物 / build 建造 / economy 经济
+│                   npc 村民 / story 剧情 / save 存档 / world 场景与路由 / ui 界面 / audio 音频
+├─ scenes/          main / player / animal / house / town / shop / mine
+├─ assets/          characters / sprites / tiles / shaders
+├─ audio/           sfx（27 音效 + 雨声）/ bgm（7 首），由 _uu/gen_audio.py 程序合成
+├─ tests/           18 个测试场景 + 12 个截图脚本
+└─ _uu/             每个模块一篇文档 + run_tests.py + gen_audio.py + 交接备忘录
 ```
+
 
 ### 这台机器上踩过的坑
 
@@ -135,3 +161,12 @@ set GODOT_MCP_UPDATE_CHECK=false
   四条测试合计 196 项断言全绿。启动脚本改成**自动找 Godot + 纯 ASCII**，换台机器也能跑。
 - **2026-10-15** 摸清 cmd.exe 的脾气：这台机器的 bat 必须 **UTF-8 + CRLF**，加 `.gitattributes` 锁死行尾。
 - **2026-10-15** Kelivo 的 MCP 三个 server（godot / pixelart / lpc）导入成功，握手全通。
+- **2026-10-16 ~ 10-18** 小牧场日记连推 6 个模块：经济与背包（`a6e5e88`）→ 存档系统（`134a433`）
+  → 建造与牧场扩建（`392f28d`）→ NPC 与剧情（`f78c90f`）→ 存档与场景管理（`0f28a7a`）
+  → 建筑与房屋系统（`808b960`）。5 个场景真实切换、8 位村民 + 三条主线、住宅三级升级 + 睡觉推进次日。
+- **2026-10-18** 附属模块 1 全局音频与氛围（`6988f93`）：AudioManager + 音效池三闸门、
+  35 个程序合成的 16-bit 素材、7 首按时段/天气/季节/场景切换的动态 BGM、F3 音频调试面板。
+  全量测试到 **18 套件 2694 项断言全绿**。
+- **2026-10-18** 模块 11 复验（`e80e9fb`）：修了截图脚本「牧场首帧空白图」的 bug，7 张换场图按当前场景重拍。
+- **2026-10-29** 写了 [`小牧场日记/_uu/交接备忘录.md`](小牧场日记/_uu/交接备忘录.md)，
+  README 的牧场章节同步更新到当前状态（操作键位 / 模块清单 / 测试跑法 / 目录）。
