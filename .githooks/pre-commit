@@ -1,0 +1,52 @@
+#!/bin/sh
+# ============================================================
+#  隐私守卫 · pre-commit hook
+#  作用：在提交前扫描暂存内容，阻挡
+#    1) 本机用户绝对路径（Windows 的 Users 目录、类 Unix 的 home 目录）
+#    2) API Key / Token / 密码 / 私钥
+#    3) 敏感文件名（.env、*.key、cookies、mcp-config.json 等）
+#  安装：把本文件 + privacy_patterns.txt 放进 .git/hooks/ 即可
+#  确需绕过：git commit --no-verify（不建议）
+# ============================================================
+set -e
+HOOKDIR=$(dirname "$0")
+PATTERNS="$HOOKDIR/privacy_patterns.txt"
+blocked=0
+
+files=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null || true)
+[ -z "$files" ] && exit 0
+
+# ---- 1) 敏感文件名 ----
+OLDIFS=$IFS
+IFS='
+'
+for f in $files; do
+  case "$f" in
+    .env|*.env|.env.*|*.key|*.pem|*.p12|*.pfx|*.ppk|*.kdbx|id_rsa*|id_ed25519*|\
+    *credentials*|*secret*.json|*.token|token.txt|cookies*.txt|Cookies|\
+    "Login Data"|"Local State"|mcp-config.json|mcp-import.json)
+      echo "✖ [隐私守卫] 拒绝提交疑似敏感文件：$f" >&2
+      blocked=1 ;;
+  esac
+done
+IFS=$OLDIFS
+
+# ---- 2) 暂存内容扫描 ----
+if [ -f "$PATTERNS" ]; then
+  diff=$(git diff --cached -U0 -- . 2>/dev/null | grep -E '^\+' | grep -Ev '^\+\+\+' || true)
+  if [ -n "$diff" ]; then
+    if printf '%s\n' "$diff" | grep -Eiqf "$PATTERNS"; then
+      echo "✖ [隐私守卫] 拒绝提交：暂存内容命中下列隐私/密钥规则 ——" >&2
+      printf '%s\n' "$diff" | grep -Ein -f "$PATTERNS" | head -5 >&2
+      echo "   请删除或改为占位符（%USERPROFILE% / <你的key> / 环境变量）后再提交。" >&2
+      blocked=1
+    fi
+  fi
+fi
+
+if [ "$blocked" = "1" ]; then
+  echo "" >&2
+  echo "提交已被隐私守卫阻止。确需强行提交：git commit --no-verify（不建议）" >&2
+  exit 1
+fi
+exit 0

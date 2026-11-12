@@ -28,3 +28,51 @@ desktop.ini
 # —— Python 缓存 ——
 **/__pycache__/
 *.pyc
+
+# ==================== 隐私 · 密钥 · 本机路径 防护 ====================
+# 说明：本段由“隐私守卫”自动追加，可按需删改。
+# 只挡未跟踪文件；已跟踪文件靠 .git/hooks/pre-commit 内容扫描兜底。
+
+# —— 运行痕迹 / 临时文件（常含用户名绝对路径） ——
+*.log
+*.tmp
+*.bak
+~$*
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# —— 环境变量与密钥 ——
+.env
+.env.*
+*.env
+secrets/
+secret*.json
+*.key
+*.pem
+*.p12
+*.pfx
+*.ppk
+*.kdbx
+id_rsa*
+id_ed25519*
+credentials*
+auth.json
+*.token
+token.txt
+
+# —— 浏览器 / 登录态 ——
+Cookies
+Login Data
+Local State
+cookies*.txt
+cookies*.sqlite
+cookies*.db
+
+# —— 本机专属配置（含绝对路径 / MCP 本地配置） ——
+mcp-config.json
+mcp-import.json
+*.local.json
+*.local.js
+*.local.html
+*.private.*
