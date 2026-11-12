@@ -15,6 +15,19 @@ _uu/shim/
 # DSH 工作区权限修复的备份与报告（含本机 ACL 细节），本机专属。
 _uu/acl-report/
 
+# 调试产物：CDP / 新道云抓取留下的浏览器配置镜像、UI 自动化截图、临时探针脚本。
+# 注意 _uu/EdgeJun 是指向本机 Edge 用户数据目录的联接点（Junction）——
+# 若被 git add，会把 Cookies、Login Data、密码库连同 8000+ 个文件一起提交到公开仓库。
+_uu/EdgeJun
+_uu/EdgeTest_*/
+_uu/uia/
+_uu/dsh_agent/
+_uu/sx/
+_uu/*.png
+_uu/_probe2.txt
+_probe.txt
+edge_launch.*
+
 # 系统垃圾
 Thumbs.db
 desktop.ini
