@@ -291,8 +291,8 @@ function switchChat(id) {
     loadChatIntoActive(chat);
     persist();
   }
-  showScreen("chat");
-  closeChatSearch();
+  showScreen("chat");  closeChatSearch();
+  setComposerTray(false);
   refreshActiveView();
   restoreDraft(chat);
   clearUnread(chat);
@@ -304,6 +304,7 @@ function openChatList() {  openTab("list");
 
 function openTab(name) {
   if (!state || !["list", "contacts", "home"].includes(name)) return;
+  setComposerTray(false);
   syncActiveKey();
   syncActiveChat();
   persist();
@@ -2625,9 +2626,8 @@ function insertEmoji(emoji) {
   input.value = `${input.value.slice(0, start)}${emoji}${input.value.slice(end)}`;
   const pos = start + emoji.length;
   input.setSelectionRange(pos, pos);
+  input.dispatchEvent(new Event("input", { bubbles: true }));
   input.focus();
-  autoResizeInput(input);
-  updateSendButton();
 }
 
 /* =========================================================
@@ -3297,6 +3297,24 @@ function openAttachSheet() {
       });
     },
   });
+}
+
+/* ---- 输入栏工具盘：+ 展开，图片 / 文件 / 表情 / 日常 / 更多 + 一排快捷表情 ---- */
+function initComposerTray() {
+  const box = $("#trayEmoji");
+  if (!box || box.childElementCount) return;
+  box.innerHTML = EMOJIS.map(
+    (emoji) => `<button type="button" class="tray-emoji-btn" data-emoji="${escapeHtml(emoji)}" aria-label="${escapeHtml(emoji)}">${escapeHtml(emoji)}</button>`,
+  ).join("");
+}
+
+function setComposerTray(open) {
+  const tray = $("#composerTray");
+  if (!tray) return;
+  initComposerTray();
+  tray.hidden = !open;
+  $("#btnAttach")?.setAttribute("aria-expanded", open ? "true" : "false");
+  $("#composer")?.classList.toggle("tray-open", open);
 }
 
 function openStickerSheet(tab = stickerTab) {
@@ -4382,6 +4400,7 @@ function bindGlobalEvents() {
       stopGeneration();
       return;
     }
+    setComposerTray(false);
     handleSend();
   });
 
@@ -4398,7 +4417,34 @@ function bindGlobalEvents() {
     }
   });
 
-  $("#btnAttach")?.addEventListener("click", openAttachSheet);
+  /* 「+」不再直接弹面板，先在输入栏里张开一层工具盘 */
+  $("#btnAttach")?.addEventListener("click", () => {
+    const tray = $("#composerTray");
+    setComposerTray(Boolean(tray?.hidden));
+  });
+  $("#composerTray")?.addEventListener("click", (event) => {
+    const emoji = event.target.closest("[data-emoji]");
+    if (emoji) {
+      insertEmoji(emoji.dataset.emoji);
+      return;
+    }
+    const action = event.target.closest("[data-tray]");
+    if (!action) return;
+    const kind = action.dataset.tray;
+    if (kind === "image" || kind === "file") {
+      setComposerTray(false);
+      const picker = kind === "image" ? $("#imageInput") : $("#fileInput");
+      if (picker) {
+        picker.value = "";
+        picker.click();
+      }
+      return;
+    }
+    setComposerTray(false);
+    if (kind === "sticker") openStickerSheet("builtin");
+    else if (kind === "report") openReportSheet();
+    else openAttachSheet();
+  });
   $("#btnSticker")?.addEventListener("click", () => openStickerSheet(stickerTab));
   $("#btnChatBack")?.addEventListener("click", openChatList);
   $("#btnPeer")?.addEventListener("click", () => openSettings("persona", "chat"));

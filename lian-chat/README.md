@@ -23,7 +23,7 @@
 
 ---
 
-## 1.9.11 版式版：四种聊天页设计 + 八套新配色（2026-11-21）
+## 1.9.11 版式版：八种聊天页设计 + 三套页面重做 + 输入栏工具盘（2026-11-21）
 
 这一版动的是**页面结构**，不是换色。
 
@@ -52,10 +52,16 @@
 - **主页新卡片「今日一问」**：每天固定一道题（按日期取模），可以「换一个」，
   点「填进输入框」会切到聊天并把问题填进输入框（不自动发送、不花 token）。
 - **通讯录卡片化**：每行露出最后一句、`N 句` / `N 条记忆` / 最后时间。
-- **主题 7 → 15**（同上）……
-- 新文件 `css/modules/15-themes.css`、`css/modules/16-layouts.css`、`css/modules/17-screens.css`；
-  新脚本 `scripts/theme-gallery.mjs`（4 版式 + 15 主题 + 列表/主页/通讯录/色号逐张截图、点选持久化、控制台报错收集）。
-  截图见 `docs/layout-grid.png`、`docs/theme-grid.png`、`docs/screens-grid.png`。
+- **输入栏也重做了**：
+  - 「+」不再直接弹底部面板，而是在输入栏里**张开一层工具盘**：图片 / 文件 / 表情 / 日常 / 更多，
+    下面还有一排可以连点的快捷表情，点一下直接插进光标处（会触发草稿保存、自动调整高度）；
+  - 输入栏颜色改成跟随主题（`--composer-bg` / `--composer-rim`），占位字与禁用按钮也走主题令牌；
+  - 每个版式的输入栏有自己的结构：漫画是**对话球**（带一个小尾巴）、手账贴一段胶带、
+    素页平时是灰线、聚焦时亮起强调色、iMessage 是圆角胶囊、泡泡是输入框在上工具栏在下。
+- 新文件 `css/modules/15-themes.css`、`16-layouts.css`、`17-screens.css`、`18-composer.css`；
+  `js/app.js` 增加 `setComposerTray()` / `insertEmoji()`，切换聊天或切 tab 会自动收起工具盘。
+- 新脚本 `scripts/theme-gallery.mjs`（8 版式 + 15 主题 + 列表/主页/通讯录/色号/工具盘逐张截图、
+  点选持久化、控制台报错收集）。截图见 `docs/layout-grid.png`、`docs/theme-grid.png`、`docs/screens-grid.png`。
 - 顺带修了 `regen-check.mjs` 重画断言的一个竞态：旧 `<img>` 会先满足 `naturalWidth > 0`，
   现在要求 `src` 变了才算重画成功。
 

@@ -97,3 +97,18 @@ test("screens: the accent field is a hex box, not a colour wheel", () => {
   assert.ok(settings.includes("normaliseAccent"), "hex validation missing");
   assert.ok(!settings.includes('type="color"'), "native colour picker should be gone");
 });
+
+test("composer: the inline tray is wired up", () => {
+  const html = read("index.html");
+  const app = read("js/app.js");
+  const css = read("css/modules/18-composer.css");
+  const sw = read("sw.js");
+  assert.ok(html.includes('id="composerTray"'), "tray markup missing");
+  assert.ok(html.includes('data-tray="image"') && html.includes('data-tray="more"'));
+  assert.ok(html.includes('id="trayEmoji"'), "emoji row missing");
+  assert.ok(css.includes(".composer-tray") && css.includes(".tray-emoji-btn"));
+  assert.ok(app.includes("setComposerTray") && app.includes("insertEmoji"), "handlers missing");
+  assert.ok(sw.includes("css/modules/18-composer.css"), "stylesheet not precached");
+  /* opening a chat or a tab must not leave the tray hanging open */
+  assert.ok(app.includes("setComposerTray(false)"));
+});

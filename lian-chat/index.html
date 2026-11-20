@@ -31,6 +31,7 @@
 <link rel="stylesheet" href="css/modules/15-themes.css" data-module="themes">
 <link rel="stylesheet" href="css/modules/16-layouts.css" data-module="layouts">
 <link rel="stylesheet" href="css/modules/17-screens.css" data-module="screens">
+<link rel="stylesheet" href="css/modules/18-composer.css" data-module="composer">
 </head>
 <body>
   <div class="boot" id="boot">
@@ -202,10 +203,35 @@
     </div>
 
     <form class="composer" id="composer" autocomplete="off">
+      <div class="composer-tray" id="composerTray" hidden>
+        <div class="tray-actions">
+          <button type="button" class="tray-action" data-tray="image">
+            <span class="tray-icon"><svg class="icon"><use href="#i-image"></use></svg></span>
+            <span data-i18n="composer.photo">图片</span>
+          </button>
+          <button type="button" class="tray-action" data-tray="file">
+            <span class="tray-icon"><svg class="icon"><use href="#i-file"></use></svg></span>
+            <span data-i18n="composer.file">文件</span>
+          </button>
+          <button type="button" class="tray-action" data-tray="sticker">
+            <span class="tray-icon"><svg class="icon"><use href="#i-sticker"></use></svg></span>
+            <span data-i18n="composer.sticker">表情</span>
+          </button>
+          <button type="button" class="tray-action" data-tray="report">
+            <span class="tray-icon"><svg class="icon"><use href="#i-doc"></use></svg></span>
+            <span data-i18n="composer.report">日常</span>
+          </button>
+          <button type="button" class="tray-action" data-tray="more">
+            <span class="tray-icon"><svg class="icon"><use href="#i-more"></use></svg></span>
+            <span data-i18n="composer.more">更多</span>
+          </button>
+        </div>
+        <div class="tray-emoji" id="trayEmoji" role="listbox" aria-label="快捷表情"></div>
+      </div>
       <div class="quote-preview" id="quotePreview" hidden></div>
       <div class="attachment-preview" id="attachmentPreview" hidden></div>
       <div class="composer-row" id="composerRow">
-        <button class="composer-btn" id="btnAttach" type="button" aria-label="添加" data-i18n-aria="chat.attach">
+        <button class="composer-btn" id="btnAttach" type="button" aria-label="添加" aria-expanded="false" data-i18n-aria="chat.attach">
           <svg class="icon"><use href="#i-plus"></use></svg>
         </button>
         <textarea id="messageInput" rows="1" maxlength="4000" placeholder="发消息…" data-i18n-ph="chat.placeholder" enterkeyhint="send"></textarea>

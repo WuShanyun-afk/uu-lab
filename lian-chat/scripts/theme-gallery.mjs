@@ -320,6 +320,25 @@ if (MODE === "all" || MODE === "screens") {
   console.log("daily draft:", draft.slice(0, 40));
   await shot("screen-daily-draft.png");
 
+  /* 输入栏工具盘：张开 + 点一个表情，确认真的插进了草稿 */
+  await evaluate(`document.querySelector("#btnAttach")?.click()`);
+  await sleep(420);
+  await shot("screen-composer.png");
+  const composed = await evaluate(`(() => {
+    const btn = document.querySelector("#trayEmoji [data-emoji]");
+    btn?.click();
+    const el = document.querySelector("#messageInput");
+    return { value: el ? el.value : "", trayHidden: document.querySelector("#composerTray")?.hidden };
+  })()`);
+  console.log("composer emoji:", JSON.stringify({ len: composed.value.length, trayHidden: composed.trayHidden }));
+  if (!composed.value.includes("😊") && !composed.value.includes("🥺")) {
+    console.log("FAIL: tapping a tray emoji did not reach the input");
+    process.exitCode = 1;
+  }
+  await shot("screen-composer-emoji.png");
+  await evaluate(`document.querySelector("#btnAttach")?.click()`);
+  await sleep(250);
+
   await evaluate(`document.querySelector("#btnChatBack")?.click(); document.querySelector('[data-tab="contacts"]')?.click()`);
   await sleep(500);
   await shot("screen-contacts.png");

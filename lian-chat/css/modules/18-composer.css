@@ -1,0 +1,151 @@
+/* =========================================================
+   18 · composer — 输入栏的工具盘与各版式的小机关
+   ---------------------------------------------------------
+   输入栏这一版有两件事：
+     1. 「+」不再直接弹底部面板，而是在输入栏里张开一层工具盘：
+        图片 / 文件 / 表情 / 日常 / 更多，外加一排可以连点的快捷表情；
+     2. 每个版式的输入栏都有一点自己的结构（漫画是对话球、手账贴胶带、
+        时间轴接上竖线、素页聚焦时才亮起强调色）。
+   颜色全部来自 15 主题与 --composer-bg / --composer-rim。
+   ========================================================= */
+
+/* ---- 1. 工具盘 ---- */
+.composer-tray {
+  margin: 0 0 7px;
+  padding: 10px 10px 6px;
+  border: 1px solid var(--composer-rim);
+  border-radius: 20px;
+  background: var(--composer-bg);
+  box-shadow: var(--el-2);
+  animation: tray-in 0.18s var(--ease-out) both;
+}
+@keyframes tray-in {
+  from {
+    opacity: 0;
+    transform: translateY(7px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.tray-actions {
+  display: flex;
+  gap: 4px;
+}
+.tray-action {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 2px 6px;
+  border-radius: 14px;
+  color: var(--text-2);
+  font-size: var(--fs-2xs);
+  line-height: 1;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+.tray-action:active {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.tray-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--paper-100));
+  color: var(--accent-strong, var(--accent));
+}
+.tray-icon .icon {
+  width: 18px;
+  height: 18px;
+}
+.tray-emoji {
+  display: flex;
+  gap: 2px;
+  margin-top: 7px;
+  padding: 7px 2px 3px;
+  overflow-x: auto;
+  border-top: 1px dashed var(--line-paper);
+  scrollbar-width: none;
+}
+.tray-emoji::-webkit-scrollbar {
+  display: none;
+}
+.tray-emoji-btn {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  font-size: 20px;
+  line-height: 1;
+}
+.tray-emoji-btn:active {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  transform: scale(1.06);
+}
+/* 张开时「+」翻成「×」 */
+.composer.tray-open #btnAttach .icon {
+  transform: rotate(45deg);
+  transition: transform var(--t-fast) var(--ease-out);
+}
+
+/* ---- 2. 各版式的小机关 ---- */
+
+/* 漫画：输入卡长出一个对话球小尾巴 */
+body[data-layout="comic"] .composer-row {
+  position: relative;
+}
+body[data-layout="comic"] .composer-row::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  left: 26px;
+  width: 15px;
+  height: 15px;
+  border-top: 2px solid var(--text);
+  border-left: 2px solid var(--text);
+  border-radius: 3px 0 0 0;
+  background: var(--composer-bg);
+  transform: rotate(45deg);
+}
+
+/* 手账：输入卡左上贴一小段胶带 */
+body[data-layout="journal"] .composer-row {
+  position: relative;
+}
+body[data-layout="journal"] .composer-row::before {
+  content: "";
+  position: absolute;
+  top: -7px;
+  left: 18px;
+  width: 44px;
+  height: 14px;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  opacity: 0.75;
+  transform: rotate(-3deg);
+}
+
+/* 时间轴：不做输入栏圆点——它会正好压在「+」上，竖线本身已经够了 */
+
+/* 素页：平时只是一条灰线，聚焦时才亮起强调色 */
+body[data-layout="plain"] .composer-row {
+  transition: border-color var(--t-fast);
+}
+body[data-layout="plain"] .composer-row:focus-within {
+  border-bottom-color: var(--accent);
+}
+
+/* 讯息：工具盘浮在胶囊上方，圆角跟着胶囊走 */
+body[data-layout="imessage"] .composer-tray {
+  border-radius: 22px;
+}
+
+/* 泡泡：工具盘和输入卡一样是方一点的卡片 */
+body[data-layout="bubble"] .composer-tray {
+  border-radius: 16px;
+}
