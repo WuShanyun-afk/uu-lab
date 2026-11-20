@@ -1,0 +1,50 @@
+/* =========================================================
+   M8 · motion — 动效规范
+   ---------------------------------------------------------
+   微交互 140ms、消息入场 220ms、面板 280ms，统一 --ease-out。
+   系统开了「减少动效」时，全部退化为无位移的淡入。
+   ========================================================= */
+
+.msg.is-new {
+  animation: msg-in 220ms var(--ease-out) both;
+}
+.msg-sticker {
+  animation: sticker-in var(--t-slow) var(--ease-out) both;
+}
+.bubble {
+  transition: transform var(--t-fast) var(--ease-out);
+}
+.tab-item .icon {
+  transition: transform 220ms var(--ease-out), stroke-width var(--t-fast) ease;
+}
+.home-quick,
+.home-row {
+  transition: background var(--t-fast) ease, transform var(--t-fast) var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .msg.is-new,
+  .msg-sticker,
+  .report-scene,
+  .typing-bubble i,
+  .boot,
+  .boot-logo {
+    animation: none !important;
+  }
+  .msg-sticker:hover,
+  .home-quick:active,
+  .send-btn:active:not(:disabled) {
+    transform: none !important;
+  }
+  .bubble,
+  .tab-item .icon,
+  .home-quick,
+  .home-row {
+    transition: none !important;
+  }
+  .chat-scroll,
+  .settings-scroll,
+  .chat-list-scroll {
+    scroll-behavior: auto !important;
+  }
+}

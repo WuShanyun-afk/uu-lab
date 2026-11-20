@@ -1,0 +1,10 @@
+# Local browser test profiles (can contain local app data)
+tests/edge-cdp/
+tests/final-cdp/
+tests/studio-cdp/
+tests/shots/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.log

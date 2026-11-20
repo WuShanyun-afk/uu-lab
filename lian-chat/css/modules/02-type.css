@@ -1,0 +1,40 @@
+/* =========================================================
+   M2 · type — 正文与时间戳
+   ---------------------------------------------------------
+   app.css 里原先散落 70 处 8–9.5px 的字号，已全部换成语义令牌
+   （8 / 8.5 / 9 → --fs-2xs，9.5 → --fs-xs），所以「最小 10px」
+   现在由源码本身保证，不再靠这一层逐个覆盖。
+   这里只保留三类「比令牌更具体」的调整。
+   ========================================================= */
+
+/* 正文 14.5 → 15px，行距放宽 */
+.bubble {
+  font-size: var(--fs-body);
+  line-height: 1.55;
+}
+#messageInput {
+  font-size: var(--fs-body);
+}
+
+/* 时间戳：10.5px + 等宽数字，扫一眼不会跳 */
+.msg-time {
+  margin-bottom: 3px;
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+/* 头部名字跟正文同号，比原来 14.5 稳一点 */
+.peer-name {
+  font-size: var(--fs-body);
+}
+
+/* 日期胶囊比正文小半号，但不再低于 10.5 */
+.date-sep span {
+  font-size: var(--fs-xs);
+}
+
+/* 主页统计数字等宽，数字变化时不抖 */
+.home-stats b {
+  font-variant-numeric: tabular-nums;
+}

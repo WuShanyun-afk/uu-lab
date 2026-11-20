@@ -1,0 +1,78 @@
+/* =========================================================
+   M1 · tokens — 设计令牌
+   ---------------------------------------------------------
+   只新增变量，不覆盖 app.css 里的任何既有声明，因此本模块
+   上线后界面应逐像素不变（用 mod-base / mod-m1 截图对比验证）。
+   后面的 M2–M9 只消费这些变量，不再出现魔法数字。
+   ========================================================= */
+
+:root {
+  /* ---- 字号阶梯：最小 10px，正文 15px ---- */
+  --fs-2xs: 10px;
+  --fs-xs: 10.5px;
+  --fs-caption: 11px;
+  --fs-sm: 11.5px;
+  --fs-label: 12.5px;
+  --fs-md: 13px;
+  --fs-body: 15px;
+  --fs-lg: 17px;
+  --fs-title: 22px;
+  --fs-display: 26px;
+
+  /* ---- 圆角阶梯 ---- */
+  --r-xs: 8px;
+  --r-sm: 12px;
+  --r-md: 16px;
+  --r-lg: 20px;
+  --r-xl: 26px;
+  --r-pill: 999px;
+
+  /* ---- 间距 ---- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 22px;
+
+  /* ---- 投影：一层比一层远 ---- */
+  --el-1: 0 1px 2px rgba(32, 27, 16, 0.05);
+  --el-2: 0 2px 6px rgba(32, 27, 16, 0.05), 0 16px 32px -26px rgba(32, 27, 16, 0.55);
+  --el-3: 0 26px 50px -42px rgba(32, 27, 16, 0.7);
+
+  /* ---- 动效时长与曲线 ---- */
+  --t-fast: 140ms;
+  --t-base: 200ms;
+  --t-slow: 280ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* ---- 气泡角色：M3 会把 --bubble-mine 换成对比度安全色 ---- */
+  --bubble-mine: var(--user-bubble);
+  --bubble-mine-ink: var(--accent-ink);
+  --bubble-peer: var(--ai-bubble);
+  --bubble-peer-ink: var(--text);
+  --bubble-radius: 20px;
+  --bubble-radius-tail: 7px;
+  --bubble-gap: 72px;
+
+  /* ---- 输入栏：跟着主题走，而不是永远一块白 ---- */
+  --composer-bg: color-mix(in srgb, var(--paper-100) 88%, var(--chat-bg) 12%);
+  --composer-rim: color-mix(in srgb, var(--accent) 16%, transparent);
+
+  /* ---- 纸感色板：默认值偏中性，M7 的 paper 主题会整体覆盖 ---- */
+  --paper-100: #fffefb;
+  --paper-150: #fbf9f1;
+  --paper-200: #f6f3e9;
+  --paper-300: #eeeade;
+  --paper-400: #e4dfcf;
+  --ink-900: #1b1a15;
+  --ink-700: #3f3c33;
+  --ink-500: #6b675b;
+  --ink-400: #8d8a7c;
+  --line-paper: rgba(72, 62, 36, 0.1);
+
+  /* ---- 纸纹：3px 点阵，零图片请求 ---- */
+  --grain-image: radial-gradient(rgba(80, 68, 38, 0.028) 0.55px, transparent 0.7px);
+  --grain-size: 4px 4px;
+
+  --gutter: 12px;
+}

@@ -1,0 +1,13 @@
+{
+  "name": "lian-chat",
+  "private": true,
+  "version": "1.9.11",
+  "type": "module",
+  "description": "Lian - a pure frontend LINE-style companion chat app.",
+  "scripts": {
+    "start": "python -m http.server 4173 --bind 127.0.0.1",
+    "test": "node --test tests/*.test.js",
+    "check": "node scripts/check-modules.mjs",
+    "test:browser": "node scripts/boot-check.mjs"
+  }
+}

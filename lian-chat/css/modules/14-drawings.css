@@ -1,0 +1,109 @@
+/* =========================================================
+   14 · AI 画面（SVG / HTML 动效）
+   A drawing renders as a picture card: SVG as an <img> built from a
+   data: URI, HTML inside a sandboxed iframe. Both get a light stage so
+   line art stays readable on the dark themes.
+   ========================================================= */
+
+.msg-art {
+  display: block;
+  width: 232px;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fbfaf6;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.msg-art.is-html {
+  position: relative;
+}
+
+.msg-art-frame {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border: 0;
+  background: #fbfaf6;
+}
+
+.msg-art img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.sticker-group-label + .msg-art,
+.msg .msg-art {
+  cursor: zoom-in;
+}
+
+.msg-art-zoom {
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: rgba(28, 28, 26, 0.46);
+  color: #fff;
+  backdrop-filter: blur(6px);
+  transition: background 0.14s, transform 0.14s;
+}
+
+.msg-art-zoom:hover {
+  background: rgba(28, 28, 26, 0.62);
+}
+
+.msg-art-zoom:active {
+  transform: scale(0.94);
+}
+
+.msg-art-zoom .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.msg-art.is-svg:hover img {
+  transform: scale(1.01);
+}
+
+.msg-art.is-svg img {
+  transition: transform 0.2s var(--ease);
+}
+
+/* ---- full view ---- */
+
+.drawing-viewer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 0 12px;
+}
+
+.drawing-full {
+  display: block;
+  max-width: 100%;
+  max-height: 62vh;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fbfaf6;
+}
+
+.drawing-full.is-html {
+  width: min(86vw, 430px);
+  height: auto;
+  aspect-ratio: 1 / 1;
+  border: 1px solid var(--line);
+}
+
+@media (prefers-color-scheme: dark) {
+  .msg-art,
+  .msg-art-frame,
+  .drawing-full {
+    border-color: rgba(255, 255, 255, 0.09);
+  }
+}

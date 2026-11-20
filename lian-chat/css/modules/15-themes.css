@@ -1,0 +1,352 @@
+/* =========================================================
+   15 · themes — 1.9.11 新增的八套皮肤
+   ---------------------------------------------------------
+   全部走「低饱和纸面 + 细边」这套语言（参考了小红书上常见的
+   聊天气泡分享：填色很淡、靠一圈深一点的描边和一点点阴影把
+   气泡从底色里托起来），因此每套主题只重新声明纸面色板和几个
+   主题私有变量，形状交给 04 / 16 两个模块。
+
+   刻意不声明 --accent / --accent-strong / --user-bubble：
+   这些由 applyAppearance() 写在 <html> 的行内样式上，主题若在
+   这里硬写会被行内样式盖掉，不如不写。
+   气泡颜色走 --bubble-mine / --bubble-mine-ink（JS 里按主题的
+   bubble 字段注入），peer 一侧由下面的共享规则统一加上边线。
+   ========================================================= */
+
+/* ---- 1. 薄荷 ---- */
+body[data-theme="mint"] {
+  --page: #f4f9f6;
+  --paper-100: #ffffff;
+  --paper-150: #f8fcfa;
+  --paper-200: #f1f7f3;
+  --paper-300: #e7f1ea;
+  --paper-400: #dceae0;
+  --surface: #ffffff;
+  --surface-2: #f3f9f5;
+  --surface-3: #eaf2ec;
+  --text: #17231d;
+  --text-2: #47564d;
+  --muted: #74857b;
+  --line: #dfeae3;
+  --line-strong: #cfdfd6;
+  --line-paper: rgba(30, 80, 55, 0.09);
+  --ink-900: #17231d;
+  --ink-700: #47564d;
+  --ink-500: #74857b;
+  --ink-400: #8a9a90;
+  --ai-bubble: #ffffff;
+  --bubble-peer: #ffffff;
+  --bubble-peer-ink: #17231d;
+  --chat-top: #f5fbf8;
+  --chat-bot: #e1f0e8;
+  --bubble-rim: rgba(28, 72, 52, 0.07);
+  --bubble-shadow: 0 1px 2px rgba(20, 60, 40, 0.04), 0 16px 28px -26px rgba(20, 60, 40, 0.5);
+  --head-top: rgba(255, 255, 255, 0.95);
+  --head-bot: rgba(250, 253, 251, 0.84);
+}
+
+/* ---- 2. 莓奶 ---- */
+body[data-theme="berry"] {
+  --page: #fbf4f6;
+  --paper-100: #fffdfd;
+  --paper-150: #fdf7f8;
+  --paper-200: #fbf1f3;
+  --paper-300: #f6e6ea;
+  --paper-400: #eed7dd;
+  --surface: #fffdfd;
+  --surface-2: #fcf3f5;
+  --surface-3: #f7e9ec;
+  --text: #251a1e;
+  --text-2: #5a4249;
+  --muted: #8d747c;
+  --line: #f0dee3;
+  --line-strong: #e4cbd3;
+  --line-paper: rgba(110, 40, 60, 0.09);
+  --ink-900: #251a1e;
+  --ink-700: #5a4249;
+  --ink-500: #8d747c;
+  --ink-400: #9c848b;
+  --ai-bubble: #fffdfd;
+  --bubble-peer: #fffdfd;
+  --bubble-peer-ink: #251a1e;
+  --chat-top: #fdf8f9;
+  --chat-bot: #f6e2e8;
+  --bubble-rim: rgba(110, 40, 60, 0.08);
+  --bubble-shadow: 0 1px 2px rgba(90, 40, 55, 0.04), 0 16px 28px -26px rgba(90, 40, 55, 0.5);
+  --head-top: rgba(255, 253, 253, 0.95);
+  --head-bot: rgba(253, 248, 249, 0.84);
+}
+
+/* ---- 3. 奶油 ---- */
+body[data-theme="butter"] {
+  --page: #fbf6e9;
+  --paper-100: #fffdf7;
+  --paper-150: #fdf9f0;
+  --paper-200: #faf3e4;
+  --paper-300: #f4e9d2;
+  --paper-400: #eadbc0;
+  --surface: #fffdf7;
+  --surface-2: #fcf7ea;
+  --surface-3: #f6eedb;
+  --text: #241d10;
+  --text-2: #574a30;
+  --muted: #8a7c60;
+  --line: #ecdfc6;
+  --line-strong: #ddcbaa;
+  --line-paper: rgba(110, 80, 20, 0.09);
+  --ink-900: #241d10;
+  --ink-700: #574a30;
+  --ink-500: #8a7c60;
+  --ink-400: #9a8b6d;
+  --ai-bubble: #fffdf7;
+  --bubble-peer: #fffdf7;
+  --bubble-peer-ink: #241d10;
+  --chat-top: #fdfaf0;
+  --chat-bot: #f3e7cf;
+  --bubble-rim: rgba(110, 80, 20, 0.08);
+  --bubble-shadow: 0 1px 2px rgba(90, 70, 20, 0.04), 0 16px 28px -26px rgba(90, 70, 20, 0.5);
+  --head-top: rgba(255, 253, 247, 0.95);
+  --head-bot: rgba(253, 250, 240, 0.85);
+}
+
+/* ---- 4. 丁香 ---- */
+body[data-theme="lilac"] {
+  --page: #f5f3fb;
+  --paper-100: #fefdff;
+  --paper-150: #f9f7fe;
+  --paper-200: #f3f0fa;
+  --paper-300: #ece7f7;
+  --paper-400: #ded6ee;
+  --surface: #fefdff;
+  --surface-2: #f6f3fd;
+  --surface-3: #efeaf8;
+  --text: #1e1a2c;
+  --text-2: #4b445f;
+  --muted: #7d7593;
+  --line: #e6e0f2;
+  --line-strong: #d5cbe8;
+  --line-paper: rgba(60, 40, 110, 0.09);
+  --ink-900: #1e1a2c;
+  --ink-700: #4b445f;
+  --ink-500: #7d7593;
+  --ink-400: #8d85a3;
+  --ai-bubble: #fefdff;
+  --bubble-peer: #fefdff;
+  --bubble-peer-ink: #1e1a2c;
+  --chat-top: #f8f6fe;
+  --chat-bot: #e8e2f6;
+  --bubble-rim: rgba(60, 40, 110, 0.08);
+  --bubble-shadow: 0 1px 2px rgba(50, 35, 90, 0.04), 0 16px 28px -26px rgba(50, 35, 90, 0.5);
+  --head-top: rgba(254, 253, 255, 0.95);
+  --head-bot: rgba(248, 246, 254, 0.85);
+}
+
+/* ---- 5. 晴空 ---- */
+body[data-theme="sky"] {
+  --page: #f0f6fb;
+  --paper-100: #fdfeff;
+  --paper-150: #f7fbfe;
+  --paper-200: #eff6fc;
+  --paper-300: #e4eef8;
+  --paper-400: #d3e2f0;
+  --surface: #fdfeff;
+  --surface-2: #f3f9fd;
+  --surface-3: #e9f2fa;
+  --text: #142430;
+  --text-2: #3f5666;
+  --muted: #6f8593;
+  --line: #dbe8f3;
+  --line-strong: #c6daea;
+  --line-paper: rgba(20, 60, 90, 0.09);
+  --ink-900: #142430;
+  --ink-700: #3f5666;
+  --ink-500: #6f8593;
+  --ink-400: #8b9dab;
+  --ai-bubble: #fdfeff;
+  --bubble-peer: #fdfeff;
+  --bubble-peer-ink: #142430;
+  --chat-top: #f4faff;
+  --chat-bot: #deecf9;
+  --bubble-rim: rgba(20, 60, 90, 0.08);
+  --bubble-shadow: 0 1px 2px rgba(20, 50, 75, 0.05), 0 18px 30px -26px rgba(20, 50, 75, 0.55);
+  --head-top: rgba(253, 254, 255, 0.95);
+  --head-bot: rgba(244, 250, 255, 0.85);
+}
+
+/* ---- 6. 暮光（暖粉 → 淡紫的纵向渐变） ---- */
+body[data-theme="dawn"] {
+  --page: #fdf4ef;
+  --paper-100: #fffcfb;
+  --paper-150: #fdf7f3;
+  --paper-200: #fcf2ec;
+  --paper-300: #f7e7de;
+  --paper-400: #eed7cc;
+  --surface: #fffcfb;
+  --surface-2: #fdf6f2;
+  --surface-3: #f8ebe4;
+  --text: #2a201c;
+  --text-2: #584440;
+  --muted: #8b746d;
+  --line: #f0ded6;
+  --line-strong: #e3cbc1;
+  --line-paper: rgba(110, 65, 50, 0.09);
+  --ink-900: #2a201c;
+  --ink-700: #584440;
+  --ink-500: #8b746d;
+  --ink-400: #9b837b;
+  --ai-bubble: #fffcfb;
+  --bubble-peer: rgba(255, 255, 255, 0.86);
+  --bubble-peer-ink: #2a201c;
+  --chat-top: #fff4ec;
+  --chat-mid: #f9e6ef;
+  --chat-bot: #eee2f5;
+  --bubble-rim: rgba(110, 65, 50, 0.08);
+  --bubble-shadow: 0 1px 2px rgba(90, 60, 50, 0.04), 0 18px 30px -26px rgba(90, 60, 50, 0.5);
+  --head-top: rgba(255, 252, 251, 0.95);
+  --head-bot: rgba(253, 246, 242, 0.85);
+}
+
+/* ---- 7. 墨白（黑气泡 + 细边白气泡，去色） ---- */
+body[data-theme="mono"] {
+  --page: #efeff1;
+  --paper-100: #ffffff;
+  --paper-150: #fafafa;
+  --paper-200: #f4f4f6;
+  --paper-300: #ececee;
+  --paper-400: #e0e0e4;
+  --surface: #ffffff;
+  --surface-2: #f5f5f6;
+  --surface-3: #ededef;
+  --text: #1b1c21;
+  --text-2: #4a4b52;
+  --muted: #7c7d85;
+  --line: #e4e4e8;
+  --line-strong: #d3d3d9;
+  --line-paper: rgba(20, 20, 25, 0.08);
+  --ink-900: #1b1c21;
+  --ink-700: #4a4b52;
+  --ink-500: #7c7d85;
+  --ink-400: #8c8d95;
+  --ai-bubble: #fbfbfc;
+  --bubble-peer: #fbfbfc;
+  --bubble-peer-ink: #1b1c21;
+  --chat-top: #f6f6f8;
+  --chat-bot: #e9e9ed;
+  --bubble-rim: rgba(15, 15, 20, 0.1);
+  --bubble-shadow: 0 1px 2px rgba(15, 15, 20, 0.05), 0 16px 28px -26px rgba(15, 15, 20, 0.5);
+  --head-top: rgba(255, 255, 255, 0.95);
+  --head-bot: rgba(246, 246, 248, 0.86);
+}
+
+/* ---- 8. 拟态（气泡和底色同色，靠双向阴影立起来） ---- */
+body[data-theme="neo"] {
+  --page: #eeece7;
+  --paper-100: #f3f1ec;
+  --paper-150: #efede8;
+  --paper-200: #eae8e2;
+  --paper-300: #e2dfd8;
+  --paper-400: #d4d0c7;
+  --surface: #f3f1ec;
+  --surface-2: #eeebe5;
+  --surface-3: #e7e3dc;
+  --text: #3c3831;
+  --text-2: #5c574e;
+  --muted: #847d71;
+  --line: #e0dcd4;
+  --line-strong: #cfc9be;
+  --line-paper: rgba(90, 80, 60, 0.1);
+  --ink-900: #3c3831;
+  --ink-700: #5c574e;
+  --ink-500: #847d71;
+  --ink-400: #948d81;
+  --ai-bubble: #eeece7;
+  --bubble-peer: #eeece7;
+  --bubble-peer-ink: #3c3831;
+  --chat-top: #f0eee9;
+  --chat-bot: #eae7e0;
+  --bubble-rim: rgba(255, 255, 255, 0.6);
+  --bubble-shadow: 6px 6px 14px rgba(163, 156, 142, 0.5), -6px -6px 14px rgba(255, 255, 255, 0.92);
+  --head-top: rgba(243, 241, 236, 0.95);
+  --head-bot: rgba(238, 236, 231, 0.86);
+}
+
+/* =========================================================
+   共享层：只在上面这八套下生效
+   ========================================================= */
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="neo"]) {
+  background: var(--page);
+}
+
+/* 头像占位块：默认的近黑方块在浅色皮肤里像一块补丁，改成 accent 淡底 */
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="neo"]) .avatar {
+  background: color-mix(in srgb, var(--accent) 14%, var(--paper-100));
+  color: color-mix(in srgb, var(--accent) 58%, #191919);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+body[data-theme="mono"] .avatar {
+  background: #f2f2f4;
+  color: #24252b;
+  box-shadow: inset 0 0 0 1px rgba(20, 20, 25, 0.1);
+}
+
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="neo"]) .chat-list-screen,
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="neo"]) .contacts-screen,
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="neo"]) .home-screen,
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="neo"]) .settings-screen {
+  background: var(--paper-200);
+}
+
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="neo"]) .chat-screen {
+  background:
+    radial-gradient(120% 60% at 50% -14%, #ffffff 0%, rgba(255, 255, 255, 0) 58%),
+    linear-gradient(180deg, var(--chat-top) 0%, var(--chat-mid, var(--chat-bot)) 58%, var(--chat-bot) 100%);
+}
+
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="neo"]) .chat-header {
+  background: linear-gradient(180deg, var(--head-top), var(--head-bot));
+  border-bottom-color: var(--line-paper);
+}
+
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="neo"]) .msg.ai .bubble {
+  border: 1px solid var(--bubble-rim);
+  box-shadow: var(--bubble-shadow);
+}
+
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="neo"]) .date-sep span {
+  background: color-mix(in srgb, var(--paper-100) 78%, transparent);
+  border: 1px solid var(--line-paper);
+  color: var(--ink-400);
+}
+
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="neo"]) .settings-group,
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="neo"]) .home-quick,
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="neo"]) .home-menu {
+  border-color: var(--line-paper);
+  background: var(--paper-100);
+}
+
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="neo"]) .sheet,
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="neo"]) .modal,
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="neo"]) .confirm-modal {
+  background: var(--paper-100);
+}
+
+/* 拟态：用户气泡也要和底色同色，并且左右对称的阴影 */
+body[data-theme="neo"] .msg.user .bubble {
+  background: var(--bubble-mine);
+  color: var(--bubble-mine-ink);
+  border: 1px solid var(--bubble-rim);
+  box-shadow: var(--bubble-shadow);
+}
+
+/* 墨白：黑白对比已经够强，阴影收掉，只留一点边 */
+body[data-theme="mono"] .msg.user .bubble {
+  box-shadow: 0 1px 2px rgba(10, 10, 15, 0.18);
+}
+
+/* 暮光：顶上那层白光会压过渐变，收一半 */
+body[data-theme="dawn"] .chat-screen::after {
+  background:
+    var(--grain-image) 0 0 / var(--grain-size) repeat,
+    radial-gradient(130% 60% at 50% -14%, rgba(255, 250, 245, 0.5), rgba(255, 255, 255, 0) 62%);
+}

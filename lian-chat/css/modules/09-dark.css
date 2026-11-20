@@ -1,0 +1,173 @@
+/* =========================================================
+   M9 · dark — 深色模式（跟随系统）
+   ---------------------------------------------------------
+   只重映射 paper 主题的令牌，其他主题保持原样：它们的颜色写死
+   在 app.css 里，硬套深色会花。想深色就用 paper，深色下它是
+   「夜幕纸」。
+   ========================================================= */
+
+@media (prefers-color-scheme: dark) {
+  body[data-theme="paper"] {
+    color-scheme: dark;
+    --page: #14130d;
+    --paper-100: #201e17;
+    --paper-150: #1b1a13;
+    --paper-200: #15140e;
+    --paper-300: #26241b;
+    --paper-400: #2f2c21;
+    --surface: #201e17;
+    --surface-2: #26241b;
+    --surface-3: #2b281f;
+    --text: #efeade;
+    --text-2: #c5bfb0;
+    --muted: #98937f;
+    --ink-900: #efeade;
+    --ink-700: #c5bfb0;
+    --ink-500: #98937f;
+    --ink-400: #8b8674;
+    --line: #332f24;
+    --line-strong: #3f3a2b;
+    --line-paper: rgba(255, 240, 200, 0.1);
+    --ai-bubble: #221f18;
+    --bubble-peer: #221f18;
+    --bubble-peer-ink: #efeade;
+    --chat-bg: #191811;
+    --grain-image: radial-gradient(rgba(255, 240, 200, 0.03) 0.55px, transparent 0.7px);
+    background: var(--page);
+  }
+
+  body[data-theme="paper"] .chat-screen {
+    background:
+      radial-gradient(120% 62% at 50% -12%, rgba(255, 246, 220, 0.06) 0%, rgba(255, 255, 255, 0) 58%),
+      linear-gradient(180deg, #1b1a13 0%, #12110b 100%);
+  }
+  body[data-theme="paper"] .chat-screen::after {
+    background:
+      var(--grain-image) 0 0 / var(--grain-size) repeat,
+      radial-gradient(130% 64% at 50% -14%, rgba(255, 246, 220, 0.07), rgba(255, 255, 255, 0) 62%);
+  }
+  body[data-theme="paper"] .chat-header {
+    background: linear-gradient(180deg, rgba(26, 25, 18, 0.96), rgba(22, 21, 15, 0.88));
+    border-bottom-color: rgba(255, 240, 200, 0.08);
+  }
+  body[data-theme="paper"] .composer {
+    background: linear-gradient(180deg, rgba(20, 19, 13, 0), rgba(20, 19, 13, 0.9) 46%, rgba(20, 19, 13, 0.98));
+  }
+  body[data-theme="paper"] .msg.ai .bubble {
+    border-color: rgba(255, 240, 200, 0.08);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 28px -26px rgba(0, 0, 0, 0.8);
+  }
+  body[data-theme="paper"] .date-sep span {
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(255, 240, 200, 0.08);
+  }
+  body[data-theme="paper"] .tabbar {
+    background: color-mix(in srgb, #1b1a13 92%, transparent);
+    border-top-color: rgba(255, 240, 200, 0.08);
+  }
+  body[data-theme="paper"] .tab-item {
+    color: #7d7867;
+  }
+  body[data-theme="paper"] #messageInput {
+    color: var(--text);
+  }
+  body[data-theme="paper"] #messageInput::placeholder {
+    color: #7d7867;
+  }
+  body[data-theme="paper"] .msg-time {
+    color: rgba(238, 230, 210, 0.46);
+  }
+  /* 深色下白底卡片会发光，收一点阴影 */
+  body[data-theme="paper"] .home-user-card,
+  body[data-theme="paper"] .home-quick,
+  body[data-theme="paper"] .home-menu,
+  body[data-theme="paper"] .settings-group {
+    box-shadow: none;
+  }
+}
+
+/* ---- 第二轮：把写死白底的面板逐个换成纸黑 ---- */
+@media (prefers-color-scheme: dark) {
+  body[data-theme="paper"] .list-header,
+  body[data-theme="paper"] .sub-header {
+    background: rgba(24, 23, 16, 0.94);
+    border-bottom-color: rgba(255, 240, 200, 0.08);
+    color: var(--text);
+  }
+  body[data-theme="paper"] .list-header .brand-name,
+  body[data-theme="paper"] .sub-header h1 {
+    color: var(--text);
+  }
+
+  /* 主页：卡片上那团白光在深色下太抢眼 */
+  body[data-theme="paper"] .home-user-card {
+    background:
+      radial-gradient(240px 170px at 100% 0%, color-mix(in srgb, var(--accent) 15%, transparent), transparent 72%),
+      linear-gradient(160deg, #201e17 0%, #191811 100%);
+  }
+  body[data-theme="paper"] .home-user-card::after {
+    border-color: rgba(255, 240, 200, 0.12);
+    opacity: 0.5;
+  }
+  body[data-theme="paper"] .home-edit {
+    border-color: rgba(255, 240, 200, 0.14);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-2);
+  }
+  body[data-theme="paper"] .home-quick-icon,
+  body[data-theme="paper"] .home-quick-icon.studio,
+  body[data-theme="paper"] .home-quick-icon.warm,
+  body[data-theme="paper"] .home-quick-icon.cool,
+  body[data-theme="paper"] .home-quick-icon.paper,
+  body[data-theme="paper"] .home-row-icon {
+    background: color-mix(in srgb, var(--accent) 17%, #201e17);
+    color: color-mix(in srgb, var(--accent) 58%, white);
+  }
+  body[data-theme="paper"] .tab-item.is-on,
+  body[data-theme="paper"] .home-row-icon,
+  body[data-theme="paper"] .home-quick-icon {
+    color: color-mix(in srgb, var(--accent) 55%, white);
+  }
+  body[data-theme="paper"] .tab-item.is-on::after {
+    background: color-mix(in srgb, var(--accent) 55%, white);
+  }
+
+  /* 表单与弹层 */
+  body[data-theme="paper"] .input,
+  body[data-theme="paper"] .textarea,
+  body[data-theme="paper"] .select {
+    border-color: var(--line);
+    background: #26241b;
+    color: var(--text);
+  }
+  body[data-theme="paper"] .chip:not(.is-on),
+  body[data-theme="paper"] .theme-swatch,
+  body[data-theme="paper"] .profile-edit,
+  body[data-theme="paper"] .btn-ghost {
+    border-color: var(--line);
+    background: #26241b;
+    color: var(--text-2);
+  }
+  body[data-theme="paper"] .sheet,
+  body[data-theme="paper"] .modal,
+  body[data-theme="paper"] .confirm-modal {
+    background: #201e17;
+    color: var(--text);
+  }
+  body[data-theme="paper"] .typing-bubble,
+  body[data-theme="paper"] .jump-latest,
+  body[data-theme="paper"] .heads-up {
+    background: #26241b;
+    color: var(--text-2);
+    border-color: var(--line);
+  }
+  body[data-theme="paper"] .switch span {
+    background: #3a352a;
+  }
+  body[data-theme="paper"] .coldwar-card,
+  body[data-theme="paper"] .bg-status {
+    border-color: var(--line);
+    background: #26241b;
+    color: var(--text-2);
+  }
+}

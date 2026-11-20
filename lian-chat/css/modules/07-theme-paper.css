@@ -1,0 +1,78 @@
+/* =========================================================
+   M7 · paper — 第七套主题「纸间」
+   ---------------------------------------------------------
+   暖白纸面 + 墨绿气泡。只覆盖颜色类令牌；布局、字号、动效
+   都由 M1–M6 的模块负责，因此这套主题不需要再写一遍尺寸。
+   注意：这里刻意不声明 --accent / --chat-bg，避免覆盖
+   applyAppearance() 写在 <html> 上的行内变量（用户在设置里
+   换自定义强调色时仍然生效）。
+   ========================================================= */
+
+body[data-theme="paper"] {
+  --page: #f5f3ec;
+  --paper-100: #fffefb;
+  --paper-150: #fbf9f1;
+  --paper-200: #f6f3e9;
+  --paper-300: #eeeade;
+  --paper-400: #e4dfcf;
+  --surface: #fffefb;
+  --surface-2: #f7f4ea;
+  --surface-3: #efece0;
+  --text: #1f1d16;
+  --text-2: #4f4b41;
+  --muted: #7c786c;
+  --line: #e8e3d4;
+  --line-strong: #dbd5c3;
+  --line-paper: rgba(72, 62, 36, 0.1);
+  --ai-bubble: #fffefb;
+  /* 自定义属性里的 var() 在「声明处」求值，所以主题必须把这对
+     角色变量重新声明成字面量，不能指望继承 --ai-bubble。 */
+  --bubble-peer: #fffefb;
+  --bubble-peer-ink: #1f1d16;
+  background: var(--page);
+}
+
+/* ---- 列表、通讯录、主页、设置：不用纯白 ---- */
+body[data-theme="paper"] .chat-list-screen,
+body[data-theme="paper"] .contacts-screen,
+body[data-theme="paper"] .home-screen,
+body[data-theme="paper"] .settings-screen {
+  background: var(--paper-200);
+}
+
+/* ---- 聊天背景：顶部一层薄光，向下过渡到淡苔绿 ---- */
+body[data-theme="paper"] .chat-screen {
+  background:
+    radial-gradient(120% 62% at 50% -12%, #ffffff 0%, rgba(255, 255, 255, 0) 58%),
+    linear-gradient(180deg, #f3f1e8 0%, #e6e9dc 100%);
+}
+body[data-theme="paper"] .chat-header {
+  background: linear-gradient(180deg, rgba(255, 254, 249, 0.96), rgba(252, 250, 243, 0.86));
+}
+
+/* ---- 气泡：白纸 + 墨绿 ---- */
+body[data-theme="paper"] .msg.ai .bubble {
+  border: 1px solid rgba(70, 60, 35, 0.07);
+  box-shadow: 0 1px 2px rgba(40, 35, 20, 0.04), 0 16px 28px -26px rgba(40, 35, 20, 0.55);
+}
+body[data-theme="paper"] .msg.user .bubble {
+  box-shadow: 0 10px 22px -16px rgba(9, 110, 60, 0.75);
+}
+body[data-theme="paper"] .date-sep span {
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--ink-400);
+}
+
+/* ---- 设置卡片 ---- */
+body[data-theme="paper"] .settings-group {
+  border-color: var(--line-paper);
+  background: var(--paper-100);
+}
+body[data-theme="paper"] .settings-group > summary {
+  background: transparent;
+}
+
+/* ---- 弹层 ---- */
+body[data-theme="paper"] .sheet {
+  background: var(--paper-100);
+}

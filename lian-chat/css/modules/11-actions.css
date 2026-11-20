@@ -1,0 +1,117 @@
+/* =========================================================
+   M11 · actions — 长按消息菜单
+   ---------------------------------------------------------
+   结构：.msg-menu-layer（全屏透明层，点一下关闭）> .msg-menu（卡片）
+   ========================================================= */
+
+.has-msg-menu {
+  overscroll-behavior: none;
+}
+
+.msg-menu-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background: rgba(20, 18, 12, 0.06);
+  -webkit-backdrop-filter: blur(1.5px);
+  backdrop-filter: blur(1.5px);
+  animation: menu-fade 120ms ease both;
+}
+
+.msg-menu {
+  position: fixed;
+  z-index: 121;
+  min-width: 148px;
+  padding: 5px;
+  border: 1px solid var(--line-paper);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--paper-100) 97%, transparent);
+  box-shadow: 0 18px 40px -18px rgba(30, 26, 16, 0.5), 0 2px 6px rgba(30, 26, 16, 0.08);
+  -webkit-backdrop-filter: blur(18px) saturate(1.1);
+  backdrop-filter: blur(18px) saturate(1.1);
+  animation: menu-in 140ms var(--ease-out) both;
+  transform-origin: center;
+}
+
+.msg-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 9px;
+  color: var(--text);
+  font-size: var(--fs-md);
+  text-align: left;
+}
+
+.msg-menu-item + .msg-menu-item {
+  margin-top: 1px;
+}
+
+.msg-menu-item .icon {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  color: var(--muted);
+  stroke-width: 1.8;
+}
+
+.msg-menu-item:hover,
+.msg-menu-item:focus-visible {
+  background: var(--paper-200);
+  outline: none;
+}
+
+.msg-menu-item.is-danger {
+  color: var(--danger);
+}
+
+.msg-menu-item.is-danger .icon {
+  color: var(--danger);
+}
+
+@keyframes menu-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .msg-menu-layer,
+  .msg-menu {
+    animation: none;
+  }
+}
+
+/* 深色主题 */
+@media (prefers-color-scheme: dark) {
+  body[data-theme="paper"] .msg-menu {
+    background: color-mix(in srgb, #26241b 96%, transparent);
+    border-color: rgba(255, 240, 200, 0.1);
+  }
+  body[data-theme="paper"] .msg-menu-item:hover,
+  body[data-theme="paper"] .msg-menu-item:focus-visible {
+    background: #302d22;
+  }
+  body[data-theme="paper"] .msg-menu-layer {
+    background: rgba(0, 0, 0, 0.22);
+  }
+}
+
+/* a bubble being re-rolled in place keeps its position and dims a little */
+.msg.is-regenerating { opacity: 0.45; filter: saturate(0.7); transition: opacity 0.2s ease; }

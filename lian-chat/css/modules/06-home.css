@@ -1,0 +1,75 @@
+/* =========================================================
+   M6 · home — 主页表面与图标语言
+   ---------------------------------------------------------
+   主页原先同时存在两套图标语言：快捷入口是彩色圆角方块，
+   设置项是单色线性图标。这里统一成「同色系浅底 + accent 线性
+   图标」，并把卡片圆角/描边/阴影收进令牌。
+   ========================================================= */
+
+/* ---- 用户卡片 ---- */
+.home-user-card {
+  padding: 18px 16px 14px;
+  border: 1px solid var(--line-paper);
+  border-radius: var(--r-lg);
+  background:
+    radial-gradient(240px 170px at 100% 0%, color-mix(in srgb, var(--accent) 11%, white), transparent 72%),
+    linear-gradient(160deg, var(--paper-100) 0%, var(--paper-150) 100%);
+  box-shadow: var(--el-2);
+}
+
+/* ---- 快捷入口 ---- */
+.home-quick {
+  min-height: 104px;
+  border: 1px solid var(--line-paper);
+  border-radius: var(--r-md);
+  background: var(--paper-100);
+  transition: transform var(--t-fast) var(--ease-out), background var(--t-fast);
+}
+.home-quick:active {
+  background: var(--paper-200);
+}
+
+.home-quick-icon,
+.home-quick-icon.studio,
+.home-quick-icon.warm,
+.home-quick-icon.cool,
+.home-quick-icon.paper {
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 10%, white);
+  color: var(--accent-strong, var(--accent));
+}
+
+.home-quick b {
+  font-size: var(--fs-label);
+  font-weight: 650;
+}
+
+/* ---- 设置项列表 ---- */
+.home-menu {
+  border: 1px solid var(--line-paper);
+  border-radius: var(--r-md);
+  background: var(--paper-100);
+}
+.home-row {
+  padding: 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line-paper) 60%, transparent);
+}
+.home-row:active {
+  background: var(--paper-200);
+}
+.home-row-icon {
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 8%, white);
+  color: var(--accent-strong, var(--accent));
+}
+.home-row-copy b {
+  font-size: var(--fs-label);
+  font-weight: 620;
+}
+
+/* ---- 底部导航做成纸片 ---- */
+.tabbar {
+  border-top: 1px solid var(--line-paper);
+  background: color-mix(in srgb, var(--paper-100) 92%, transparent);
+  box-shadow: 0 -16px 32px -30px rgba(30, 25, 15, 0.9);
+}

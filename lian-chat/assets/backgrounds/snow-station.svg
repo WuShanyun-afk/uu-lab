@@ -1,0 +1,230 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1800" preserveAspectRatio="xMidYMid slice" role="img" aria-label="雪中的小站">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#dfe6e9"/>
+      <stop offset="0.45" stop-color="#bcc8ce"/>
+      <stop offset="0.78" stop-color="#8f9ca5"/>
+      <stop offset="1" stop-color="#697680"/>
+    </linearGradient>
+    <linearGradient id="farHill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d6dee2" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#a6b3ba" stop-opacity="0.55"/>
+    </linearGradient>
+    <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d9dfe0"/>
+      <stop offset="0.45" stop-color="#c3ccce"/>
+      <stop offset="1" stop-color="#98a4a8"/>
+    </linearGradient>
+    <linearGradient id="platform" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#d5dcdd"/>
+      <stop offset="0.5" stop-color="#b9c4c7"/>
+      <stop offset="1" stop-color="#9aa7ac"/>
+    </linearGradient>
+    <linearGradient id="trainBody" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#b8c7ce"/>
+      <stop offset="0.32" stop-color="#8fa7b2"/>
+      <stop offset="0.55" stop-color="#6f8d9b"/>
+      <stop offset="1" stop-color="#4f6b78"/>
+    </linearGradient>
+    <linearGradient id="trainStripe" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5d94ad"/>
+      <stop offset="1" stop-color="#37697f"/>
+    </linearGradient>
+    <linearGradient id="windowGlow" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff7df" stop-opacity="0.92"/>
+      <stop offset="0.55" stop-color="#e8d7ae" stop-opacity="0.7"/>
+      <stop offset="1" stop-color="#9e927b" stop-opacity="0.25"/>
+    </linearGradient>
+    <linearGradient id="roof" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4b555c"/>
+      <stop offset="1" stop-color="#333b41"/>
+    </linearGradient>
+    <linearGradient id="snowCap" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7fafb"/>
+      <stop offset="1" stop-color="#dbe4e6"/>
+    </linearGradient>
+    <radialGradient id="lamp" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff3c8" stop-opacity="0.55"/>
+      <stop offset="0.45" stop-color="#fff0be" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#fff0be" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0d1318" stop-opacity="0.48"/>
+      <stop offset="0.24" stop-color="#0d1318" stop-opacity="0.06"/>
+      <stop offset="0.68" stop-color="#0d1318" stop-opacity="0.02"/>
+      <stop offset="1" stop-color="#0d1318" stop-opacity="0.54"/>
+    </linearGradient>
+    <radialGradient id="vignette" cx="0.5" cy="0.44" r="0.72">
+      <stop offset="0.48" stop-color="#111820" stop-opacity="0"/>
+      <stop offset="1" stop-color="#111820" stop-opacity="0.38"/>
+    </radialGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="16"/>
+    </filter>
+    <filter id="softSmall" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="4"/>
+    </filter>
+    <filter id="grain">
+      <feTurbulence type="fractalNoise" baseFrequency="0.82" numOctaves="2" seed="8" stitchTiles="stitch" result="noise"/>
+      <feColorMatrix in="noise" type="saturate" values="0"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.06"/>
+      </feComponentTransfer>
+    </filter>
+  </defs>
+
+  <!-- winter sky -->
+  <rect width="900" height="1800" fill="url(#sky)"/>
+  <circle cx="676" cy="310" r="118" fill="#f4f7f7" opacity="0.2" filter="url(#soft)"/>
+
+  <!-- low cloud bands -->
+  <g fill="#e8edef" opacity="0.2" filter="url(#soft)">
+    <ellipse cx="240" cy="348" rx="280" ry="44"/>
+    <ellipse cx="650" cy="410" rx="310" ry="38"/>
+    <ellipse cx="430" cy="470" rx="390" ry="32"/>
+  </g>
+
+  <!-- far mountains -->
+  <path d="M0 650 L108 560 L190 596 L300 494 L410 588 L506 526 L620 612 L724 548 L830 620 L900 574 L900 820 L0 820 Z" fill="url(#farHill)"/>
+  <path d="M0 690 L140 618 L252 660 L360 590 L492 674 L610 602 L760 680 L900 620 L900 860 L0 860 Z" fill="#b5c0c5" opacity="0.42"/>
+
+  <!-- overhead wires -->
+  <g stroke="#39434a" stroke-opacity="0.48" fill="none">
+    <path d="M-30 392 Q220 424 470 398 T930 414" stroke-width="2"/>
+    <path d="M-30 424 Q230 462 470 432 T930 448" stroke-width="1.4"/>
+    <path d="M-30 456 Q240 498 470 466 T930 482" stroke-width="1"/>
+  </g>
+
+  <!-- station canopy -->
+  <g>
+    <path d="M-20 -20 H920 V118 L-20 166 Z" fill="url(#roof)"/>
+    <path d="M-20 118 L920 70 V108 L-20 158 Z" fill="#20272c" opacity="0.72"/>
+    <g stroke="#39444b" stroke-width="14" stroke-linecap="square" opacity="0.9">
+      <path d="M58 122 L245 360"/>
+      <path d="M286 112 L474 350"/>
+      <path d="M520 100 L705 338"/>
+      <path d="M752 88 L936 326"/>
+    </g>
+    <g stroke="#2c353b" stroke-width="18" opacity="0.92">
+      <path d="M84 134 V555"/>
+      <path d="M332 120 V548"/>
+      <path d="M598 106 V540"/>
+      <path d="M854 94 V532"/>
+    </g>
+    <g stroke="#c7d1d4" stroke-opacity="0.38" stroke-width="3">
+      <path d="M-10 126 L910 78"/>
+      <path d="M30 156 L916 110"/>
+    </g>
+  </g>
+
+  <!-- train -->
+  <g>
+    <rect x="-90" y="636" width="758" height="536" rx="20" fill="#26343c" opacity="0.42" filter="url(#soft)"/>
+    <path d="M-100 642 H620 Q706 642 734 704 L756 780 V1138 H-100 Z" fill="url(#trainBody)"/>
+    <path d="M-100 1036 H756 V1138 H-100 Z" fill="#344a55"/>
+    <path d="M-100 1004 H756 V1044 H-100 Z" fill="url(#trainStripe)"/>
+    <path d="M-100 654 H620 Q680 654 704 700 L720 756 H-100 Z" fill="url(#snowCap)" opacity="0.9"/>
+    <path d="M-100 760 H726" stroke="#dfe9eb" stroke-width="3" opacity="0.42"/>
+
+    <!-- windows -->
+    <g>
+      <rect x="-44" y="780" width="116" height="108" rx="12" fill="#384e59"/>
+      <rect x="-38" y="786" width="104" height="96" rx="8" fill="url(#windowGlow)" opacity="0.72"/>
+      <rect x="104" y="780" width="116" height="108" rx="12" fill="#384e59"/>
+      <rect x="110" y="786" width="104" height="96" rx="8" fill="url(#windowGlow)" opacity="0.64"/>
+      <rect x="252" y="780" width="116" height="108" rx="12" fill="#384e59"/>
+      <rect x="258" y="786" width="104" height="96" rx="8" fill="url(#windowGlow)" opacity="0.58"/>
+      <rect x="400" y="780" width="116" height="108" rx="12" fill="#384e59"/>
+      <rect x="406" y="786" width="104" height="96" rx="8" fill="url(#windowGlow)" opacity="0.66"/>
+      <rect x="548" y="780" width="106" height="108" rx="12" fill="#384e59"/>
+      <rect x="554" y="786" width="94" height="96" rx="8" fill="url(#windowGlow)" opacity="0.6"/>
+    </g>
+
+    <!-- door -->
+    <g>
+      <rect x="662" y="744" width="96" height="348" rx="8" fill="#4b6572"/>
+      <rect x="674" y="756" width="72" height="144" rx="5" fill="#2b404a"/>
+      <rect x="678" y="760" width="64" height="136" rx="4" fill="url(#windowGlow)" opacity="0.42"/>
+      <rect x="674" y="918" width="72" height="156" rx="5" fill="#354e59"/>
+      <path d="M758 744 V1092" stroke="#d7e2e5" stroke-width="4" opacity="0.6"/>
+      <circle cx="750" cy="902" r="5" fill="#d9e4e7" opacity="0.7"/>
+    </g>
+
+    <!-- underside / snow on roof edge -->
+    <path d="M-100 1120 H756" stroke="#16242b" stroke-width="10" opacity="0.55"/>
+    <g fill="#eef4f5" opacity="0.82">
+      <path d="M-80 646 Q54 630 184 646 L184 662 Q52 648 -80 664 Z"/>
+      <path d="M214 640 Q340 628 460 640 L460 656 Q334 644 214 656 Z"/>
+      <path d="M490 638 Q590 628 680 650 L678 666 Q584 646 490 654 Z"/>
+    </g>
+  </g>
+
+  <!-- platform sign -->
+  <g>
+    <rect x="338" y="500" width="262" height="126" rx="5" fill="#f4f6f4" opacity="0.94"/>
+    <rect x="348" y="510" width="242" height="106" rx="3" fill="none" stroke="#7b8588" stroke-width="2"/>
+    <text x="469" y="555" text-anchor="middle" font-family="'Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="38" font-weight="600" fill="#3d484d" letter-spacing="7">ゆきみ</text>
+    <text x="469" y="590" text-anchor="middle" font-family="'Helvetica Neue',Arial,sans-serif" font-size="15" fill="#6d787c" letter-spacing="4">YUKIMI</text>
+    <text x="469" y="613" text-anchor="middle" font-family="'Noto Sans CJK SC','Microsoft YaHei',sans-serif" font-size="12" fill="#8d979a" letter-spacing="2">雪 见 驿</text>
+  </g>
+
+  <!-- lamp on platform -->
+  <g>
+    <circle cx="804" cy="828" r="180" fill="url(#lamp)"/>
+    <path d="M802 1118 V720" stroke="#30383d" stroke-width="9"/>
+    <path d="M772 720 H832" stroke="#30383d" stroke-width="9"/>
+    <path d="M786 720 Q804 690 822 720 Z" fill="#f6e9bd" opacity="0.9"/>
+    <circle cx="804" cy="730" r="9" fill="#fff2c5" opacity="0.9"/>
+  </g>
+
+  <!-- platform floor / tracks -->
+  <rect y="1140" width="900" height="660" fill="url(#ground)"/>
+  <path d="M0 1190 L900 1130" stroke="#7e8b90" stroke-width="4" opacity="0.5"/>
+  <path d="M0 1210 L900 1150" stroke="#eef4f5" stroke-width="12" opacity="0.5"/>
+  <path d="M0 1288 L900 1222" stroke="#3e4a50" stroke-width="7" opacity="0.48"/>
+  <path d="M0 1328 L900 1262" stroke="#2e383e" stroke-width="6" opacity="0.34"/>
+  <path d="M0 1360 L900 1292" stroke="#e9eff0" stroke-width="20" opacity="0.5"/>
+  <path d="M0 1460 L900 1390 L900 1800 L0 1800 Z" fill="url(#platform)"/>
+
+  <!-- snow banks -->
+  <g fill="#eef3f4">
+    <path d="M0 1164 Q92 1120 190 1150 Q270 1174 334 1198 L334 1236 Q190 1200 0 1230 Z" opacity="0.7"/>
+    <path d="M540 1218 Q650 1180 764 1210 Q838 1228 900 1264 L900 1320 Q780 1270 650 1290 Q586 1298 540 1304 Z" opacity="0.62"/>
+    <path d="M0 1608 Q120 1544 250 1584 Q356 1616 470 1592 Q622 1560 750 1602 Q834 1630 900 1622 L900 1800 L0 1800 Z" opacity="0.74"/>
+    <path d="M0 1430 Q130 1386 254 1428 Q330 1454 398 1442 L398 1830 L0 1830 Z" opacity="0.26"/>
+  </g>
+
+  <!-- footprints -->
+  <g fill="#8e9b9f" opacity="0.24">
+    <ellipse cx="238" cy="1602" rx="10" ry="18" transform="rotate(-12 238 1602)"/>
+    <ellipse cx="280" cy="1648" rx="10" ry="18" transform="rotate(8 280 1648)"/>
+    <ellipse cx="330" cy="1692" rx="10" ry="18" transform="rotate(-14 330 1692)"/>
+    <ellipse cx="388" cy="1734" rx="10" ry="18" transform="rotate(6 388 1734)"/>
+    <ellipse cx="458" cy="1776" rx="10" ry="18" transform="rotate(-10 458 1776)"/>
+  </g>
+
+  <!-- fence / platform edge -->
+  <g stroke="#65737a" stroke-width="3" opacity="0.32">
+    <path d="M0 1382 Q150 1360 304 1372 Q500 1388 700 1352 Q806 1332 900 1344"/>
+    <path d="M34 1350 V1470 M120 1340 V1458 M210 1338 V1450 M302 1340 V1444 M396 1346 V1438 M494 1350 V1432 M592 1344 V1426 M690 1332 V1420 M788 1322 V1414 M874 1318 V1408"/>
+  </g>
+
+  <!-- snowfall -->
+  <g fill="#ffffff" opacity="0.72">
+    <circle cx="78" cy="238" r="3"/><circle cx="154" cy="462" r="2"/><circle cx="228" cy="300" r="2.6"/>
+    <circle cx="298" cy="700" r="2"/><circle cx="350" cy="218" r="2.2"/><circle cx="424" cy="928" r="2.6"/>
+    <circle cx="512" cy="258" r="2.4"/><circle cx="586" cy="560" r="2"/><circle cx="642" cy="190" r="3"/>
+    <circle cx="718" cy="1016" r="2.6"/><circle cx="786" cy="416" r="2.2"/><circle cx="842" cy="680" r="2.8"/>
+    <circle cx="62" cy="886" r="2.2"/><circle cx="132" cy="1112" r="3"/><circle cx="248" cy="1244" r="2.4"/>
+    <circle cx="380" cy="1460" r="2.6"/><circle cx="508" cy="1524" r="2.2"/><circle cx="624" cy="1374" r="2.8"/>
+    <circle cx="742" cy="1502" r="2.4"/><circle cx="828" cy="1210" r="2.2"/><circle cx="472" cy="1080" r="2"/>
+  </g>
+  <g fill="#ffffff" opacity="0.3">
+    <circle cx="116" cy="558" r="5"/><circle cx="558" cy="356" r="4"/><circle cx="806" cy="880" r="5"/>
+    <circle cx="322" cy="1150" r="6"/><circle cx="654" cy="1608" r="5"/><circle cx="184" cy="1436" r="4"/>
+  </g>
+
+  <rect width="900" height="1800" fill="url(#shade)"/>
+  <rect width="900" height="1800" fill="url(#vignette)"/>
+  <rect width="900" height="1800" filter="url(#grain)" opacity="0.75"/>
+</svg>

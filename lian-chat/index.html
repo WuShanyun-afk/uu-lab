@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="description" content="Lian — 一个只属于你们的纯前端聊天应用。">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Lian">
+  <title>Lian</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icons/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="assets/icons/icon-180.png">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/modules/01-tokens.css" data-module="tokens">
+  <link rel="stylesheet" href="css/modules/02-type.css" data-module="type">
+  <link rel="stylesheet" href="css/modules/03-contrast.css" data-module="contrast">
+  <link rel="stylesheet" href="css/modules/04-bubbles.css" data-module="bubbles">
+  <link rel="stylesheet" href="css/modules/05-surfaces.css" data-module="surfaces">
+  <link rel="stylesheet" href="css/modules/06-home.css" data-module="home">
+  <link rel="stylesheet" href="css/modules/07-theme-paper.css" data-module="theme-paper">
+  <link rel="stylesheet" href="css/modules/08-motion.css" data-module="motion">
+  <link rel="stylesheet" href="css/modules/09-dark.css" data-module="dark">
+  <link rel="stylesheet" href="css/modules/10-live.css" data-module="live">
+  <link rel="stylesheet" href="css/modules/11-actions.css" data-module="actions">
+  <link rel="stylesheet" href="css/modules/12-search.css" data-module="search">
+  <link rel="stylesheet" href="css/modules/13-inbox.css" data-module="inbox">
+<link rel="stylesheet" href="css/modules/14-drawings.css" data-module="drawings">
+<link rel="stylesheet" href="css/modules/15-themes.css" data-module="themes">
+<link rel="stylesheet" href="css/modules/16-layouts.css" data-module="layouts">
+<link rel="stylesheet" href="css/modules/17-screens.css" data-module="screens">
+</head>
+<body>
+  <div class="boot" id="boot">
+    <img src="assets/icons/icon.svg" alt="" class="boot-logo">
+    <span class="boot-name">Lian</span>
+  </div>
+
+  <div class="heads-up" id="headsUp" hidden role="status" aria-live="polite">
+    <span class="heads-avatar" id="headsAvatar"></span>
+    <span class="heads-copy"><b id="headsTitle"></b><span id="headsBody"></span></span>
+    <button type="button" class="heads-close" id="headsClose" aria-label="关闭"><svg class="icon"><use href="#i-close"></use></svg></button>
+  </div>
+
+  <svg class="svg-sprite" aria-hidden="true">
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5 8 12l7 7"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.35" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.35" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.35" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-doc" viewBox="0 0 24 24"><path d="M7 3.5h6.8L19 8.7v11.8H7z"/><path d="M13.5 3.8V9H19"/><path d="M9.8 12.5h6M9.8 15.5h6M9.8 18h3.5"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-sticker" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 0-8 8c1.1 0 2.2-.2 3.2-.7L20 12Z"/><path d="M20 12h-4.5a3.5 3.5 0 0 0-3.5 3.5V20"/><path d="M8.7 13.5c.8 1 2.2 1.6 3.3 1.6s2.5-.6 3.3-1.6"/><circle cx="9" cy="9.7" r=".9" fill="currentColor" stroke="none"/><circle cx="15" cy="9.7" r=".9" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m6.5 10.5 5.5-5.5 5.5 5.5"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="m4.5 17 4.8-4.7a2 2 0 0 1 2.8 0l2 2 1.5-1.4a2 2 0 0 1 2.8 0l1.6 1.6"/></symbol>
+    <symbol id="i-expand" viewBox="0 0 24 24"><path d="M9 4.5H4.5V9M15 19.5h4.5V15M4.5 15v4.5H9M19.5 9V4.5H15"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M6.5 3.5h7L18 8v12.5H6.5z"/><path d="M13.2 3.8V8H18"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.3 4.3L19 6.8"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.2 13.5a7.8 7.8 0 0 0 0-3l2-1.5-2-3.4-2.4 1a8 8 0 0 0-2.6-1.5L14 2.5h-4l-.3 2.6a8 8 0 0 0-2.6 1.5l-2.4-1-2 3.4 2 1.5a7.8 7.8 0 0 0 0 3l-2 1.5 2 3.4 2.4-1a8 8 0 0 0 2.6 1.5l.3 2.6h4l.3-2.6a8 8 0 0 0 2.6-1.5l2.4 1 2-3.4-2.1-1.5Z"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20.2S4 15.3 4 9.6A4.4 4.4 0 0 1 12 7a4.4 4.4 0 0 1 8 2.6c0 5.7-8 10.6-8 10.6Z"/></symbol>
+    <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3.5c.4 4.4 2.6 6.6 7 7-4.4.4-6.6 2.6-7 7-.4-4.4-2.6-6.6-7-7 4.4-.4 6.6-2.6 7-7Z"/></symbol>
+    <symbol id="i-arrow-down" viewBox="0 0 24 24"><path d="M12 5v14M6.5 13.5 12 19l5.5-5.5"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4M6.5 9.5 12 4l5.5 5.5"/><path d="M4.5 15v3.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V15"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15M9 7V4.5h6V7M7 7l1 13h8l1-13M10 11v5M14 11v5"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7 10.5 12 16l5-5.5"/><path d="M4.5 19.5h15"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5.5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="18.5" r="2.5"/><path d="m8.2 10.8 7.6-4M8.2 13.2l7.6 4"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19.3 14.4A8 8 0 0 1 9.6 4.7 8.2 8.2 0 1 0 19.3 14.4Z"/></symbol>
+    <symbol id="i-reply" viewBox="0 0 24 24"><path d="m9 7-5 5 5 5"/><path d="M4 12h9.5A6.5 6.5 0 0 1 20 18.5"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H6l-3 2.5.7-4.6A7.5 7.5 0 1 1 20 11.5Z"/><path d="M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01"/></symbol>
+    <symbol id="i-contacts" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c.3-3.8 2.5-6.1 5.5-6.1s5.2 2.3 5.5 6.1"/><circle cx="17.2" cy="9" r="2.4"/><path d="M15.8 13.6c2.6.1 4.4 2.1 4.7 5.2"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="m3.5 10.8 8.5-7 8.5 7"/><path d="M5.5 9.4V20h13V9.4"/><path d="M9.6 20v-5.8h4.8V20"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.4"/><path d="m15.8 15.8 4.7 4.7"/></symbol>
+  </svg>
+
+  <!-- ============ 首次设置 ============ -->
+  <section class="screen setup-screen" id="setupScreen" hidden>
+    <div class="setup-shell">
+      <header class="setup-header">
+        <div class="brand">
+          <img src="assets/icons/icon.svg" alt="" class="brand-mark">
+          <span class="brand-name">Lian</span>
+        </div>
+        <span class="setup-privacy" data-i18n="setup.privacy">仅存本机</span>
+      </header>
+      <div class="setup-progress" id="setupProgress" aria-hidden="true">
+        <span class="is-on"></span><span></span>
+      </div>
+      <main class="setup-body" id="setupBody"></main>
+      <footer class="setup-footer" id="setupFooter"></footer>
+    </div>
+  </section>
+
+  <!-- ============ 聊天列表 ============ -->
+  <section class="screen chat-list-screen" id="chatListScreen" hidden>
+    <header class="list-header">
+      <div class="list-brand">
+        <img src="assets/icons/icon.svg" alt="" class="brand-mark">
+        <span class="brand-name">Lian</span>
+      </div>
+      <div class="list-header-actions">
+        <button class="icon-btn" id="btnNewChat" type="button" aria-label="新建聊天" data-i18n-aria="chatList.newChat">
+          <svg class="icon"><use href="#i-plus"></use></svg>
+        </button>
+      </div>
+    </header>
+    <div class="chat-list-scroll">
+      <div class="list-hero" id="listHero"></div>
+      <div class="list-search">
+        <svg class="icon"><use href="#i-search"></use></svg>
+        <input type="search" id="listSearchInput" autocomplete="off" placeholder="搜索名字或聊天内容" data-i18n-ph="chatList.searchPh">
+        <button type="button" class="list-search-clear" id="listSearchClear" hidden aria-label="清空" data-i18n-aria="chatList.searchClear">
+          <svg class="icon"><use href="#i-close"></use></svg>
+        </button>
+      </div>
+      <div class="list-filters" id="listFilters" hidden></div>
+      <div class="chat-list" id="chatList"></div>
+      <p class="chat-list-footnote" data-i18n="chatList.footnote">所有聊天都只保存在这台设备上</p>
+    </div>
+  </section>
+
+  <!-- ============ 通讯录 ============ -->
+  <section class="screen contacts-screen" id="contactsScreen" hidden>
+    <header class="list-header contacts-header">
+      <div>
+        <span class="list-eyebrow">Lian</span>
+        <h1 data-i18n="contacts.title">通讯录</h1>
+      </div>
+      <button class="icon-btn" id="btnNewContact" type="button" aria-label="新建角色" data-i18n-aria="chatList.newChat">
+        <svg class="icon"><use href="#i-plus"></use></svg>
+      </button>
+    </header>
+    <div class="chat-list-scroll contacts-scroll">
+      <p class="contacts-lead" id="contactsMeta"></p>
+      <div class="contacts-list" id="contactsList"></div>
+      <p class="chat-list-footnote" data-i18n="contacts.footnote">通讯录里是你在 Lian 认识的所有角色</p>
+    </div>
+  </section>
+
+  <!-- ============ 主页 ============ -->
+  <section class="screen home-screen" id="homeScreen" hidden>
+    <header class="list-header home-header">
+      <div class="list-brand">
+        <img src="assets/icons/icon.svg" alt="" class="brand-mark">
+        <span class="brand-name">Lian</span>
+      </div>
+      <button class="icon-btn" id="btnHomeNewChat" type="button" aria-label="新建聊天" data-i18n-aria="chatList.newChat">
+        <svg class="icon"><use href="#i-plus"></use></svg>
+      </button>
+    </header>
+    <div class="chat-list-scroll home-scroll">
+      <div id="homeBody"></div>
+    </div>
+  </section>
+
+  <!-- ============ 聊天 ============ -->
+  <section class="screen chat-screen" id="chatScreen" hidden>
+    <header class="chat-header">
+      <button class="icon-btn" id="btnChatBack" type="button" aria-label="返回聊天列表" data-i18n-aria="chatList.title">
+        <svg class="icon"><use href="#i-back"></use></svg>
+      </button>
+      <button class="peer" id="btnPeer" type="button" aria-label="人设卡">
+        <span class="avatar avatar-ai avatar-40" id="headerAvatar">
+          <span class="avatar-fallback">L</span>
+          <img alt="" hidden>
+          <i class="presence"></i>
+        </span>
+        <span class="peer-meta">
+          <span class="peer-name" id="peerName">Lian</span>
+          <span class="peer-status"><span id="peerStatus" data-i18n="chat.online">在线</span><span class="peer-note" id="peerNote"></span></span>
+        </span>
+      </button>
+      <div class="header-actions">
+        <button class="icon-btn" id="btnChatSearch" type="button" aria-label="搜索聊天记录" data-i18n-aria="chat.search">
+          <svg class="icon"><use href="#i-search"></use></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="chat-search" id="chatSearchBar" hidden>
+      <svg class="icon chat-search-icon"><use href="#i-search"></use></svg>
+      <input type="search" id="chatSearchInput" autocomplete="off" enterkeyhint="search" placeholder="搜索聊天记录" data-i18n-ph="chat.searchPh">
+      <span class="chat-search-count" id="chatSearchCount"></span>
+      <button type="button" class="chat-search-nav" id="chatSearchPrev" aria-label="上一条" data-i18n-aria="chat.searchPrev">↑</button>
+      <button type="button" class="chat-search-nav" id="chatSearchNext" aria-label="下一条" data-i18n-aria="chat.searchNext">↓</button>
+      <button type="button" class="chat-search-nav" id="chatSearchClose" aria-label="关闭搜索" data-i18n-aria="chat.searchClose">
+        <svg class="icon"><use href="#i-close"></use></svg>
+      </button>
+    </div>
+
+    <div class="chat-scroll" id="chatScroll">
+      <div class="chat-crest" id="chatCrest" hidden></div>
+      <div class="chat-inner" id="messageList" role="log" aria-live="polite"></div>
+      <button class="jump-latest" id="jumpLatest" type="button" hidden aria-label="回到最新">
+        <svg class="icon"><use href="#i-arrow-down"></use></svg>
+      </button>
+    </div>
+
+    <div class="error-bar" id="errorBar" hidden>
+      <span id="errorText"></span>
+      <button type="button" id="btnRetry" data-i18n="common.retry">重试</button>
+      <button type="button" class="error-close" id="btnErrorClose" aria-label="关闭"><svg class="icon"><use href="#i-close"></use></svg></button>
+    </div>
+
+    <form class="composer" id="composer" autocomplete="off">
+      <div class="quote-preview" id="quotePreview" hidden></div>
+      <div class="attachment-preview" id="attachmentPreview" hidden></div>
+      <div class="composer-row" id="composerRow">
+        <button class="composer-btn" id="btnAttach" type="button" aria-label="添加" data-i18n-aria="chat.attach">
+          <svg class="icon"><use href="#i-plus"></use></svg>
+        </button>
+        <textarea id="messageInput" rows="1" maxlength="4000" placeholder="发消息…" data-i18n-ph="chat.placeholder" enterkeyhint="send"></textarea>
+        <button class="composer-btn" id="btnSticker" type="button" aria-label="表情包" data-i18n-aria="chat.stickers">
+          <svg class="icon"><use href="#i-sticker"></use></svg>
+        </button>
+        <button class="send-btn" id="btnSend" type="submit" aria-label="发送" data-i18n-aria="chat.send" disabled>
+          <svg class="icon"><use href="#i-send"></use></svg>
+        </button>
+      </div>
+    </form>
+  </section>
+
+  <!-- ============ 设置 ============ -->
+  <section class="screen settings-screen" id="settingsScreen" hidden>
+    <header class="sub-header">
+      <button class="icon-btn" id="btnSettingsBack" type="button" aria-label="返回" data-i18n-aria="common.back">
+        <svg class="icon"><use href="#i-back"></use></svg>
+      </button>
+      <h1 data-i18n="settings.title">设置</h1>
+      <button class="text-btn" id="btnSettingsDone" type="button" data-i18n="common.done">完成</button>
+    </header>
+    <div class="settings-scroll">
+      <div id="settingsBody"></div>
+      <p class="settings-footnote" data-i18n="settings.footnote">Lian 是纯前端应用 · 聊天与密钥只保存在当前浏览器</p>
+    </div>
+  </section>
+
+  <nav class="tabbar" id="tabBar" aria-label="主导航" data-i18n-aria="tab.label">
+    <button type="button" class="tab-item" data-tab="list">
+      <svg class="icon"><use href="#i-chat"></use></svg>
+      <span data-i18n="tab.chats">聊天</span>
+    </button>
+    <button type="button" class="tab-item" data-tab="contacts">
+      <svg class="icon"><use href="#i-contacts"></use></svg>
+      <span data-i18n="tab.contacts">通讯录</span>
+    </button>
+    <button type="button" class="tab-item" data-tab="home">
+      <svg class="icon"><use href="#i-home"></use></svg>
+      <span data-i18n="tab.home">主页</span>
+    </button>
+  </nav>
+
+  <div class="sheet-layer" id="sheetLayer" hidden>
+    <div class="sheet-backdrop" data-close-sheet></div>
+    <section class="sheet" id="sheet" role="dialog" aria-modal="true"></section>
+  </div>
+
+  <div class="modal-layer" id="modalLayer" hidden>
+    <section class="modal" id="modal" role="dialog" aria-modal="true"></section>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden>
+    <span id="toastText"></span>
+    <button type="button" id="toastAction" hidden></button>
+  </div>
+
+  <input type="file" id="imageInput" accept="image/*" hidden>
+  <input type="file" id="fileInput" hidden>
+  <input type="file" id="avatarInput" accept="image/*" hidden>
+  <input type="file" id="bgInput" accept="image/*" hidden>
+  <input type="file" id="stickerInput" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
+  <input type="file" id="importInput" accept="application/json,.json" hidden>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

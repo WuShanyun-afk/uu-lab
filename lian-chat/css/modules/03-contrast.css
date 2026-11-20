@@ -1,0 +1,36 @@
+/* =========================================================
+   M3 · contrast — 气泡与选中态的可读性
+   ---------------------------------------------------------
+   颜色由 js/palette.js 推导后写进 CSS 变量：
+     --bubble-mine / --bubble-mine-ink   用户气泡（压深到 4.5:1）
+     --accent-strong                     选中态文字（压深到 4.5:1）
+   刻意不覆盖 --accent：品牌绿继续用于装饰性填充。
+   ========================================================= */
+
+.msg.ai .bubble {
+  background: var(--bubble-peer);
+  color: var(--bubble-peer-ink);
+}
+
+.msg.user .bubble {
+  background: var(--bubble-mine);
+  color: var(--bubble-mine-ink);
+}
+
+/* 发送按钮和气泡同色，才像一个动作的两个入口 */
+.send-btn {
+  background: var(--bubble-mine);
+  color: var(--bubble-mine-ink);
+}
+.send-btn:disabled {
+  background: #dfdfd9;
+  color: #a5a59e;
+}
+
+/* 选中态文字：白底上 4.5:1 */
+.tab-item.is-on {
+  color: var(--accent-strong, var(--accent));
+}
+.tab-item.is-on::after {
+  background: var(--accent-strong, var(--accent));
+}

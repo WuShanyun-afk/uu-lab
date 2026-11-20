@@ -1,0 +1,169 @@
+/* =========================================================
+   M12 · search — 列表搜索与聊天内搜索
+   ========================================================= */
+
+/* ---- 聊天列表搜索框 ---- */
+.list-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 8px;
+  padding: 8px 11px;
+  border: 1px solid var(--line-paper);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.list-search .icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  stroke-width: 1.9;
+}
+
+.list-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: var(--fs-md);
+  outline: none;
+}
+
+.list-search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.list-search-clear {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+}
+.list-search-clear .icon {
+  width: 13px;
+  height: 13px;
+}
+
+.search-hit {
+  padding: 0 1px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: inherit;
+}
+
+/* ---- 聊天内搜索条 ---- */
+.chat-search {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line-paper);
+  background: color-mix(in srgb, var(--paper-100) 92%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  animation: search-drop 160ms var(--ease-out) both;
+}
+
+.chat-search-icon {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  color: var(--muted);
+}
+
+#chatSearchInput {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: var(--fs-md);
+  outline: none;
+}
+
+#chatSearchInput::-webkit-search-cancel-button {
+  display: none;
+}
+
+.chat-search-count {
+  flex: none;
+  min-width: 34px;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.chat-search-nav {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--text-2);
+  font-size: var(--fs-md);
+  line-height: 1;
+}
+
+.chat-search-nav:hover {
+  background: var(--surface-2);
+}
+
+.chat-search-nav .icon {
+  width: 15px;
+  height: 15px;
+}
+
+@keyframes search-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---- 命中的消息 ---- */
+.msg.is-hit .bubble,
+.msg.is-hit .msg-sticker,
+.msg.is-hit .report-card {
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: 2px;
+  animation: hit-pulse 1.4s var(--ease-out) 1;
+}
+
+@keyframes hit-pulse {
+  0% {
+    outline-color: color-mix(in srgb, var(--accent) 90%, transparent);
+  }
+  100% {
+    outline-color: color-mix(in srgb, var(--accent) 20%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-search,
+  .msg.is-hit .bubble {
+    animation: none;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  body[data-theme="paper"] .list-search {
+    background: #26241b;
+  }
+  body[data-theme="paper"] .chat-search {
+    background: rgba(26, 25, 18, 0.94);
+  }
+}

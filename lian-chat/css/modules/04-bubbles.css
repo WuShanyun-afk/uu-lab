@@ -1,0 +1,59 @@
+/* =========================================================
+   M4 · bubbles — 气泡形状与连发合并
+   ---------------------------------------------------------
+   1. 气泡从小尾巴（5px）改成「圆角 + 底部一个小尖角」；
+   2. 用户气泡最大宽度收到 76%，长句不再顶到屏幕边；
+   3. 同一个人 4 分钟内的连续消息合并成一组：只留一个头像；
+   4. 表情包 124 → 136px。
+   连发判定在 js/app.js 的 sameGroup()，这里只负责样式。
+   ========================================================= */
+
+.msg {
+  padding: 4px 0;
+}
+
+/* 连发的后续消息贴紧上一条，头像让位 */
+.msg.is-grouped {
+  padding-top: 1px;
+}
+.msg.ai.is-grouped .avatar {
+  visibility: hidden;
+}
+
+.msg-body {
+  max-width: calc(100% - 48px);
+}
+
+.bubble {
+  padding: 10px 13px;
+  border-radius: var(--bubble-radius);
+  box-shadow: 0 1px 1px rgba(25, 25, 20, 0.05), 0 10px 20px -18px rgba(25, 25, 20, 0.5);
+  /* 少一个字的孤行比窄气泡更难看，能支持就交给浏览器 */
+  text-wrap: pretty;
+}
+
+/* 小尖角统一放在底部，和头像站在同一条基线上 */
+.msg.ai .bubble {
+  border-top-left-radius: var(--bubble-radius);
+  border-bottom-left-radius: var(--bubble-radius-tail);
+}
+.msg.user .bubble {
+  border-top-right-radius: var(--bubble-radius);
+  border-bottom-right-radius: var(--bubble-radius-tail);
+}
+
+/* 连发时，上一条气泡的尖角收圆，看起来是一句话被拆成几行 */
+.msg.is-grouped .msg-time {
+  opacity: 0.72;
+}
+
+.msg .avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+}
+
+.msg-sticker {
+  width: 136px;
+  height: 136px;
+}

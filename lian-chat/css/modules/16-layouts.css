@@ -1,0 +1,718 @@
+/* =========================================================
+   16 · layouts — 聊天页的四种版式
+   ---------------------------------------------------------
+   这一层改的是「页面结构」而不是配色：
+     · 头部：谁是居中、头像藏不藏、状态行要不要
+     · 气泡：有没有尾巴、圆角几档、有没有边线、名字标不标
+     · 头像：有没有、放在哪一侧、多大
+     · 时间：跟在气泡旁边，还是缩到气泡下面，还是干脆不显示
+     · 输入栏：浮起来的一行 / 白纸卡 / 输入框下面再挂一排图标
+   颜色仍然全部来自 15-themes.css 与 --bubble-mine 等令牌。
+
+   默认 line 不写任何规则（等价于 1.9.10），另外三套只覆盖需要改的部分。
+   ========================================================= */
+
+/* 只在对应版式下出现的东西，默认收起来 */
+.msg-name {
+  display: none;
+}
+.chat-crest {
+  display: none;
+}
+
+/* =========================================================
+   1. 讯息 / iMessage
+   — 标题居中、没有头像、四角全圆、时间沉到气泡下面、
+     日期只是灰字、输入栏是一颗浮起来的胶囊
+   ========================================================= */
+body[data-layout="imessage"] .chat-header {
+  justify-content: center;
+  background: color-mix(in srgb, var(--paper-100) 78%, transparent);
+  border-bottom-color: transparent;
+  box-shadow: none;
+}
+body[data-layout="imessage"] .peer {
+  flex: 0 1 auto;
+  gap: 4px;
+  justify-content: center;
+  padding: 0;
+}
+body[data-layout="imessage"] .peer .avatar {
+  display: none;
+}
+body[data-layout="imessage"] .peer-meta {
+  align-items: center;
+  gap: 0;
+}
+body[data-layout="imessage"] .peer-name {
+  font-size: 16px;
+  font-weight: 620;
+}
+body[data-layout="imessage"] .peer-status {
+  display: none;
+}
+body[data-layout="imessage"] .peer-name::after {
+  content: " ›";
+  color: var(--muted);
+  font-weight: 400;
+}
+body[data-layout="imessage"] .header-actions {
+  position: absolute;
+  right: 10px;
+  bottom: 9px;
+}
+body[data-layout="imessage"] #btnChatBack {
+  position: absolute;
+  left: 4px;
+  bottom: 7px;
+}
+
+body[data-layout="imessage"] .msg .avatar {
+  display: none;
+}
+body[data-layout="imessage"] .msg-body,
+body[data-layout="imessage"] .msg.user .msg-body {
+  flex-direction: column;
+  max-width: 80%;
+}
+body[data-layout="imessage"] .msg-body {
+  align-items: flex-start;
+}
+body[data-layout="imessage"] .msg.user .msg-body {
+  align-items: flex-end;
+}
+body[data-layout="imessage"] .msg-time {
+  order: 2;
+  margin: 4px 7px 0;
+  font-size: 10px;
+  color: var(--muted);
+}
+body[data-layout="imessage"] .msg.ai .bubble,
+body[data-layout="imessage"] .msg.user .bubble {
+  padding: 9px 14px;
+  border: 0;
+  border-radius: 18px;
+  box-shadow: none;
+  font-size: 15px;
+  line-height: 1.5;
+}
+body[data-layout="imessage"] .msg.ai .bubble {
+  background: color-mix(in srgb, var(--paper-100) 92%, var(--chat-bg));
+  color: var(--text);
+}
+body[data-layout="imessage"] .msg.user .bubble {
+  background: var(--bubble-mine);
+  color: var(--bubble-mine-ink);
+}
+body[data-layout="imessage"] .date-sep {
+  padding: 16px 0 10px;
+}
+body[data-layout="imessage"] .date-sep span {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 10.5px;
+}
+body[data-layout="imessage"] .composer {
+  background: transparent;
+  padding-bottom: 6px;
+}
+body[data-layout="imessage"] .composer-row {
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--composer-bg) 80%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  backdrop-filter: blur(16px) saturate(1.2);
+  box-shadow: 0 14px 30px -24px rgba(20, 25, 35, 0.6);
+}
+
+/* =========================================================
+   2. 信笺 / Letter
+   — 聊天内容变成一张浮在背景上的白纸、顶上一对重叠头像、
+     自己的气泡从品牌色变成半透明灰、日期两侧拉细线
+   ========================================================= */
+body[data-layout="letter"] .chat-scroll {
+  padding: 12px 12px 12px;
+}
+/* 头像已经在信笺顶上的那对里了，头部不再重复一遍 */
+body[data-layout="letter"] .peer .avatar {
+  display: none;
+}
+body[data-layout="letter"] .chat-crest {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 14px 0 18px;
+}
+body[data-layout="letter"] .crest-pair {
+  display: flex;
+  align-items: center;
+}
+body[data-layout="letter"] .crest-avatar {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 3px solid var(--paper-100);
+  box-shadow: 0 10px 20px -14px rgba(50, 40, 30, 0.8);
+  font-size: 22px;
+}
+body[data-layout="letter"] .crest-avatar + .crest-avatar {
+  margin-left: -16px;
+}
+body[data-layout="letter"] .crest-names,
+body[data-layout="letter"] .crest-note {
+  margin: 0;
+  text-align: center;
+}
+body[data-layout="letter"] .crest-names {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text);
+}
+body[data-layout="letter"] .crest-names i {
+  font-style: normal;
+  color: var(--muted);
+}
+body[data-layout="letter"] .crest-note {
+  font-size: 10.5px;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+body[data-layout="letter"] .chat-inner {
+  padding: 16px 12px 20px;
+  border: 1px solid var(--line-paper);
+  border-radius: 22px;
+  background: var(--paper-100);
+  box-shadow: 0 26px 50px -40px rgba(50, 40, 30, 0.9);
+}
+body[data-layout="letter"] .msg .avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+}
+body[data-layout="letter"] .msg.user .avatar {
+  display: block;
+}
+body[data-layout="letter"] .msg.user.is-grouped .avatar {
+  visibility: hidden;
+}
+body[data-layout="letter"] .msg .bubble {
+  padding: 10px 13px;
+  border-radius: 14px;
+}
+body[data-layout="letter"] .msg.ai .bubble {
+  border: 1px solid var(--line-paper);
+  border-bottom-left-radius: 5px;
+  box-shadow: 0 8px 18px -18px rgba(50, 40, 30, 0.8);
+}
+body[data-layout="letter"] .msg.user .bubble {
+  border: 1px solid color-mix(in srgb, var(--text) 6%, transparent);
+  border-bottom-right-radius: 5px;
+  background: color-mix(in srgb, var(--text) 8%, var(--paper-100));
+  color: var(--text);
+  box-shadow: none;
+}
+body[data-layout="letter"] .msg-body,
+body[data-layout="letter"] .msg.user .msg-body {
+  flex-direction: column;
+  max-width: 78%;
+}
+body[data-layout="letter"] .msg-body {
+  align-items: flex-start;
+}
+body[data-layout="letter"] .msg.user .msg-body {
+  align-items: flex-end;
+}
+body[data-layout="letter"] .msg-time {
+  order: 2;
+  margin: 4px 6px 0;
+  font-size: 10px;
+  color: var(--muted);
+}
+body[data-layout="letter"] .date-sep {
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0 12px;
+}
+body[data-layout="letter"] .date-sep::before,
+body[data-layout="letter"] .date-sep::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line-paper);
+}
+body[data-layout="letter"] .date-sep span {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 10px;
+}
+body[data-layout="letter"] .composer {
+  background: transparent;
+  padding-top: 8px;
+}
+body[data-layout="letter"] .composer-row {
+  padding: 4px 5px 4px 4px;
+  border: 1px solid var(--line-paper);
+  border-radius: 16px;
+  background: var(--composer-bg);
+  box-shadow: 0 16px 30px -26px rgba(50, 40, 30, 0.9);
+}
+
+/* =========================================================
+   3. 泡泡 / Bubble
+   — 仿 QQ：气泡上方标名字、方一点的气泡带描边、
+     头像两侧都露、时间不显示、输入框下面挂一排图标
+   ========================================================= */
+body[data-layout="bubble"] .msg-name {
+  display: block;
+  max-width: 100%;
+  margin: 0 3px 4px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body[data-layout="bubble"] .msg.user .msg-name {
+  text-align: right;
+}
+body[data-layout="bubble"] .msg.is-grouped .msg-name {
+  display: none;
+}
+body[data-layout="bubble"] .msg .avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+}
+body[data-layout="bubble"] .msg.user .avatar {
+  display: block;
+}
+body[data-layout="bubble"] .msg.user.is-grouped .avatar {
+  visibility: hidden;
+}
+body[data-layout="bubble"] .msg-time {
+  display: none;
+}
+body[data-layout="bubble"] .msg .bubble {
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+  border-radius: 13px;
+  box-shadow: none;
+}
+body[data-layout="bubble"] .msg.ai .bubble {
+  border-bottom-left-radius: 4px;
+}
+body[data-layout="bubble"] .msg.user .bubble {
+  border-bottom-right-radius: 4px;
+  border-color: color-mix(in srgb, var(--bubble-mine-ink) 14%, transparent);
+}
+body[data-layout="bubble"] .chat-screen::after {
+  background:
+    radial-gradient(rgba(90, 80, 60, 0.1) 0.6px, transparent 0.7px) 0 0 / 9px 9px repeat,
+    linear-gradient(to bottom, color-mix(in srgb, var(--chat-bg) 20%, transparent), color-mix(in srgb, var(--chat-bg) 4%, transparent));
+  background-size: 9px 9px, auto;
+}
+body[data-layout="bubble"] .composer-row {
+  flex-wrap: wrap;
+  row-gap: 4px;
+  padding: 8px 8px 6px;
+  border: 1px solid var(--composer-rim);
+  border-radius: 18px;
+  background: var(--composer-bg);
+  box-shadow: 0 16px 32px -26px rgba(40, 35, 20, 0.9);
+}
+body[data-layout="bubble"] #messageInput {
+  order: 0;
+  flex: 1 0 100%;
+  padding: 6px 8px 2px;
+  background: transparent;
+}
+body[data-layout="bubble"] .composer-btn,
+body[data-layout="bubble"] .send-btn {
+  order: 1;
+  width: 34px;
+  height: 34px;
+}
+body[data-layout="bubble"] .composer-btn .icon {
+  width: 19px;
+  height: 19px;
+}
+body[data-layout="bubble"] .send-btn {
+  margin-left: auto;
+  border-radius: 11px;
+}
+
+/* =========================================================
+   4. 素页 / Plain
+   — 一个气泡都没有：整页就是一份对话记录，每条之间一条细线，
+     自己说的话缩进并带一根强调色竖线，名字用小型大写
+   ========================================================= */
+body[data-layout="plain"] .chat-inner {
+  gap: 0;
+  padding: 4px 14px 8px;
+}
+body[data-layout="plain"] .msg {
+  align-items: stretch;
+  gap: 0;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line-paper);
+}
+body[data-layout="plain"] .msg .avatar,
+body[data-layout="plain"] .msg.user .avatar {
+  display: none;
+}
+body[data-layout="plain"] .msg-body,
+body[data-layout="plain"] .msg.user .msg-body {
+  flex-direction: column;
+  max-width: 100%;
+}
+body[data-layout="plain"] .msg-body {
+  align-items: flex-start;
+}
+body[data-layout="plain"] .msg.user .msg-body {
+  align-items: flex-end;
+}
+body[data-layout="plain"] .msg-name {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+body[data-layout="plain"] .msg.is-grouped .msg-name {
+  display: none;
+}
+body[data-layout="plain"] .msg .bubble,
+body[data-layout="plain"] .msg.ai .bubble,
+body[data-layout="plain"] .msg.user .bubble {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.65;
+}
+body[data-layout="plain"] .msg.user .bubble {
+  padding-right: 10px;
+  border-right: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--text-2);
+}
+body[data-layout="plain"] .msg-time {
+  order: 2;
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+body[data-layout="plain"] .date-sep {
+  justify-content: flex-start;
+  padding: 22px 0 8px;
+}
+body[data-layout="plain"] .date-sep span {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+body[data-layout="plain"] .composer {
+  background: transparent;
+}
+body[data-layout="plain"] .composer-row {
+  padding: 4px 4px 4px 8px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+body[data-layout="plain"] .send-btn {
+  border-radius: 50%;
+}
+
+/* =========================================================
+   5. 手账 / Journal
+   — 点阵纸 + 白色小卡片 + 和纸胶带，相邻两张左右微微歪一点
+   ========================================================= */
+body[data-layout="journal"] .chat-screen::after {
+  background:
+    radial-gradient(color-mix(in srgb, var(--text) 9%, transparent) 0.7px, transparent 0.8px) 0 0 / 16px 16px repeat,
+    linear-gradient(to bottom, color-mix(in srgb, var(--paper-150) 70%, transparent), transparent);
+  background-size: 16px 16px, auto;
+}
+body[data-layout="journal"] .msg .avatar {
+  display: none;
+}
+body[data-layout="journal"] .msg {
+  align-items: center;
+  padding: 9px 0;
+}
+body[data-layout="journal"] .msg-body,
+body[data-layout="journal"] .msg.user .msg-body {
+  flex-direction: column;
+  max-width: 82%;
+}
+body[data-layout="journal"] .msg-body {
+  align-items: flex-start;
+}
+body[data-layout="journal"] .msg.user .msg-body {
+  align-items: flex-end;
+}
+body[data-layout="journal"] .msg .bubble,
+body[data-layout="journal"] .msg.ai .bubble,
+body[data-layout="journal"] .msg.user .bubble {
+  position: relative;
+  padding: 13px 14px 12px;
+  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  border-radius: 7px;
+  background: var(--paper-100);
+  box-shadow: 0 2px 6px rgba(60, 45, 30, 0.08), 0 12px 24px -22px rgba(60, 45, 30, 0.6);
+  color: var(--text);
+}
+body[data-layout="journal"] .msg.user .bubble {
+  background: color-mix(in srgb, var(--bubble-mine) 22%, var(--paper-100));
+}
+body[data-layout="journal"] .msg:nth-of-type(odd) .bubble {
+  transform: rotate(-0.5deg);
+}
+body[data-layout="journal"] .msg:nth-of-type(even) .bubble {
+  transform: rotate(0.4deg);
+}
+body[data-layout="journal"] .msg .bubble::before {
+  content: "";
+  position: absolute;
+  top: -7px;
+  left: 16px;
+  width: 40px;
+  height: 14px;
+  background: color-mix(in srgb, var(--accent) 26%, transparent);
+  transform: rotate(-4deg);
+  opacity: 0.75;
+}
+body[data-layout="journal"] .msg.user .bubble::before {
+  left: auto;
+  right: 16px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  transform: rotate(3deg);
+}
+body[data-layout="journal"] .msg-time {
+  order: 2;
+  margin: 5px 4px 0;
+  color: var(--muted);
+  font-size: 10px;
+}
+body[data-layout="journal"] .date-sep {
+  align-items: center;
+  gap: 10px;
+}
+body[data-layout="journal"] .date-sep::before,
+body[data-layout="journal"] .date-sep::after {
+  content: "";
+  flex: 1;
+  border-top: 1px dashed color-mix(in srgb, var(--text) 18%, transparent);
+}
+body[data-layout="journal"] .date-sep span {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 10px;
+}
+body[data-layout="journal"] .composer-row {
+  border: 1px dashed color-mix(in srgb, var(--text) 16%, transparent);
+  border-radius: 10px;
+  background: var(--composer-bg);
+  box-shadow: none;
+}
+
+/* =========================================================
+   6. 时间轴 / Timeline
+   — 左侧一条竖线，每条消息一个圆点，时间在圆点旁边
+   ========================================================= */
+body[data-layout="timeline"] .chat-inner {
+  position: relative;
+  gap: 6px;
+  padding: 6px 12px 10px 34px;
+}
+body[data-layout="timeline"] .chat-inner::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 15px;
+  width: 1px;
+  background: color-mix(in srgb, var(--text) 14%, transparent);
+}
+body[data-layout="timeline"] .msg {
+  position: relative;
+  align-items: flex-start;
+  padding: 2px 0;
+}
+body[data-layout="timeline"] .msg .avatar,
+body[data-layout="timeline"] .msg.user .avatar {
+  display: none;
+}
+body[data-layout="timeline"] .msg::before {
+  content: "";
+  position: absolute;
+  left: -23px;
+  top: 12px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--paper-100);
+  border-radius: 50%;
+  background: var(--accent);
+}
+body[data-layout="timeline"] .msg.user::before {
+  background: var(--paper-100);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+body[data-layout="timeline"] .msg-body,
+body[data-layout="timeline"] .msg.user .msg-body {
+  flex-direction: column;
+  max-width: 100%;
+}
+body[data-layout="timeline"] .msg-body {
+  align-items: flex-start;
+}
+body[data-layout="timeline"] .msg.user .msg-body {
+  align-items: flex-end;
+}
+body[data-layout="timeline"] .msg-time {
+  order: -1;
+  margin: 0 0 3px;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+body[data-layout="timeline"] .msg .bubble,
+body[data-layout="timeline"] .msg.ai .bubble,
+body[data-layout="timeline"] .msg.user .bubble {
+  padding: 9px 13px;
+  border: 0;
+  border-radius: 13px;
+  background: var(--paper-100);
+  box-shadow: 0 1px 2px rgba(25, 25, 20, 0.04);
+  color: var(--text);
+}
+body[data-layout="timeline"] .msg.user .bubble {
+  background: var(--bubble-mine);
+  color: var(--bubble-mine-ink);
+}
+body[data-layout="timeline"] .date-sep {
+  align-items: center;
+  gap: 10px;
+  padding: 16px 0 10px;
+}
+body[data-layout="timeline"] .date-sep::before,
+body[data-layout="timeline"] .date-sep::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--line-paper);
+}
+body[data-layout="timeline"] .date-sep span {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+/* =========================================================
+   7. 漫画 / Comic
+   — 2px 粗描边 + 半调网点背景 + 微微倾斜，像漫画分镜
+   ========================================================= */
+body[data-layout="comic"] .chat-screen::after {
+  background:
+    radial-gradient(color-mix(in srgb, var(--text) 12%, transparent) 1px, transparent 1.2px) 0 0 / 10px 10px repeat,
+    linear-gradient(to bottom, color-mix(in srgb, var(--chat-bg) 24%, transparent), transparent);
+  background-size: 10px 10px, auto;
+}
+body[data-layout="comic"] .msg .avatar {
+  width: 36px;
+  height: 36px;
+  border: 2px solid var(--text);
+  border-radius: 10px;
+}
+body[data-layout="comic"] .msg-name {
+  display: block;
+  margin: 0 4px 4px;
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+body[data-layout="comic"] .msg.is-grouped .msg-name {
+  display: none;
+}
+body[data-layout="comic"] .msg .bubble,
+body[data-layout="comic"] .msg.ai .bubble,
+body[data-layout="comic"] .msg.user .bubble {
+  padding: 10px 14px;
+  border: 2px solid var(--text);
+  border-radius: 14px;
+  background: var(--paper-100);
+  box-shadow: 3px 3px 0 color-mix(in srgb, var(--text) 18%, transparent);
+  color: var(--text);
+  font-weight: 550;
+}
+body[data-layout="comic"] .msg.user .bubble {
+  background: var(--bubble-mine);
+  color: var(--bubble-mine-ink);
+  border-color: var(--bubble-mine-ink);
+}
+body[data-layout="comic"] .msg:nth-of-type(odd) .bubble {
+  transform: rotate(-0.6deg);
+}
+body[data-layout="comic"] .date-sep span {
+  border: 2px solid var(--text);
+  background: var(--paper-100);
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+body[data-layout="comic"] .composer-row {
+  border: 2px solid var(--text);
+  border-radius: 14px;
+  background: var(--composer-bg);
+  box-shadow: 3px 3px 0 color-mix(in srgb, var(--text) 18%, transparent);
+}
+body[data-layout="comic"] .send-btn {
+  border-radius: 10px;
+}
+/* 引用条在漫画 / 手账里也要跟主体一致，否则像贴错了一张便签 */
+body[data-layout="comic"] .msg-quote {
+  border: 2px solid var(--text);
+  border-radius: 10px;
+  background: var(--paper-100);
+  color: var(--text);
+}
+body[data-layout="journal"] .msg-quote {
+  border: 1px dashed color-mix(in srgb, var(--text) 20%, transparent);
+  border-left-width: 1px;
+  border-radius: 6px;
+  background: var(--paper-100);
+}
+/* 素页里连引用条也不该有卡片感 */
+body[data-layout="plain"] .msg-quote {
+  padding: 2px 0 2px 9px;
+  border-left: 2px solid color-mix(in srgb, var(--text) 20%, transparent);
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+}

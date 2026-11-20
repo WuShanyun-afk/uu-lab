@@ -1,0 +1,53 @@
+/* =========================================================
+   M13 · inbox — 草稿与未读
+   ========================================================= */
+
+/* 未读数字徽标 */
+.chat-unread {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-left: 6px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: var(--fs-2xs);
+  font-style: normal;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.chat-row.has-unread .chat-row-copy b {
+  font-weight: 720;
+}
+
+.chat-row.has-unread small {
+  color: var(--text-2);
+}
+
+/* 底部导航的小红点（数量 > 99 会显示 99+） */
+.tab-item.has-unread::before {
+  content: "";
+  position: absolute;
+  top: 7px;
+  left: calc(50% + 6px);
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--paper-100) 92%, transparent);
+}
+
+/* 列表里未读和时间的排布 */
+.chat-row-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chat-row-top time {
+  margin-left: auto;
+}
