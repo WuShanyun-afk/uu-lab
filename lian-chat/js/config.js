@@ -187,10 +187,23 @@ export const UI_LANGS = [
   { id: "en", label: "English" },
 ];
 
-export const EMOJIS = [
-  "😊", "🥺", "❤️", "😂", "😴", "😡", "🐱", "✨", "🌙", "🍰", "👍", "🫶",
-  "😭", "😳", "🤔", "🙌", "☕", "🌸", "💬", "🎉", "🥰", "😌", "🫧", "💤",
+/* 表情分组。工具盘按组切换，组内顺序就是顺手程度排的，不是在别处排序过的。
+   EMOJIS 仍然是这些组的并集：表情面板的九宫格继续用它。 */
+export const EMOJI_GROUPS = [
+  { id: "face", label: "笑脸", labelEn: "Faces", items: ["😊", "😂", "🥰", "😌", "😴", "🙂", "😉", "🥹"] },
+  { id: "soft", label: "撒娇", labelEn: "Soft", items: ["🥺", "😭", "😳", "😤", "🙃", "😢"] },
+  { id: "heart", label: "心意", labelEn: "Hearts", items: ["❤️", "🫶", "💕", "💗", "💌", "🌸"] },
+  { id: "hand", label: "手势", labelEn: "Hands", items: ["👍", "🙌", "👏", "✌️", "🤝", "👉"] },
+  { id: "daily", label: "日常", labelEn: "Daily", items: ["☕", "🍰", "🌙", "✨", "💤", "🎉", "🐱", "🌱", "💬", "🫧"] },
 ];
+
+export const EMOJIS = EMOJI_GROUPS.flatMap((group) => group.items);
+
+/** Emoji group name in the UI language, falling back to the Chinese label. */
+export function emojiGroupLabel(group, lang = "zh") {
+  if (!group) return "";
+  return lang === "en" && group.labelEn ? group.labelEn : group.label || "";
+}
 
 /* Built-in packs supplied by the user. These files are local, transparent
    WebP cut-outs and never count toward the 24-image import limit.
@@ -399,6 +412,9 @@ export function defaultState() {
       lastAt: 0,
     },
     customStickers: [],
+    /* 工具盘「最近」用的计数：{ e: 表情, n: 次数, at: 最后一次的时间 }，
+       按 at 倒序存，最多 12 条（见 store.js 的清洗与 app.js 的 EMOJI_RECENT_MAX）。 */
+    emojiUsage: [],
     stickerStudio: {
       packs: [],
       style: "auto",

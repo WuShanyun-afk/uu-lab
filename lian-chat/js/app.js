@@ -2,11 +2,13 @@ import {
   BUILTIN_PACKS,
   DEFAULT_GREETING,
   EMOJIS,
+  EMOJI_GROUPS,
   PROVIDERS,
   THEMES,
   USER_STICKER_LIMIT,
   builtinPackLabel,
   defaultState,
+  emojiGroupLabel,
   estimateReportTokens,
   getSticker,
   stickerSrc,
@@ -775,7 +777,7 @@ function renderHome(force = false) {
         ${homeRow("about", "doc", t("settings.about"), t("settings.aboutHint"))}
       </div>
     </section>
-    <p class="home-foot">${escapeHtml(t("settings.version", { v: "1.9.11" }))} · ${escapeHtml(t("home.localOnly"))}</p>`;
+    <p class="home-foot">${escapeHtml(t("settings.version", { v: "1.9.12" }))} · ${escapeHtml(t("home.localOnly"))}</p>`;
 }
 
 /* =========================================================
@@ -2628,6 +2630,7 @@ function insertEmoji(emoji) {
   input.setSelectionRange(pos, pos);
   input.dispatchEvent(new Event("input", { bubbles: true }));
   input.focus();
+  recordEmojiUse(emoji);
 }
 
 /* =========================================================
@@ -3125,6 +3128,8 @@ function settingsCallbacks() {
 function openSettings(section = "", returnTo = "") {
   const current = document.body.dataset.screen;
   settingsReturnScreen = returnTo || (["list", "contacts", "home"].includes(current) ? current : "chat");
+  /* the tool tray belongs to the composer: don't let it wait behind the settings page */
+  setComposerTray(false);
   applyAppearance();
   renderSettings(settingsCallbacks());
   showScreen("settings");
@@ -3299,13 +3304,85 @@ function openAttachSheet() {
   });
 }
 
-/* ---- 输入栏工具盘：+ 展开，图片 / 文件 / 表情 / 日常 / 更多 + 一排快捷表情 ---- */
-function initComposerTray() {
+/* ---- 输入栏工具盘：+ 展开，图片 / 文件 / 表情 / 日常 / 更多 + 分组快捷表情 ---- */
+const EMOJI_RECENT_MAX = 12;
+
+/* 当前停在哪个表情分组上。只在这次会话里有意义，所以不写进 state；
+   空字符串 = 跟着「最近」走（有历史就停在最近，没有就停在第一组）。 */
+let trayEmojiGroup = "";
+let trayEmojiShown = "";
+
+function recentEmojis() {
+  return Array.isArray(state?.emojiUsage) ? state.emojiUsage.map((item) => item.e) : [];
+}
+
+function trayEmojiGroups() {
+  if (!state) return [];
+  const recent = recentEmojis();
+  const groups = [];
+  if (recent.length) groups.push({ id: "recent", label: t("composer.recent"), items: recent });
+  for (const group of EMOJI_GROUPS) {
+    groups.push({ id: group.id, label: emojiGroupLabel(group, state.settings.uiLang), items: group.items });
+  }
+  return groups;
+}
+
+function renderTrayEmojis() {
+  const head = $("#trayEmojiHead");
   const box = $("#trayEmoji");
-  if (!box || box.childElementCount) return;
-  box.innerHTML = EMOJIS.map(
-    (emoji) => `<button type="button" class="tray-emoji-btn" data-emoji="${escapeHtml(emoji)}" aria-label="${escapeHtml(emoji)}">${escapeHtml(emoji)}</button>`,
-  ).join("");
+  if (!state || !box) return;
+  const groups = trayEmojiGroups();
+  if (!groups.some((group) => group.id === trayEmojiGroup)) trayEmojiGroup = groups[0]?.id || "face";
+  const active = groups.find((group) => group.id === trayEmojiGroup) || groups[0];
+  const keepScroll = active?.id === trayEmojiShown ? box.scrollLeft : 0;
+  if (head) {
+    head.innerHTML = groups
+      .map(
+        (group) =>
+          `<button type="button" class="tray-emoji-tab${group.id === active?.id ? " is-on" : ""}" data-emoji-group="${escapeHtml(group.id)}" aria-pressed="${group.id === active?.id}">${escapeHtml(group.label)}</button>`,
+      )
+      .join("");
+  }
+  box.innerHTML = (active?.items || [])
+    .map(
+      (emoji) =>
+        `<button type="button" class="tray-emoji-btn" data-emoji="${escapeHtml(emoji)}" aria-label="${escapeHtml(emoji)}">${escapeHtml(emoji)}</button>`,
+    )
+    .join("");
+  box.scrollLeft = keepScroll;
+  trayEmojiShown = active?.id || "";
+}
+
+/* 记一次使用：最近用过的排最前，顺手把「最近」分组刷新出来。 */
+function recordEmojiUse(emoji) {
+  if (!state || !emoji) return;
+  const list = Array.isArray(state.emojiUsage) ? state.emojiUsage : [];
+  const existing = list.find((item) => item.e === emoji);
+  if (existing) {
+    existing.n = Math.min(999, (Number(existing.n) || 0) + 1);
+    existing.at = Date.now();
+  } else {
+    list.push({ e: emoji, n: 1, at: Date.now() });
+  }
+  list.sort((a, b) => b.at - a.at);
+  state.emojiUsage = list.slice(0, EMOJI_RECENT_MAX);
+  /* through persist(): it keeps demo mode out of real storage */
+  persist();
+  renderTrayEmojis();
+}
+
+function initComposerTray() {
+  const tray = $("#composerTray");
+  if (!tray) return;
+  renderTrayEmojis();
+  if (tray.dataset.ready) return;
+  tray.dataset.ready = "1";
+  $("#trayEmojiHead")?.addEventListener("click", (event) => {
+    const tab = event.target.closest("[data-emoji-group]");
+    if (!tab) return;
+    trayEmojiGroup = tab.dataset.emojiGroup;
+    renderTrayEmojis();
+  });
 }
 
 function setComposerTray(open) {

@@ -193,6 +193,19 @@ export function normaliseState(raw) {
         }))
         .slice(-120)
     : [];
+  const seenEmoji = new Set();
+  merged.emojiUsage = Array.isArray(merged.emojiUsage)
+    ? merged.emojiUsage
+        .filter((item) => item && typeof item.e === "string" && item.e)
+        .map((item) => ({
+          e: item.e.slice(0, 16),
+          n: Math.min(999, Math.max(1, Number(item.n) || 1)),
+          at: Math.max(0, Number(item.at) || 0),
+        }))
+        .sort((a, b) => b.at - a.at)
+        .filter((item) => !seenEmoji.has(item.e) && seenEmoji.add(item.e))
+        .slice(0, 12)
+    : [];
   merged.stickerStudio = merged.stickerStudio && typeof merged.stickerStudio === "object" ? merged.stickerStudio : { packs: [], lastAt: 0 };
   merged.stickerStudio.style = ["auto", "kaomoji", "plush", "emoji"].includes(merged.stickerStudio.style)
     ? merged.stickerStudio.style

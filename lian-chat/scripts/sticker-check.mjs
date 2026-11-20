@@ -305,7 +305,12 @@ const customTab = await evaluate(`(() => ({
 check("custom tab keeps the import and AI cells", customTab.importCell && customTab.makeCell && customTab.builtin === 0, JSON.stringify(customTab));
 await evaluate(`document.querySelector('[data-sticker-tab="emoji"]').click()`);
 await waitFor(`document.querySelectorAll(".emoji-cell").length > 0`, 4000, "emoji tab");
-check("emoji tab still renders its picker", (await evaluate(`document.querySelectorAll(".emoji-cell").length`)) === 24);
+/* 1.9.12 grew the emoji set (grouped tray), so pin a floor rather than an exact count */
+const emojiCells = await evaluate(`(() => {
+  const cells = Array.from(document.querySelectorAll(".emoji-cell"));
+  return { n: cells.length, keyed: cells.every((cell) => !!cell.dataset.emoji) };
+})()`);
+check("emoji tab still renders its picker", emojiCells.n >= 24 && emojiCells.keyed, JSON.stringify(emojiCells));
 await evaluate(`document.querySelector('[data-sticker-tab="builtin"]').click()`);
 await sleep(300);
 const backToBuiltin = await evaluate(`(() => ({

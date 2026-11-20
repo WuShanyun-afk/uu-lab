@@ -62,11 +62,36 @@
   width: 18px;
   height: 18px;
 }
+.tray-emoji-head {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 0 2px 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tray-emoji-head::-webkit-scrollbar {
+  display: none;
+}
+.tray-emoji-tab {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: var(--text-3);
+  font-size: var(--fs-2xs);
+  line-height: 1.4;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+.tray-emoji-tab.is-on {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent-strong, var(--accent));
+  font-weight: 600;
+}
 .tray-emoji {
   display: flex;
   gap: 2px;
-  margin-top: 7px;
-  padding: 7px 2px 3px;
+  margin-top: 2px;
+  padding: 5px 2px 3px;
   overflow-x: auto;
   border-top: 1px dashed var(--line-paper);
   scrollbar-width: none;
