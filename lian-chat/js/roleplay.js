@@ -116,6 +116,25 @@ export function chatModeOf(settings) {
 }
 
 /**
+ * 一条会话属于哪个模块。
+ * 1.9.18 之前所有会话都没有 `mode`，那些历史都是陪伴模式留下来的，所以默认陪伴。
+ */
+export function modeOfChat(chat) {
+  return CHAT_MODES.includes(chat?.mode) ? chat.mode : "companion";
+}
+
+/**
+ * 每个模块的独立会话信息。
+ * `threadNameKey` 只在新建空会话时用作名字；助理沿用用户设置里的名字。
+ * `greetingKey` 为空的模块从空会话开始（角色扮演先选剧本）。
+ */
+export const MODE_THREADS = {
+  companion: { threadNameKey: "", greetingKey: "", badgeKey: "module.companionName" },
+  roleplay: { threadNameKey: "module.roleplayThread", greetingKey: "", badgeKey: "mode.badge.roleplay" },
+  assistant: { threadNameKey: "", greetingKey: "module.assistantHello", badgeKey: "mode.badge.assistant" },
+};
+
+/**
  * 把一段消息拆成「台词 / 动作 / 旁白」。
  *   *把杯子推过去*            → action
  *   （外面开始下雨了）        → 整行括号 = narration

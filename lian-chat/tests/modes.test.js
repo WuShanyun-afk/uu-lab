@@ -5,8 +5,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { THEMES, defaultState } from "../js/config.js";
 import { normaliseState } from "../js/store.js";
-import { CHAT_MODES, ROLEPLAY_PRESETS, chatModeOf, parseNarration } from "../js/roleplay.js";
+import { CHAT_MODES, MODE_THREADS, ROLEPLAY_PRESETS, chatModeOf, modeOfChat, parseNarration } from "../js/roleplay.js";
 import { buildSystemPrompt, parseReply } from "../js/prompt.js";
+import { t } from "../js/i18n.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
@@ -164,4 +165,84 @@ test("roleplay narration is rendered as separate blocks", () => {
     assert.ok(body.includes(cls), `${cls} is not produced`);
   }
   assert.ok(!body.includes("<br>"), "narration should use blocks, not line breaks");
+});
+
+/* ---------------- 1.9.18：每个模块一条独立会话 ---------------- */
+
+test("a chat belongs to one module, and old chats default to companion", () => {
+  assert.equal(modeOfChat({ mode: "assistant" }), "assistant");
+  assert.equal(modeOfChat({ mode: "roleplay" }), "roleplay");
+  assert.equal(modeOfChat({ mode: "companion" }), "companion");
+  /* 1.9.18 之前的会话没有 mode 字段 */
+  assert.equal(modeOfChat({ id: "old" }), "companion");
+  assert.equal(modeOfChat(null), "companion");
+  assert.deepEqual(Object.keys(MODE_THREADS).sort(), ["assistant", "companion", "roleplay"]);
+  for (const mode of CHAT_MODES) assert.ok(MODE_THREADS[mode].badgeKey, `${mode} has no badge key`);
+});
+
+test("stored chats keep their module and activeByMode is sanitised", () => {
+  const state = normaliseState({
+    chats: [
+      { id: "c1", name: "Lian" },
+      { id: "c2", name: "助理", mode: "assistant" },
+      { id: "c3", name: "剧本", mode: "roleplay", kind: "module" },
+      { id: "c4", name: "bad", mode: "nonsense" },
+    ],
+    activeByMode: { assistant: "c2", roleplay: 42 },
+  });
+  assert.equal(state.chats[0].mode, "companion");
+  assert.equal(state.chats[1].mode, "assistant");
+  assert.equal(state.chats[3].mode, "companion");
+  assert.equal(state.chats[2].kind, "module");
+  assert.equal(state.chats[1].kind, "");
+  assert.deepEqual(state.activeByMode, { companion: "", roleplay: "", assistant: "c2" });
+  assert.deepEqual(defaultState().activeByMode, { companion: "", roleplay: "", assistant: "" });
+});
+
+test("switching modules swaps the thread instead of the same message list", () => {
+  const app = read("js/app.js");
+  for (const hook of ["ensureModeThread", "modeThread(", "activeByMode", "syncActiveThread", "rememberModeThread", "applyModeTheme"]) {
+    assert.ok(app.includes(hook), `${hook} is missing`);
+  }
+  /* setChatMode must load the target thread, not only flip a string */
+  const start = app.indexOf("function setChatMode");
+  const body = app.slice(start, start + 1400);
+  assert.ok(body.includes("ensureModeThread"), "setChatMode does not resolve a thread");
+  assert.ok(body.includes("loadChatIntoActive"), "setChatMode does not load the thread");
+  assert.ok(body.includes("renderChat({ force: true"), "setChatMode does not rebuild the list");
+});
+
+test("the assistant prompt drops the lover persona and pet names", () => {
+  const state = modeState("assistant");
+  state.settings.relationship = "认识三年的恋人";
+  state.settings.persona = "很爱撒娇，喜欢喊对方宝贝";
+  const prompt = buildSystemPrompt(state);
+  assert.ok(!prompt.includes("认识三年的恋人"), "relationship leaked into the assistant prompt");
+  assert.ok(!prompt.includes("很爱撒娇"), "companion persona leaked into the assistant prompt");
+  assert.ok(!prompt.includes("你们的关系"), "assistant should not be told about a relationship");
+  assert.ok(prompt.includes("不要喊「宝贝」"), "the assistant prompt should ban pet names");
+  assert.ok(!prompt.includes("【现场画画面】"), "the assistant page shows svg as code, so it must not draw");
+
+  /* 陪伴模式仍然带着关系和人设 */
+  const companion = modeState("companion");
+  companion.settings.relationship = "认识三年的恋人";
+  const companionPrompt = buildSystemPrompt(companion);
+  assert.ok(companionPrompt.includes("认识三年的恋人"));
+  assert.ok(companionPrompt.includes("你们的关系"));
+});
+
+test("module threads have copy in both languages", () => {
+  const i18n = read("js/i18n.js");
+  const keys = [
+    "module.assistantHello", "module.roleplayThread", "module.threadCount", "module.threadEmpty",
+    "module.start", "mode.badge.assistant", "mode.badge.roleplay", "chat.emptyAssistant",
+    "chat.emptyRoleplay", "chat.pickScene", "settings.modeThreadHint", "settings.proactiveCompanionOnly",
+  ];
+  for (const key of keys) {
+    const hits = (i18n.match(new RegExp(`"${key.replaceAll(".", "\\.")}"`, "g")) || []).length;
+    assert.equal(hits, 2, `${key} needs a Chinese and an English line`);
+    assert.notEqual(t(key), key, `${key} is missing from the dictionary`);
+  }
+  assert.ok(t("module.assistantHello").includes("在"), "the assistant hello should be neutral");
+  assert.ok(!/宝贝/.test(t("module.assistantHello")), "the assistant hello must not use pet names");
 });

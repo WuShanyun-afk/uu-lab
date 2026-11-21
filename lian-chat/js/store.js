@@ -146,6 +146,11 @@ export function normaliseState(raw) {
   merged.memories = Array.isArray(merged.memories) ? merged.memories.filter(Boolean).slice(-60) : [];
   merged.activeChatId = typeof merged.activeChatId === "string" ? merged.activeChatId : "";
   merged.activeKeyId = typeof merged.activeKeyId === "string" ? merged.activeKeyId : "";
+  merged.activeByMode = {
+    companion: typeof merged.activeByMode?.companion === "string" ? merged.activeByMode.companion : "",
+    roleplay: typeof merged.activeByMode?.roleplay === "string" ? merged.activeByMode.roleplay : "",
+    assistant: typeof merged.activeByMode?.assistant === "string" ? merged.activeByMode.assistant : "",
+  };
   merged.keys = Array.isArray(merged.keys)
     ? merged.keys
         .filter((key) => key && typeof key === "object" && key.id)
@@ -168,6 +173,9 @@ export function normaliseState(raw) {
           ...chat,
           id: String(chat.id).slice(0, 80),
           name: String(chat.name || "Lian").slice(0, 120),
+          /* 1.9.18：会话按模块分开。旧数据没有 mode，那些历史都是陪伴模式的。 */
+          mode: ["companion", "roleplay", "assistant"].includes(chat.mode) ? chat.mode : "companion",
+          kind: chat.kind === "module" ? "module" : "",
           avatar: typeof chat.avatar === "string" ? chat.avatar : "",
           relationship: String(chat.relationship || "").slice(0, 300),
           persona: String(chat.persona || "").slice(0, 1200),
@@ -286,7 +294,7 @@ export async function loadState() {
 function trimForFallback(state) {
   const clone = JSON.parse(JSON.stringify(state));
   clone.settings.chatBg = "";
-  clone.messages = clone.messages.slice(-60).map((m) => {
+  const trim = (list) => (Array.isArray(list) ? list.slice(-60) : []).map((m) => {
     if (m.image?.dataUrl && m.image.dataUrl.length > 300_000) {
       delete m.image.dataUrl;
       m.image.missing = true;
@@ -297,6 +305,9 @@ function trimForFallback(state) {
     }
     return m;
   });
+  clone.messages = trim(clone.messages);
+  /* 每个模块的会话也存了消息：只裁当前那条会让其它模块在降级存储里整段消失。 */
+  clone.chats = (clone.chats || []).map((chat) => ({ ...chat, messages: trim(chat.messages) }));
   clone.customStickers = clone.customStickers.map((s) => (s.dataUrl.length > 120_000 ? { ...s, dataUrl: "" } : s)).filter((s) => s.dataUrl);
   return clone;
 }

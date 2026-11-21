@@ -1,6 +1,6 @@
-/* Checks for the 1.9.17 module work: bottom「模块」page, the assistant
- * conversation page and the roleplay script page (no avatars, no fake-chat
- * bubbles).
+/* Checks for the module work: bottom「模块」page, the assistant conversation
+ * page, the roleplay script page, and 1.9.18's per-module threads (each module
+ * keeps its own messages, so switching never mixes them).
  *
  *   node scripts/mode-check.mjs
  *
@@ -113,10 +113,16 @@ const capture = async (name) => {
 };
 
 const now = Date.now();
+/* 三条会话各自的关键词，用来验证切换时消息没有串过去。 */
 const chatMessages = [
   { id: "m1", role: "assistant", kind: "text", text: "*把门推开，雪落进来* 老位置。", ts: now - 3600000 },
   { id: "m2", role: "user", kind: "text", text: "今天有热的吗？", ts: now - 3500000 },
   { id: "m3", role: "assistant", kind: "text", text: "*把茶推到你面前*\n喝吧。\n（火盆里的炭轻轻响了一声）", ts: now - 3400000 },
+];
+const sceneMessages = [
+  { id: "r1", role: "assistant", kind: "text", text: "（渡口的风把灯吹得晃了一下）\n*把伞收起来靠在门边*", ts: now - 3000000 },
+  { id: "r2", role: "user", kind: "text", text: "今晚还走吗？", ts: now - 2900000 },
+  { id: "r3", role: "assistant", kind: "text", text: "不走了。*在你对面坐下*\n炉子还有炭吗。", ts: now - 2800000 },
 ];
 const codeMessages = [
   { id: "a1", role: "user", kind: "text", text: "帮我写一个防抖函数", ts: now - 900000 },
@@ -125,46 +131,79 @@ const codeMessages = [
     text: "用 `setTimeout` 记下最后一次调用即可：\n\n```js\nfunction debounce(fn, wait = 300) {\n  let timer = 0;\n  return (...args) => {\n    clearTimeout(timer);\n    timer = setTimeout(() => fn(...args), wait);\n  };\n}\n```\n\n注意：组件卸载时要 `clearTimeout`，否则会留下悬挂的定时器。",
   },
 ];
-const seedFor = (mode, messages) => ({
-  onboarded: true,
-  settings: {
-    provider: "custom", apiKey: "seed", baseUrl: "http://127.0.0.1:1/v1", model: "m",
-    aiName: "沈砚", userName: "小满", relationship: "客栈老板与常来的刀客", persona: "话少。",
-    greeting: "（推门进来）老位置。", theme: mode === "assistant" ? "assistant" : "paper", layout: "line", mode,
-  },
-  chats: [{
-    id: "c1", name: "沈砚", relationship: "客栈老板与常来的刀客", keyId: "k1",
-    createdAt: now - 86400000, updatedAt: now, messages,
-  }],
-  keys: [{ id: "k1", name: "Mock", provider: "custom", apiKey: "seed", baseUrl: "http://127.0.0.1:1/v1", model: "m", createdAt: now }],
-  activeChatId: "c1", activeKeyId: "k1",
-  messages, memories: [], memoryMeta: { lastUserCount: 0, lastAttemptAt: 0, lastAt: 0 },
-});
 
-async function boot(mode = "companion", messages = chatMessages) {
-  await send("Page.navigate", { url: base });
-  await sleep(450);
-  await evaluate(`(async () => {
-    localStorage.clear();
-    await new Promise((resolve) => { const req = indexedDB.deleteDatabase("lian-chat"); req.onsuccess = req.onerror = req.onblocked = () => resolve(); });
-    localStorage.setItem("lian.state.fallback.v1", ${JSON.stringify(JSON.stringify(seedFor(mode, messages)))});
-    return true;
-  })()`);
-  await send("Page.reload");
-  for (let attempt = 0; attempt < 120; attempt += 1) {
+/* `withThreads: false` 模拟 1.9.18 之前的老数据：只有一个会话，另外两个模块还没建。 */
+const seedState = ({ mode = "companion", withThreads = true } = {}) => {
+  const baseChat = (extra) => ({
+    avatar: "", keyId: "k1", memories: [], memoryMeta: { lastUserCount: 0, lastAttemptAt: 0, lastAt: 0 },
+    block: null, blockFollowUp: null, createdAt: now - 86400000, updatedAt: now, ...extra,
+  });
+  const chats = [
+    baseChat({
+      id: "c1", mode: "companion", kind: "", name: "沈砚",
+      relationship: "客栈老板与常来的刀客", persona: "话少。", greeting: "（推门进来）老位置。", messages: chatMessages,
+    }),
+  ];
+  if (withThreads) {
+    chats.push(
+      baseChat({ id: "c2", mode: "roleplay", kind: "module", name: "沈砚", relationship: "客栈老板与常来的刀客", persona: "话少。", messages: sceneMessages }),
+      baseChat({ id: "c3", mode: "assistant", kind: "module", name: "沈砚", relationship: "", persona: "", messages: codeMessages }),
+    );
+  }
+  return {
+    onboarded: true,
+    settings: {
+      provider: "custom", apiKey: "seed", baseUrl: "http://127.0.0.1:1/v1", model: "m",
+      aiName: "沈砚", userName: "小满", relationship: "客栈老板与常来的刀客", persona: "话少。",
+      greeting: "（推门进来）老位置。", theme: "paper", layout: "line", mode,
+    },
+    chats,
+    keys: [{ id: "k1", name: "Mock", provider: "custom", apiKey: "seed", baseUrl: "http://127.0.0.1:1/v1", model: "m", createdAt: now }],
+    activeChatId: "c1",
+    activeByMode: withThreads ? { companion: "c1", roleplay: "c2", assistant: "c3" } : { companion: "c1", roleplay: "", assistant: "" },
+    messages: chatMessages, memories: [], memoryMeta: { lastUserCount: 0, lastAttemptAt: 0, lastAt: 0 },
+  };
+};
+
+async function waitBoot() {
+  for (let attempt = 0; attempt < 140; attempt += 1) {
     if (await evaluate(`!document.querySelector("#boot") || !!document.querySelector("#boot.is-done")`)) break;
     await sleep(110);
   }
   await sleep(320);
 }
 
+async function boot(seed) {
+  await send("Page.navigate", { url: base });
+  await sleep(450);
+  await evaluate(`(async () => {
+    localStorage.clear();
+    await new Promise((resolve) => { const req = indexedDB.deleteDatabase("lian-chat"); req.onsuccess = req.onerror = req.onblocked = () => resolve(); });
+    localStorage.setItem("lian.state.fallback.v1", ${JSON.stringify(JSON.stringify(seed))});
+    return true;
+  })()`);
+  await send("Page.reload");
+  await waitBoot();
+}
+
 const openChat = async () => {
   await evaluate(`document.querySelector("[data-chat-open]")?.click()`);
   await sleep(500);
 };
+const openModuleTab = async () => {
+  await evaluate(`document.querySelector('[data-tab="module"]').click()`);
+  await sleep(420);
+};
+const cardText = `(() => {
+  const card = (id) => document.querySelector('[data-module-pick="' + id + '"]');
+  const thread = (id) => (card(id)?.querySelector(".module-card-thread")?.innerText || "").trim();
+  const state = (id) => (card(id)?.querySelector(".module-card-state")?.innerText || "").trim();
+  return { companion: thread("companion"), roleplay: thread("roleplay"), assistant: thread("assistant"),
+    roleplayState: state("roleplay"), assistantState: state("assistant") };
+})()`;
 
-await boot("companion");
-/* the 陪伴 page keeps the fake-human look */
+/* ================= 陪伴页还是真人聊天 ================= */
+await boot(seedState());
 await openChat();
 let page1 = await evaluate(`(() => {
   const avatar = document.querySelector(".msg .avatar");
@@ -181,28 +220,29 @@ check("companion still shows avatars", page1.avatar !== "none", page1.avatar);
 check("companion bubbles keep a background", page1.bg !== "rgba(0, 0, 0, 0)", page1.bg);
 check("companion shows timestamps", page1.time !== "none", page1.time);
 
-/* ---------- the bottom「模块」page ---------- */
+/* ================= 底部「模块」页 ================= */
 const tabs = await evaluate(`Array.from(document.querySelectorAll("#tabBar [data-tab]")).map((node) => node.dataset.tab)`);
 check("the bottom bar has a module tab", tabs.includes("module"), tabs.join(","));
 check("the bottom bar keeps four entries", tabs.length === 4, String(tabs.length));
 
-await evaluate(`document.querySelector('[data-tab="module"]').click()`);
-await sleep(500);
+await openModuleTab();
 let modulePage = await evaluate(`(() => ({
   screen: document.body.dataset.screen,
   visible: !document.querySelector("#moduleScreen").hidden,
   cards: Array.from(document.querySelectorAll("[data-module-pick]")).map((node) => node.dataset.modulePick),
   current: document.querySelector(".module-card.is-on")?.dataset.modulePick || "",
-  lead: (document.querySelector(".module-lead") || {}).innerText || "",
 }))()`);
 check("the module page opens from the bottom bar", modulePage.screen === "module" && modulePage.visible, modulePage.screen);
 check("it offers assistant / roleplay / companion", modulePage.cards.join(",") === "assistant,roleplay,companion", modulePage.cards.join(","));
 check("it marks the current module", modulePage.current === "companion", modulePage.current);
+let cards = await evaluate(cardText);
+check("each module shows its own thread size", cards.companion.includes("3") && cards.roleplay.includes("3") && cards.assistant.includes("2"), JSON.stringify(cards));
+check("a module with a thread says 切换", cards.roleplayState.length > 0 && cards.assistantState.length > 0, `${cards.roleplayState}/${cards.assistantState}`);
 await capture("module-home.png");
 
-/* ---------- roleplay: script page ---------- */
+/* ================= 角色扮演：剧本页 + 自己的消息 ================= */
 await evaluate(`document.querySelector('[data-module-pick="roleplay"]').click()`);
-await sleep(800);
+await sleep(700);
 page1 = await evaluate(`(() => ({
   screen: document.body.dataset.screen,
   mode: document.body.dataset.mode,
@@ -223,25 +263,15 @@ check("roleplay has no bubble background", page1.bubbleBg === "rgba(0, 0, 0, 0)"
 check("roleplay shows a speaker label", page1.name !== "none", page1.name);
 check("actions and narration are separate blocks", page1.actions >= 2 && page1.narrations >= 1 && page1.lines >= 2, `${page1.actions}/${page1.narrations}/${page1.lines}`);
 check("no action markers are printed", !page1.text.includes("*"), page1.text.slice(0, 60));
+check("roleplay shows its own scene", page1.text.includes("今晚还走吗"), page1.text.slice(0, 40));
+check("roleplay does not borrow the companion thread", !page1.text.includes("今天有热的吗"), page1.text.slice(0, 60));
+check("roleplay does not borrow the assistant thread", !page1.text.includes("debounce"), page1.text.slice(0, 60));
 await capture("module-roleplay.png");
 
-/* ---------- the scenario cards still fill the form ---------- */
-await evaluate(`document.querySelector("#btnChatBack").click()`);
-await sleep(450);
-await evaluate(`document.querySelector("#btnNewChat").click()`);
-await sleep(450);
-const chips = await evaluate(`Array.from(document.querySelectorAll("#newChatPresets [data-preset]")).map((node) => node.dataset.preset)`);
-check("roleplay offers the scenario cards", chips.length === ROLEPLAY_PRESETS.length, `${chips.length}`);
-await evaluate(`document.querySelector('[data-preset="jianghu"]').click()`);
-await sleep(200);
-const filled = await evaluate(`document.querySelector("#newChatName").value`);
-check("picking a card fills the form", filled === "沈砚", filled);
-await evaluate(`document.querySelector("[data-close-sheet]").click()`);
-await sleep(250);
-
-/* ---------- assistant: modern AI page ---------- */
-await boot("assistant", codeMessages);
-await openChat();
+/* ================= AI 助理：现代对话页 + 自己的消息 ================= */
+await openModuleTab();
+await evaluate(`document.querySelector('[data-module-pick="assistant"]').click()`);
+await sleep(700);
 page1 = await evaluate(`(() => ({
   mode: document.body.dataset.mode,
   theme: document.body.dataset.theme,
@@ -255,6 +285,7 @@ page1 = await evaluate(`(() => ({
   lang: (document.querySelector(".msg-code-head span") || {}).textContent || "",
   lines: document.querySelectorAll(".as-line").length,
   stickerBtn: getComputedStyle(document.querySelector("#btnSticker")).display,
+  text: document.querySelector("#messageList").innerText,
 }))()`);
 check("assistant page opens in assistant mode", page1.mode === "assistant", page1.mode);
 check("assistant page uses the assistant theme", page1.theme === "assistant", page1.theme);
@@ -266,6 +297,9 @@ check("a fenced block becomes a code block", page1.code === 1 && page1.lang === 
 check("the code block has a copy button", page1.copy === 1, String(page1.copy));
 check("assistant text is laid out as paragraphs", page1.lines >= 2, String(page1.lines));
 check("assistant hides the sticker button", page1.stickerBtn === "none", page1.stickerBtn);
+check("assistant shows its own thread", page1.text.includes("debounce"), page1.text.slice(0, 40));
+check("assistant does not borrow the companion thread", !page1.text.includes("今天有热的吗"), page1.text.slice(0, 60));
+check("assistant has no roleplay narration blocks", page1.text.includes("今晚还走吗") === false, page1.text.slice(0, 60));
 
 const copied = await evaluate(`(() => {
   const button = document.querySelector("[data-copy-code]");
@@ -275,21 +309,120 @@ const copied = await evaluate(`(() => {
 check("the copy button is clickable", copied === "clicked", copied);
 await capture("module-assistant.png");
 
-/* ---------- back to companion through the module page ---------- */
+/* ================= 切回陪伴：原会话原封不动 ================= */
 await evaluate(`document.querySelector("#btnChatBack").click()`);
-await sleep(400);
-await evaluate(`document.querySelector('[data-tab="module"]').click()`);
-await sleep(450);
+await sleep(350);
+await openModuleTab();
 await evaluate(`document.querySelector('[data-module-pick="companion"]').click()`);
 await sleep(700);
 const back = await evaluate(`(() => ({
   mode: document.body.dataset.mode,
   theme: document.body.dataset.theme,
   avatar: document.querySelector(".msg.ai .avatar") ? getComputedStyle(document.querySelector(".msg.ai .avatar")).display : "missing",
+  text: document.querySelector("#messageList").innerText,
 }))()`);
 check("companion restores the fake-human page", back.mode === "companion", back.mode);
 check("companion restores the old theme", back.theme === "paper", back.theme);
 check("companion shows avatars again", back.avatar !== "none", back.avatar);
+check("companion still has its own messages", back.text.includes("今天有热的吗"), back.text.slice(0, 40));
+check("companion never received the assistant's code", !back.text.includes("debounce"), back.text.slice(0, 60));
+
+/* ================= 在剧本里新建场景：只有剧本变多 ================= */
+await openModuleTab();
+await evaluate(`document.querySelector('[data-module-pick="roleplay"]').click()`);
+await sleep(600);
+await evaluate(`document.querySelector("#btnChatBack").click()`);
+await sleep(350);
+await evaluate(`document.querySelector("#btnNewChat").click()`);
+await sleep(450);
+const chips = await evaluate(`Array.from(document.querySelectorAll("#newChatPresets [data-preset]")).map((node) => node.dataset.preset)`);
+check("roleplay offers the scenario cards", chips.length === ROLEPLAY_PRESETS.length, `${chips.length}`);
+await evaluate(`document.querySelector('[data-preset="orbit"]').click()`);
+await sleep(200);
+const filled = await evaluate(`document.querySelector("#newChatName").value`);
+check("picking a card fills the form", filled === "K", filled);
+await evaluate(`document.querySelector("#newChatForm").requestSubmit()`);
+await sleep(700);
+const scene = await evaluate(`(() => ({
+  mode: document.body.dataset.mode,
+  name: (document.querySelector("#peerName") || {}).textContent || "",
+  text: document.querySelector("#messageList").innerText,
+}))()`);
+check("a new scene is created inside the roleplay module", scene.mode === "roleplay", scene.mode);
+check("the new scene starts from its preset greeting", scene.name === "K" && scene.text.includes("呼吸阀"), `${scene.name} / ${scene.text.slice(0, 30)}`);
+check("the new scene does not inherit the old scene", !scene.text.includes("今晚还走吗"), scene.text.slice(0, 50));
+
+await openModuleTab();
+cards = await evaluate(cardText);
+check("the roleplay module now counts the new scene", cards.roleplay.includes("1"), cards.roleplay);
+check("the companion thread is untouched", cards.companion.includes("3"), cards.companion);
+check("the assistant thread is untouched", cards.assistant.includes("2"), cards.assistant);
+
+/* ================= 列表里能分清哪条是模块会话 ================= */
+await evaluate(`document.querySelector('[data-tab="list"]').click()`);
+await sleep(450);
+const list = await evaluate(`(() => ({
+  badges: Array.from(document.querySelectorAll(".chat-mode-badge")).map((node) => node.innerText),
+  rows: document.querySelectorAll("[data-chat-open]").length,
+}))()`);
+check("the list marks assistant and script threads", list.badges.length === 3, list.badges.join(","));
+check("the list keeps every thread", list.rows === 4, String(list.rows));
+await capture("module-threads.png");
+
+/* ================= 老数据（只有一个会话）：助理会自己开一条 ================= */
+await boot(seedState({ withThreads: false }));
+await openModuleTab();
+cards = await evaluate(cardText);
+check("an old profile shows empty module threads", cards.assistant.includes("还没") || cards.assistantState.length > 0, JSON.stringify(cards));
+await evaluate(`document.querySelector('[data-module-pick="assistant"]').click()`);
+await sleep(750);
+const fresh = await evaluate(`(() => ({
+  mode: document.body.dataset.mode,
+  text: document.querySelector("#messageList").innerText,
+  count: document.querySelectorAll(".msg").length,
+}))()`);
+check("opening an empty module creates its own thread", fresh.mode === "assistant", fresh.mode);
+check("the assistant thread opens with a neutral hello", fresh.text.includes("在。要处理什么？"), fresh.text.slice(0, 40));
+check("it holds only that hello", fresh.count === 1, String(fresh.count));
+check("it did not copy the companion history", !fresh.text.includes("今天有热的吗"), fresh.text.slice(0, 60));
+
+/* 重新加载后仍然停在助理会话里（activeByMode 存下来了） */
+await send("Page.reload");
+await waitBoot();
+const afterReload = await evaluate(`(() => ({ mode: document.body.dataset.mode, theme: document.body.dataset.theme }))()`);
+check("the active module survives a reload", afterReload.mode === "assistant", `${afterReload.mode}/${afterReload.theme}`);
+await openModuleTab();
+await evaluate(`document.querySelector('[data-module-pick="assistant"]').click()`);
+await sleep(650);
+const restored = await evaluate(`(() => ({
+  mode: document.body.dataset.mode,
+  text: document.querySelector("#messageList")?.innerText || "",
+}))()`);
+check("its messages survive the reload too", restored.mode === "assistant" && restored.text.includes("在。要处理什么？"), restored.text.slice(0, 40));
+
+/* 切回陪伴，历史还在 */
+await openModuleTab();
+await evaluate(`document.querySelector('[data-module-pick="companion"]').click()`);
+await sleep(700);
+const legacyBack = await evaluate(`(() => ({
+  mode: document.body.dataset.mode,
+  text: document.querySelector("#messageList").innerText,
+}))()`);
+check("the old single chat stays in companion", legacyBack.mode === "companion" && legacyBack.text.includes("今天有热的吗"), legacyBack.mode);
+
+/* ================= 设置里的人设卡也能切模块 ================= */
+await evaluate(`document.querySelector("#btnPeer")?.click()`);
+await sleep(650);
+const settingsHint = await evaluate(`(() => {
+  const hints = Array.from(document.querySelectorAll("#settingsBody .field-hint")).map((node) => node.innerText).join(" | ");
+  return { opened: document.body.dataset.screen, hints };
+})()`);
+check("settings explains the separate threads", /自己的对话记录|独立/.test(settingsHint.hints), settingsHint.hints.slice(0, 70));
+await evaluate(`document.querySelector('.mode-card[data-mode="roleplay"]')?.click()`);
+await sleep(600);
+const viaSettings = await evaluate(`(() => ({ mode: document.body.dataset.mode, text: document.querySelector("#messageList").innerText }))()`);
+check("the settings picker switches the thread too", viaSettings.mode === "roleplay", viaSettings.mode);
+check("that thread is a fresh script, not the companion chat", !viaSettings.text.includes("今天有热的吗"), viaSettings.text.slice(0, 40));
 
 check("no console errors", consoleErrors.length === 0, consoleErrors.slice(0, 2).join(" | "));
 

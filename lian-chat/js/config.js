@@ -355,6 +355,9 @@ export function defaultState() {
     activeChatId: "",
     activeKeyId: "",
     chats: [],
+    /* 每个模块最后打开的那条会话：{ companion, roleplay, assistant }。
+       会话本身存在 chats[] 里，用 chat.mode 标记归属（见 roleplay.js 的 modeOfChat）。 */
+    activeByMode: { companion: "", roleplay: "", assistant: "" },
     keys: [],
     settings: {
       provider: "mimo",

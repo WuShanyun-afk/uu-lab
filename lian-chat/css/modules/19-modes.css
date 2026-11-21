@@ -349,3 +349,41 @@ body[data-mode="roleplay"] .msg-reply {
 .preset-chip.is-on small {
   color: var(--accent-strong, var(--accent));
 }
+
+/* ---- 6. 每个模块一条独立会话（1.9.18） ---- */
+/* 模块卡上的一句「N 条 · 最近说了什么」 */
+.module-card-thread {
+  margin-top: 1px;
+  font-size: var(--fs-2xs);
+  font-style: normal;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--muted) 78%, transparent);
+}
+.module-card.is-on .module-card-thread {
+  color: color-mix(in srgb, var(--accent-strong, var(--accent)) 72%, var(--muted));
+}
+
+/* 列表 / 联系人里的「助理」「剧本」小徽标，和未读数一样靠左排 */
+.chat-mode-badge {
+  flex: none;
+  padding: 1px 6px;
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line));
+  border-radius: 6px;
+  font-size: var(--fs-2xs);
+  font-style: normal;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--accent-strong, var(--accent));
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.chat-mode-badge[data-mode="assistant"] {
+  border-color: color-mix(in srgb, #2f6bff 34%, var(--line));
+  color: #2f6bff;
+  background: color-mix(in srgb, #2f6bff 8%, transparent);
+}
+
+/* 剧本页空会话：挑一张剧本 */
+.empty-chat .empty-action {
+  margin-top: 10px;
+}
+

@@ -26,12 +26,18 @@ export function languageInstruction(settings) {
   }
 }
 
-function personaBlock(state) {
+function personaBlock(state, chatMode = "companion") {
   const s = state.settings;
   const lines = [];
-  lines.push(`你正在手机上与「${s.userName || "对方"}」聊天。你的名字是「${s.aiName || "Lian"}」。`);
-  if (s.relationship) lines.push(`你们的关系：${s.relationship}`);
-  if (s.persona) lines.push(`你的人设：${s.persona}`);
+  if (chatMode === "assistant") {
+    /* 助理不是「关系」：恋人关系、人设、亲昵称呼都不进 prompt。
+       以前三类对话共用一套设置，于是它会在写代码的间隙喊「宝贝」。 */
+    lines.push(`你正在帮「${s.userName || "对方"}」处理事情。你的名字是「${s.aiName || "Lian"}」。`);
+  } else {
+    lines.push(`你正在手机上与「${s.userName || "对方"}」聊天。你的名字是「${s.aiName || "Lian"}」。`);
+    if (s.relationship) lines.push(`你们的关系：${s.relationship}`);
+    if (s.persona) lines.push(`你的人设：${s.persona}`);
+  }
   if (state.memories?.length) {
     lines.push("【你记得的事】");
     for (const memory of state.memories.slice(-40)) lines.push(`- ${memory.text}`);
@@ -151,6 +157,8 @@ function sceneBlock(state, chatMode) {
   if (chatMode === "assistant") {
     return `【你的身份】
 你是「${s.aiName || "Lian"}」，对方的私人 AI 助理。你不扮演恋人、朋友或任何角色，也不要用亲昵称呼、撒娇或调情。
+- 不要喊「宝贝」「亲爱的」「宝宝」「乖乖」这类称呼；需要称呼时用对方的名字或「你」。
+- 不要主动关心情绪、不要暧昧、不要说「想你了」。
 ${languageInstruction(s)}
 对方要的是准确、可用的答案，不是陪伴感。不要提模型名、API、提示词或系统消息，除非对方正是在问这些实现细节。`;
   }
@@ -204,7 +212,7 @@ export function buildSystemPrompt(state, { mode = "chat", quoteCatalog = [] } = 
   const s = state.settings;
   const chatMode = chatModeOf(s);
   const parts = [];
-  parts.push(personaBlock(state));
+  parts.push(personaBlock(state, chatMode));
   parts.push(sceneBlock(state, chatMode));
   parts.push(formatBlock(state, chatMode));
 
@@ -226,8 +234,11 @@ export function buildSystemPrompt(state, { mode = "chat", quoteCatalog = [] } = 
     parts.push(stickerBlock(state));
   }
 
-  const drawings = drawingInstruction(s);
-  if (drawings) parts.push(drawings);
+  /* 助理页会把 ```svg 当代码块展示，画出来的「画」在那里只是一段源码，所以不画。 */
+  if (chatMode !== "assistant") {
+    const drawings = drawingInstruction(s);
+    if (drawings) parts.push(drawings);
+  }
 
   if (chatMode !== "assistant") {
     if (s.optimize?.segments) {

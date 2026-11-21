@@ -28,7 +28,7 @@ import {
 } from "./prompt.js";
 import { buildMemoryMessages, mergeMemories, parseMemoryReply } from "./memory.js";
 import { adoptStoredDrawings, buildHtmlDocument, buildSvgDataUri, drawingLabel, stripSvgSource } from "./drawing.js";
-import { ROLEPLAY_PRESETS, chatModeOf, parseNarration } from "./roleplay.js";
+import { CHAT_MODES, MODE_THREADS, ROLEPLAY_PRESETS, chatModeOf, modeOfChat, parseNarration } from "./roleplay.js";
 import { accentStrong, mineBubble, relativeLuminance } from "./palette.js";
 import { buildReportFromRaw, reportBlocksHtml, salvageReport, sanitizeReportHtml } from "./report.js";
 import { chatHaystack, matchMessageIndexes, matchSnippet, normaliseQuery, splitByMatches } from "./search.js";
@@ -124,6 +124,98 @@ function currentChat() {
   return state?.chats?.find((chat) => chat.id === state.activeChatId) || null;
 }
 
+/* =========================================================
+   模块会话：陪伴 / 角色扮演 / AI 助理 各自一条线索
+   会话存在 state.chats 里，用 chat.mode 标记归属，
+   state.activeByMode 记住每个模块最后打开的那条。
+   ========================================================= */
+
+function modeThreads(mode) {
+  return (state?.chats || []).filter((chat) => modeOfChat(chat) === mode);
+}
+
+/** 某个模块当前该打开哪条会话：优先上次打开的那条，否则取最近更新的。 */
+function modeThread(mode) {
+  const threads = modeThreads(mode);
+  if (!threads.length) return null;
+  const rememberedId = state.activeByMode?.[mode];
+  return threads.find((chat) => chat.id === rememberedId)
+    || threads.slice().sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0))[0];
+}
+
+function rememberModeThread(mode, id) {
+  if (!state.activeByMode || typeof state.activeByMode !== "object") {
+    state.activeByMode = { companion: "", roleplay: "", assistant: "" };
+  }
+  state.activeByMode[mode] = id || "";
+}
+
+/** 新建某个模块的第一条会话时用的种子。 */
+function modeThreadSeed(mode) {
+  const s = state.settings;
+  const meta = MODE_THREADS[mode] || MODE_THREADS.companion;
+  if (mode === "assistant" || mode === "roleplay") {
+    return {
+      name: meta.threadNameKey ? t(meta.threadNameKey) : s.aiName || "Lian",
+      relationship: "",
+      persona: "",
+      greeting: meta.greetingKey ? t(meta.greetingKey) : "",
+    };
+  }
+  return {
+    name: s.aiName || "Lian",
+    relationship: s.relationship || "",
+    persona: s.persona || "",
+    greeting: s.greeting || DEFAULT_GREETING,
+  };
+}
+
+function ensureModeThread(mode) {
+  const found = modeThread(mode);
+  if (found) return found;
+  const seed = modeThreadSeed(mode);
+  const chat = {
+    id: uid("chat"),
+    mode,
+    kind: mode === "companion" ? "" : "module",
+    name: seed.name,
+    avatar: "",
+    relationship: seed.relationship,
+    persona: seed.persona,
+    greeting: seed.greeting,
+    keyId: state.activeKeyId || "",
+    messages: [],
+    memories: [],
+    memoryMeta: { lastUserCount: 0, lastAttemptAt: 0, lastAt: 0 },
+    proactiveLastAt: 0,
+    block: null,
+    blockFollowUp: null,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+  if (seed.greeting) {
+    chat.messages.push({ id: uid("m"), role: "assistant", kind: "text", text: seed.greeting, ts: Date.now(), greeting: true });
+  }
+  state.chats.push(chat);
+  rememberModeThread(mode, chat.id);
+  return chat;
+}
+
+/** 进助理页换「助理」配色，离开时换回进来之前那套。 */
+function applyModeTheme(previous, next) {
+  const s = state.settings;
+  if (previous === next) return;
+  if (next === "assistant" && s.theme !== "assistant") {
+    s.modeTheme = s.theme;
+    s.theme = "assistant";
+    s.accent = "#2F6BFF";
+  } else if (previous === "assistant" && s.theme === "assistant") {
+    const back = THEMES.find((theme) => theme.id === s.modeTheme) || THEMES[0];
+    s.theme = back.id;
+    s.accent = back.accent;
+  }
+}
+
 function providerShort(provider) {
   return PROVIDERS[provider]?.short || PROVIDERS[provider]?.label || "Key";
 }
@@ -157,6 +249,8 @@ function chatFromActive() {
   const s = state.settings;
   return {
     id: uid("chat"),
+    mode: chatModeOf(s),
+    kind: chatModeOf(s) === "companion" ? "" : "module",
     name: s.aiName || "Lian",
     avatar: s.aiAvatar || "",
     relationship: s.relationship || "",
@@ -179,6 +273,16 @@ function ensureChatState() {
   let migrated = false;
   if (!Array.isArray(state.keys)) state.keys = [];
   if (!Array.isArray(state.chats)) state.chats = [];
+  if (!state.activeByMode || typeof state.activeByMode !== "object") {
+    state.activeByMode = { companion: "", roleplay: "", assistant: "" };
+    migrated = true;
+  }
+  for (const mode of CHAT_MODES) {
+    if (typeof state.activeByMode[mode] !== "string") {
+      state.activeByMode[mode] = "";
+      migrated = true;
+    }
+  }
   if (!state.keys.length && state.settings.apiKey) {
     const key = keyFromSettings();
     state.keys.push(key);
@@ -190,21 +294,52 @@ function ensureChatState() {
     if (!state.chats.some((chat) => chat.id === state.activeChatId)) {
       state.activeChatId = state.chats[0].id;
     }
-    const chat = currentChat();
-    if (chat) {
-      if (!chat.keyId) chat.keyId = state.activeKeyId || "";
-      if (!state.activeKeyId && chat.keyId) state.activeKeyId = chat.keyId;
+    const activeChat = currentChat();
+    if (activeChat) {
+      if (!activeChat.keyId) activeChat.keyId = state.activeKeyId || "";
+      if (!state.activeKeyId && activeChat.keyId) state.activeKeyId = activeChat.keyId;
+      const mode = modeOfChat(activeChat);
+      if (!state.activeByMode[mode]) {
+        state.activeByMode[mode] = activeChat.id;
+        migrated = true;
+      }
     }
   } else if (state.onboarded) {
     const chat = chatFromActive();
     state.chats.push(chat);
     state.activeChatId = chat.id;
+    rememberModeThread(modeOfChat(chat), chat.id);
     migrated = true;
   }
   const activeKey = state.keys.find((key) => key.id === state.activeKeyId);
   if (activeKey && !state.settings.apiKey) applyKeyToSettings(activeKey);
-  if (currentChat()) syncActiveChat();
+  /* 老数据 / 导入的数据里顶层 messages 可能比会话里的更全（1.9.17 之前两者是同一个数组）。
+     只有会话是空的才接手，免得覆盖用户刚清空的对话。 */
+  const active = currentChat();
+  if (active && !(Array.isArray(active.messages) && active.messages.length) && state.messages?.length) {
+    active.messages = state.messages;
+    migrated = true;
+  }
+  if (currentChat()) syncActiveThread();
   return migrated;
+}
+
+/**
+ * 让顶部 state.messages / memories / block 指向「当前会话」。
+ * 每个模块一条线索之后，这三样不能再和别的模块共用，所以启动和切换都要走这里。
+ */
+function syncActiveThread({ force = false } = {}) {
+  const chat = currentChat();
+  if (!chat) return false;
+  const needsLoad = force
+    || state.messages !== chat.messages
+    || chatModeOf(state.settings) !== modeOfChat(chat);
+  if (!needsLoad) {
+    syncActiveChat();
+    return false;
+  }
+  loadChatIntoActive(chat);
+  return true;
 }
 
 function syncActiveKey() {
@@ -251,7 +386,11 @@ function syncActiveChat() {
 function loadChatIntoActive(chat) {
   if (!chat) return;
   const s = state.settings;
+  const previousMode = chatModeOf(s);
+  const nextMode = modeOfChat(chat);
   state.activeChatId = chat.id;
+  s.mode = nextMode;
+  applyModeTheme(previousMode, nextMode);
   s.aiName = chat.name || "Lian";
   s.aiAvatar = chat.avatar || "";
   s.relationship = chat.relationship || "";
@@ -272,6 +411,7 @@ function loadChatIntoActive(chat) {
     state.activeKeyId = "";
     s.apiKey = "";
   }
+  rememberModeThread(nextMode, chat.id);
   typingVisible = false;
 }
 
@@ -321,13 +461,19 @@ function openTab(name) {
   startProactiveTimer();
 }
 
-function createChat({ name, relationship = "", persona = "", greeting = "", keyId = "" }) {
+function createChat({ name, relationship = "", persona = "", greeting = "", keyId = "", mode = "" }) {
   syncActiveKey();
   syncActiveChat();
   const cleanName = String(name || "").trim().slice(0, 80) || "Lian";
+  /* 在角色扮演里新建 = 新开一个剧本；其它情况都是陪伴角色。 */
+  const chatMode = CHAT_MODES.includes(mode)
+    ? mode
+    : chatModeOf(state.settings) === "roleplay" ? "roleplay" : "companion";
   const selectedKey = state.keys.find((item) => item.id === keyId) || state.keys.find((item) => item.id === state.activeKeyId);
   const chat = {
     id: uid("chat"),
+    mode: chatMode,
+    kind: chatMode === "companion" ? "" : "module",
     name: cleanName,
     avatar: "",
     relationship: String(relationship || "").slice(0, 300),
@@ -352,6 +498,14 @@ function createChat({ name, relationship = "", persona = "", greeting = "", keyI
   requestAnimationFrame(() => $("#messageInput")?.focus());
 }
 
+/* 列表预览不能把 ```js 这类围栏原样露出来；助理的代码块在预览里只留一个记号。 */
+function previewSafe(text) {
+  return String(text || "")
+    .replace(/```[^\n]*\n?[\s\S]*?(```|$)/gi, "〔代码〕")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function chatPreview(chat) {
   const last = chat.messages?.at(-1);
   if (!last) return chat.relationship || t("chat.noMessages");
@@ -363,7 +517,15 @@ function chatPreview(chat) {
   if (last.kind === "file") return last.file?.name || last.text || t("chat.fileSent");
   if (last.kind === "report") return last.report?.title || t("chat.report");
   if (last.kind === "drawing") return last.text || t("chat.drawingSent");
-  return String(last.text || "").replace(/\s+/g, " ").trim().slice(0, 60) || t("chat.noMessages");
+  return previewSafe(last.text).slice(0, 60) || t("chat.noMessages");
+}
+
+/** 列表里给助理 / 剧本会话加一枚小徽标；陪伴是默认，不加。 */
+function modeBadgeMarkup(chat) {
+  const mode = modeOfChat(chat);
+  const meta = MODE_THREADS[mode];
+  if (!meta || mode === "companion") return "";
+  return `<i class="chat-mode-badge" data-mode="${mode}">${escapeHtml(t(meta.badgeKey))}</i>`;
 }
 
 let listQuery = "";
@@ -465,7 +627,7 @@ function renderChatList() {
       return `<button type="button" class="chat-row ${chat.id === state.activeChatId ? "is-active" : ""} ${unread ? "has-unread" : ""}" data-chat-open="${escapeHtml(chat.id)}">
         <span class="chat-row-avatar">${avatarMarkup({ src: chat.avatar, role: "ai", name: chat.name, size: 46 })}</span>
         <span class="chat-row-copy">
-          <span class="chat-row-top"><b>${searchMarkup(chat.name || "Lian", query)}</b>${unread ? `<i class="chat-unread">${unread > 99 ? "99+" : unread}</i>` : ""}<time>${escapeHtml(timeLabel(chat.updatedAt || chat.createdAt))}</time></span>
+          <span class="chat-row-top"><b>${searchMarkup(chat.name || "Lian", query)}</b>${modeBadgeMarkup(chat)}${unread ? `<i class="chat-unread">${unread > 99 ? "99+" : unread}</i>` : ""}<time>${escapeHtml(timeLabel(chat.updatedAt || chat.createdAt))}</time></span>
           <small>${searchMarkup(preview, query)}</small>
           <span class="chat-row-foot">${escapeHtml(chat.relationship || t("chatList.noRelation"))}${key ? ` · ${escapeHtml(key.name)}` : ""}</span>
         </span>
@@ -640,7 +802,7 @@ function renderContacts() {
       return `<button type="button" class="contact-row ${chat.id === state.activeChatId ? "is-active" : ""}" data-chat-open="${escapeHtml(chat.id)}">
         <span class="contact-avatar">${avatarMarkup({ src: chat.avatar, role: "ai", name: chat.name, size: 48 })}</span>
         <span class="contact-copy">
-          <span class="contact-top"><b>${escapeHtml(chat.name || "Lian")}</b>${chat.id === state.activeChatId ? `<i class="contact-now">${escapeHtml(t("contacts.current"))}</i>` : ""}</span>
+          <span class="contact-top"><b>${escapeHtml(chat.name || "Lian")}</b>${modeBadgeMarkup(chat)}${chat.id === state.activeChatId ? `<i class="contact-now">${escapeHtml(t("contacts.current"))}</i>` : ""}</span>
           <small>${escapeHtml(chat.relationship || t("contacts.noRelation"))}</small>
           <span class="contact-line">${escapeHtml(chatPreview(chat))}</span>
           <span class="contact-chips">
@@ -779,7 +941,7 @@ function renderHome(force = false) {
         ${homeRow("about", "doc", t("settings.about"), t("settings.aboutHint"))}
       </div>
     </section>
-    <p class="home-foot">${escapeHtml(t("settings.version", { v: "1.9.17" }))} · ${escapeHtml(t("home.localOnly"))}</p>`;
+    <p class="home-foot">${escapeHtml(t("settings.version", { v: "1.9.18" }))} · ${escapeHtml(t("home.localOnly"))}</p>`;
 }
 
 /* =========================================================
@@ -1107,19 +1269,33 @@ const MODULE_CARDS = [
   { id: "companion", icon: "chat", nameKey: "module.companionName", descKey: "module.companionDesc" },
 ];
 
+function moduleThreadInfo(mode) {
+  const thread = modeThread(mode);
+  if (!thread) return { text: t("module.threadEmpty"), count: 0 };
+  const messages = thread.messages || [];
+  const preview = messages.length ? chatPreview(thread) : "";
+  const short = preview.length > 24 ? `${preview.slice(0, 24)}…` : preview;
+  return {
+    text: `${t("module.threadCount", { n: messages.length })}${short ? ` · ${short}` : ""}`,
+    count: messages.length,
+  };
+}
+
 function renderModuleHome() {
   const box = $("#moduleBody");
   if (!box || !state) return;
   const current = chatModeOf(state.settings);
   box.innerHTML = MODULE_CARDS.map((card) => {
     const on = card.id === current;
+    const info = moduleThreadInfo(card.id);
     return `<button type="button" class="module-card${on ? " is-on" : ""}" data-module-pick="${card.id}" aria-pressed="${on}">
       <span class="module-card-icon">${icon(card.icon)}</span>
       <span class="module-card-copy">
         <b>${escapeHtml(t(card.nameKey))}</b>
         <small>${escapeHtml(t(card.descKey))}</small>
+        <em class="module-card-thread">${escapeHtml(info.text)}</em>
       </span>
-      <span class="module-card-state">${escapeHtml(on ? t("module.current") : t("module.use"))}</span>
+      <span class="module-card-state">${escapeHtml(on ? t("module.current") : info.count ? t("module.use") : t("module.start"))}</span>
     </button>`;
   }).join("");
 }
@@ -1128,7 +1304,7 @@ function openModuleChat() {
   if (state.chats?.length) {
     showScreen("chat");
     renderHeader();
-    renderChat({ force: true });
+    renderChat({ force: true, forceScroll: true });
     return;
   }
   openTab("list");
@@ -1149,30 +1325,34 @@ function bindModuleScreen() {
     const code = button.closest(".msg-code")?.querySelector("code")?.textContent || "";
     if (code) copyText(code);
   });
+  /* roleplay 的空会话：直接去挑一张剧本 */
+  $("#messageList")?.addEventListener("click", (event) => {
+    if (!event.target.closest("[data-open-scenes]")) return;
+    openNewChatSheet();
+  });
 }
 
-/* 切换聊天模式：companion / roleplay / assistant。
-   进助理模式顺手换成「助理」主题，退出时换回原来的那套。 */
+/* 切换模块：每个模块有自己的会话（chats[].mode），
+   所以这里不只是换提示词，而是把当前会话存起来、把目标模块的会话读进来。
+   进助理页顺手换成「助理」主题，退出时换回原来的那套（见 applyModeTheme）。 */
 function setChatMode(mode) {
   if (!state) return;
-  const next = ["companion", "roleplay", "assistant"].includes(mode) ? mode : "companion";
+  const next = CHAT_MODES.includes(mode) ? mode : "companion";
   const previous = chatModeOf(state.settings);
-  if (next === previous) return;
-  if (next === "assistant" && state.settings.theme !== "assistant") {
-    state.settings.modeTheme = state.settings.theme;
-    state.settings.theme = "assistant";
-    state.settings.accent = "#2F6BFF";
-  } else if (previous === "assistant" && state.settings.theme === "assistant") {
-    const back = THEMES.find((theme) => theme.id === state.settings.modeTheme) || THEMES[0];
-    state.settings.theme = back.id;
-    state.settings.accent = back.accent;
-  }
-  state.settings.mode = next;
+  const alreadyThere = next === previous && modeOfChat(currentChat()) === next;
+  if (alreadyThere) return;
+  syncActiveKey();
+  syncActiveChat();
+  const target = ensureModeThread(next);
+  loadChatIntoActive(target);
   persist();
   applyAppearance();
   renderHeader();
+  updateBlockUI();
+  startBlockTicker();
+  startProactiveTimer();
   /* narration styling is baked into each bubble, so the list must be rebuilt */
-  renderChat({ force: true });
+  renderChat({ force: true, forceScroll: true });
   renderSettings(settingsCallbacks());
   if (document.body.dataset.screen === "module") renderModuleHome();
   toast(t(`mode.toast.${next}`));
@@ -1678,9 +1858,18 @@ function rangeSignature(messages, from, to) {
 }
 
 function chatEmptyMarkup() {
+  const mode = chatModeOf(state.settings);
+  const hint = mode === "assistant"
+    ? t("chat.emptyAssistant")
+    : mode === "roleplay" ? t("chat.emptyRoleplay") : t("chat.emptyHint");
+  /* 剧本页空着的时候，第一步不是打字，是挑一张剧本。 */
+  const action = mode === "roleplay"
+    ? `<button type="button" class="btn btn-ghost btn-small empty-action" data-open-scenes>${escapeHtml(t("chat.pickScene"))}</button>`
+    : "";
   return `<div class="empty-chat">
       <img class="empty-mark" src="assets/icons/icon.svg" alt="">
-      <p>${escapeHtml(t("chat.emptyHint"))}</p>
+      <p>${escapeHtml(hint)}</p>
+      ${action}
     </div>`;
 }
 
@@ -4199,6 +4388,8 @@ function startProactiveTimer() {
 
 async function checkProactive() {
   if (!state || demoMode || !state.settings.proactive.enabled) return;
+  /* 主动消息只属于陪伴：助理和剧本里「忽然想起你」很出戏。 */
+  if (chatModeOf(state.settings) !== "companion") return;
   if (!state.settings.apiKey) return;
   if (document.visibilityState !== "visible" && !state.settings.notifications?.background) return;
   if (sending || reporting || studioGenerating || proactiveBusy || isBlocked()) return;
@@ -4215,6 +4406,10 @@ async function sendProactive({ manual = false } = {}) {
   if (!state || proactiveBusy || sending || reporting || studioGenerating || isBlocked()) return;
   if (demoMode) {
     toast(t("toast.demo"));
+    return;
+  }
+  if (chatModeOf(state.settings) !== "companion") {
+    toast(t("settings.proactiveCompanionOnly"));
     return;
   }
   if (!state.settings.apiKey) {
