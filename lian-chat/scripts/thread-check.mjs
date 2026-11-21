@@ -683,6 +683,59 @@ const sendText = async (text) => {
   check("the fallback answer still lands in the thread", fallback.text.includes("联网被拒，先用普通回答"), fallback.text.slice(0, 40));
 }
 
+/* ================= 13. contacts: characters only, search + sort ================= */
+{
+  const shen = [msg("m1", "assistant", "老位置。", now - 5000)];
+  const cat = [msg("n1", "assistant", "喵。", now - 4000)];
+  await boot(wrap(baseSettings("companion"), [
+    chat("c1", "companion", "沈砚", shen),
+    chat("c2", "companion", "Cat", cat, { updatedAt: now - 1000 }),
+    chat("c3", "assistant", "Lian", [msg("a1", "assistant", "你好，需要什么帮助吗？", now - 3000)], { updatedAt: now, mode: "assistant", kind: "module", keyId: "k2" }),
+  ], "c1", shen, { companion: "c1", roleplay: "", assistant: "c3" }));
+  await evaluate(`document.querySelector('[data-tab="contacts"]').click()`);
+  await sleep(450);
+  const base = await evaluate(`({
+    rows: document.querySelectorAll("#contactsList [data-chat-open]").length,
+    names: [...document.querySelectorAll("#contactsList [data-chat-open] .contact-top b")].map((node) => node.innerText),
+    hasAssistant: [...document.querySelectorAll("#contactsList [data-chat-open]")].some((node) => node.innerText.includes("Lian")),
+    search: !!document.querySelector("#contactsSearchInput"),
+    sort: document.querySelectorAll("[data-contacts-sort]").length,
+  })`);
+  check("contacts lists characters and keeps modules out", base.rows === 2 && base.names.includes("Cat") && base.names.includes("沈砚") && !base.hasAssistant, JSON.stringify(base));
+  check("contacts offers search and two sorts", base.search === true && base.sort === 2, JSON.stringify(base));
+  await evaluate(`(() => {
+    const input = document.querySelector("#contactsSearchInput");
+    input.value = "Cat";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  })()`);
+  await sleep(180);
+  const found = await evaluate(`({
+    rows: document.querySelectorAll("#contactsList [data-chat-open]").length,
+    name: document.querySelector("#contactsList [data-chat-open] .contact-top b")?.innerText || "",
+    meta: document.querySelector("#contactsMeta")?.textContent || "",
+  })`);
+  check("typing a name filters the contact list", found.rows === 1 && found.name === "Cat" && found.meta.includes("1"), JSON.stringify(found));
+  await evaluate(`(() => {
+    const input = document.querySelector("#contactsSearchInput");
+    input.value = "zzz";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  })()`);
+  await sleep(160);
+  const empty = await evaluate(`({ empty: !!document.querySelector("[data-contacts-clear]"), rows: document.querySelectorAll("#contactsList [data-chat-open]").length })`);
+  check("a query with no hits shows the search empty state", empty.empty === true && empty.rows === 0, JSON.stringify(empty));
+  await evaluate(`document.querySelector("[data-contacts-clear]")?.click()`);
+  await sleep(160);
+  await evaluate(`document.querySelector('[data-contacts-sort="name"]')?.click()`);
+  await sleep(160);
+  const cleared = await evaluate(`({
+    rows: document.querySelectorAll("#contactsList [data-chat-open]").length,
+    pressed: document.querySelector('[data-contacts-sort="name"]')?.getAttribute("aria-pressed"),
+    names: [...document.querySelectorAll("#contactsList [data-chat-open] .contact-top b")].map((node) => node.innerText),
+  })`);
+  check("clearing the search restores every character", cleared.rows === 2, String(cleared.rows));
+  check("the name sort is applied", cleared.pressed === "true" && cleared.names.join(",") === "沈砚,Cat", JSON.stringify(cleared));
+}
+
 check("no console errors", consoleErrors.length === 0, consoleErrors.slice(0, 2).join(" | "));
 
 const failed = results.filter((item) => !item.ok);

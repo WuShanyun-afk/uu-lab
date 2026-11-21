@@ -80,7 +80,7 @@ import {
 } from "./utils.js";
 
 /* 与 index.html 的 __LIAN_HTML_BUILD__ 对齐；不一致时由页内脚本清缓存重载。 */
-window.__LIAN_APP_BUILD__ = "1.9.27";
+window.__LIAN_APP_BUILD__ = "1.9.28";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -913,6 +913,20 @@ function bindSearch() {
   });
 }
 
+let contactsQuery = "";
+let contactsSort = "recent";
+
+function contactsMatch(chat, query) {
+  if (!query) return true;
+  const haystack = [
+    chatDisplayName(chat),
+    chat.relationship || "",
+    chat.persona || "",
+    chatPreview(chat),
+  ].join(" ").toLowerCase();
+  return haystack.includes(query);
+}
+
 function renderContacts() {
   if (!state) return;
   ensureChatState();
@@ -920,8 +934,20 @@ function renderContacts() {
   if (!list) return;
   /* 通讯录只放「角色」；助理 / 剧本是独立模块，不混进角色列表。 */
   const characters = state.chats.filter((chat) => modeOfChat(chat) === "companion");
+  const query = normaliseQuery(contactsQuery);
   const meta = $("#contactsMeta");
-  if (meta) meta.textContent = t("contacts.meta", { n: characters.length });
+  if (meta) {
+    meta.textContent = query
+      ? t("contacts.searchMeta", { n: characters.filter((chat) => contactsMatch(chat, query)).length })
+      : t("contacts.meta", { n: characters.length });
+  }
+  const input = $("#contactsSearchInput");
+  if (input && input.value !== contactsQuery) input.value = contactsQuery;
+  const clear = $("#contactsSearchClear");
+  if (clear) clear.hidden = !contactsQuery;
+  $$("#contactsSort [data-contacts-sort]").forEach((button) => {
+    button.setAttribute("aria-pressed", button.dataset.contactsSort === contactsSort ? "true" : "false");
+  });
   if (!characters.length) {
     list.innerHTML = `<div class="chat-list-empty contacts-empty">
       <span class="empty-symbol">${icon("contacts")}</span>
@@ -931,16 +957,37 @@ function renderContacts() {
     </div>`;
     return;
   }
-  const sorted = characters
-    .slice()
-    .sort((a, b) => chatDisplayName(a).localeCompare(chatDisplayName(b), state.settings.uiLang === "en" ? "en" : "zh-CN"));
-  list.innerHTML = `<p class="contacts-group-label">${escapeHtml(t("contacts.all"))}</p>${sorted
+  const filtered = characters.filter((chat) => contactsMatch(chat, query));
+  if (!filtered.length) {
+    list.innerHTML = `<div class="chat-list-empty contacts-empty">
+      <span class="empty-symbol">${icon("search")}</span>
+      <b>${escapeHtml(t("contacts.searchEmptyTitle"))}</b>
+      <p>${escapeHtml(t("contacts.searchEmptyBody"))}</p>
+      <button type="button" class="btn btn-ghost btn-small" data-contacts-clear>${escapeHtml(t("contacts.clearSearch"))}</button>
+    </div>`;
+    return;
+  }
+  const sorted = filtered.slice().sort((a, b) => {
+    if (contactsSort === "name") {
+      return chatDisplayName(a).localeCompare(chatDisplayName(b), state.settings.uiLang === "en" ? "en" : "zh-CN");
+    }
+    return Number(b.updatedAt || 0) - Number(a.updatedAt || 0)
+      || chatDisplayName(a).localeCompare(chatDisplayName(b), state.settings.uiLang === "en" ? "en" : "zh-CN");
+  });
+  const group = query ? t("contacts.searchGroup") : "";
+  list.innerHTML = `${group ? `<p class="contacts-group-label">${escapeHtml(group)}</p>` : ""}${sorted
     .map((chat) => {
       const last = chat.messages?.at(-1);
       const key = state.keys.find((item) => item.id === chat.keyId);
       const lines = chat.messages?.length || 0;
       const memories = chat.memories?.length || 0;
       const displayName = chatDisplayName(chat);
+      const chips = [];
+      if (lines) chips.push(t("contacts.lines", { n: lines }));
+      if (memories) chips.push(t("contacts.memories", { n: memories }));
+      chips.push(last
+        ? `${timeLabel(last.ts)}${key ? ` · ${key.name}` : ""}`
+        : `${t("chat.noMessages")}${key ? ` · ${key.name}` : ""}`);
       return `<button type="button" class="contact-row ${chat.id === state.activeChatId ? "is-active" : ""}" data-chat-open="${escapeHtml(chat.id)}">
         <span class="contact-avatar">${avatarMarkup({ src: chat.avatar, role: "ai", name: displayName, size: 48 })}</span>
         <span class="contact-copy">
@@ -948,19 +995,17 @@ function renderContacts() {
           <small>${escapeHtml(chat.relationship || t("contacts.noRelation"))}</small>
           <span class="contact-line">${escapeHtml(chatPreview(chat))}</span>
           <span class="contact-chips">
-            <i>${escapeHtml(t("contacts.lines", { n: lines }))}</i>
-            <i>${escapeHtml(t("contacts.memories", { n: memories }))}</i>
-            <i>${last ? escapeHtml(timeLabel(last.ts)) : escapeHtml(t("chat.noMessages"))}${key ? ` · ${escapeHtml(key.name)}` : ""}</i>
+            ${chips.map((chip) => `<i>${escapeHtml(chip)}</i>`).join("")}
           </span>
         </span>
         <span class="contact-enter">›</span>
       </button>`;
     })
     .join("")}
-    <button type="button" class="contact-add" data-new-contact>
+    ${query ? "" : `<button type="button" class="contact-add" data-new-contact>
       <span class="contact-add-icon">${icon("plus")}</span>
       <span><b>${escapeHtml(t("contacts.new"))}</b><small>${escapeHtml(t("contacts.newHint"))}</small></span>
-    </button>`;
+    </button>`}`;
 }
 
 function homeRow(action, iconName, title, hint) {
@@ -5505,12 +5550,38 @@ function bindGlobalEvents() {
     if (row) switchChat(row.dataset.chatOpen);
   });
   $("#contactsList")?.addEventListener("click", (event) => {
+    if (event.target.closest("[data-contacts-clear]")) {
+      contactsQuery = "";
+      renderContacts();
+      return;
+    }
     if (event.target.closest("[data-new-contact]")) {
       openNewChatSheet();
       return;
     }
     const row = event.target.closest("[data-chat-open]");
     if (row) switchChat(row.dataset.chatOpen);
+  });
+  $("#contactsSearchInput")?.addEventListener("input", (event) => {
+    contactsQuery = String(event.target.value || "");
+    renderContacts();
+  });
+  $("#contactsSearchInput")?.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      contactsQuery = "";
+      renderContacts();
+    }
+  });
+  $("#contactsSearchClear")?.addEventListener("click", () => {
+    contactsQuery = "";
+    renderContacts();
+    $("#contactsSearchInput")?.focus();
+  });
+  $("#contactsSort")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-contacts-sort]");
+    if (!button) return;
+    contactsSort = button.dataset.contactsSort === "name" ? "name" : "recent";
+    renderContacts();
   });
   $("#homeBody")?.addEventListener("click", (event) => {
     const shuffle = event.target.closest("[data-daily-shuffle]");

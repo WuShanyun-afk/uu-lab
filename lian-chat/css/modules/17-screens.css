@@ -189,6 +189,83 @@
 }
 
 /* ---- 5. 通讯录卡片 ---- */
+.contacts-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 2px 6px;
+}
+.contacts-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.contacts-search .icon {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  color: var(--muted);
+}
+.contacts-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 16px;
+}
+.contacts-search input::-webkit-search-cancel-button {
+  display: none;
+}
+.contacts-search-clear {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--paper-200);
+  color: var(--muted);
+}
+.contacts-search-clear .icon {
+  width: 12px;
+  height: 12px;
+}
+.contacts-sort {
+  display: flex;
+  gap: 16px;
+  padding: 0 2px;
+}
+.contacts-sort button {
+  position: relative;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.contacts-sort button[aria-pressed="true"] {
+  color: var(--text);
+  font-weight: 650;
+}
+.contacts-sort button[aria-pressed="true"]::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+}
 .contacts-list {
   gap: 8px;
 }

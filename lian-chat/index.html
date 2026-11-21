@@ -133,6 +133,19 @@
     </header>
     <div class="chat-list-scroll contacts-scroll">
       <p class="contacts-lead" id="contactsMeta"></p>
+      <div class="contacts-tools">
+        <label class="contacts-search" for="contactsSearchInput">
+          <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+          <input type="search" id="contactsSearchInput" autocomplete="off" enterkeyhint="search" placeholder="按名字、关系或最后一句话找" data-i18n-ph="contacts.searchPh">
+          <button type="button" class="contacts-search-clear" id="contactsSearchClear" hidden aria-label="清空搜索" data-i18n-aria="contacts.clearSearch">
+            <svg class="icon"><use href="#i-close"></use></svg>
+          </button>
+        </label>
+        <div class="contacts-sort" id="contactsSort" role="group" aria-label="排序" data-i18n-aria="contacts.sortLabel">
+          <button type="button" data-contacts-sort="recent" aria-pressed="true" data-i18n="contacts.sortRecent">最近聊过</button>
+          <button type="button" data-contacts-sort="name" aria-pressed="false" data-i18n="contacts.sortName">按名字</button>
+        </div>
+      </div>
       <div class="contacts-list" id="contactsList"></div>
       <p class="chat-list-footnote" data-i18n="contacts.footnote">通讯录里是你在 Lian 认识的所有角色</p>
     </div>
@@ -341,7 +354,7 @@
     /* 资源版本自检：新 HTML 配到旧 JS（Service Worker / HTTP 缓存混用）时，
        自动清掉旧的 Service Worker 与缓存并重载一次；仍然不一致就提示。
        不再用固定延时，否则冷启动慢的机器会误判。 */
-    window.__LIAN_HTML_BUILD__ = "1.9.27";
+    window.__LIAN_HTML_BUILD__ = "1.9.28";
     (() => {
       const started = Date.now();
       const repair = async () => {
@@ -387,6 +400,6 @@
       tick();
     })();
   </script>
-  <script type="module" src="js/app.js?v=1.9.27"></script>
+  <script type="module" src="js/app.js?v=1.9.28"></script>
 </body>
 </html>
