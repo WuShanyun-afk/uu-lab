@@ -387,3 +387,398 @@ body[data-mode="roleplay"] .msg-reply {
   margin-top: 10px;
 }
 
+/* =========================================================
+   7 · 助理页 1.9.20：从「一张白纸」到 AI 工作台
+   ---------------------------------------------------------
+   页头：渐变 AI 徽记 + 「AI 助理」小标 + 独立会话条数
+   内容：AI / 你的小标与时间、欢迎卡与快捷提问、思考指示、流式光标
+   代码：语言 chip + 行数 + 复制；正文认出标题 / 列表 / 引用 / 表格 / 粗斜体
+   ========================================================= */
+
+/* ---- 7.1 页头 ---- */
+.peer-mark,
+.peer-badge,
+.peer-sub {
+  display: none;
+}
+.peer-badge[hidden],
+.peer-sub[hidden] {
+  display: none !important;
+}
+.peer-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+body[data-mode="assistant"] .chat-header {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, #2f6bff 6%, var(--surface)) 0%,
+    color-mix(in srgb, var(--surface) 94%, transparent) 100%
+  );
+  border-bottom-color: color-mix(in srgb, #2f6bff 14%, var(--line));
+}
+body[data-mode="assistant"] .peer {
+  gap: 11px;
+}
+body[data-mode="assistant"] .peer-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 13px;
+  background: linear-gradient(140deg, #2f6bff 0%, #7b5cff 58%, #ff7ac2 120%);
+  color: #fff;
+  box-shadow: 0 6px 16px color-mix(in srgb, #2f6bff 24%, transparent);
+}
+body[data-mode="assistant"] .peer-mark .icon {
+  width: 19px;
+  height: 19px;
+}
+body[data-mode="assistant"] .peer-title {
+  max-width: 100%;
+}
+body[data-mode="assistant"] .peer-badge {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  padding: 1px 6px;
+  border: 1px solid color-mix(in srgb, #2f6bff 26%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, #2f6bff 9%, transparent);
+  color: #2f6bff;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+body[data-mode="assistant"] .peer-sub {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10.5px;
+  color: var(--muted);
+  letter-spacing: 0.01em;
+}
+body[data-mode="assistant"] .peer-status {
+  display: none !important;
+}
+
+/* ---- 7.2 每条消息的小标 + 时间 ---- */
+body[data-mode="assistant"] .as-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 2px 7px;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+body[data-mode="assistant"] .as-meta.is-user {
+  justify-content: flex-end;
+  margin: 0 2px 6px;
+}
+body[data-mode="assistant"] .as-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2f6bff, #7b5cff);
+  box-shadow: 0 0 0 3px color-mix(in srgb, #2f6bff 10%, transparent);
+}
+body[data-mode="assistant"] .as-meta time {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.68;
+}
+body[data-mode="assistant"] .as-meta.is-user .as-who {
+  color: color-mix(in srgb, var(--muted) 85%, var(--text));
+}
+
+/* ---- 7.3 答案操作条 ---- */
+body[data-mode="assistant"] .as-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 9px;
+}
+body[data-mode="assistant"] .as-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1;
+  transition: color var(--t-fast), border-color var(--t-fast), background var(--t-fast);
+}
+body[data-mode="assistant"] .as-action .icon {
+  width: 13px;
+  height: 13px;
+}
+body[data-mode="assistant"] .as-action:active {
+  color: var(--accent-strong, #2f6bff);
+  border-color: color-mix(in srgb, #2f6bff 30%, var(--line));
+  background: color-mix(in srgb, #2f6bff 7%, var(--surface));
+}
+
+/* ---- 7.4 欢迎卡与快捷提问 ---- */
+.as-welcome {
+  margin: 4px 0 14px;
+  padding: 16px 15px 15px;
+  border: 1px solid color-mix(in srgb, #2f6bff 15%, var(--line));
+  border-radius: 18px;
+  background:
+    radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, #7b5cff 10%, transparent), transparent 62%),
+    color-mix(in srgb, #2f6bff 4%, var(--surface));
+}
+.as-welcome-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  margin-bottom: 13px;
+}
+.as-orb {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: linear-gradient(140deg, #2f6bff 0%, #7b5cff 70%);
+  color: #fff;
+  box-shadow: 0 5px 14px color-mix(in srgb, #2f6bff 22%, transparent);
+}
+.as-orb .icon {
+  width: 18px;
+  height: 18px;
+}
+.as-welcome-copy b {
+  display: block;
+  font-size: 15px;
+  line-height: 1.35;
+  color: var(--text);
+}
+.as-welcome-copy small {
+  display: block;
+  margin-top: 3px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.as-prompts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+.as-prompt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 40px;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  text-align: left;
+  transition: border-color var(--t-fast), transform var(--t-fast);
+}
+.as-prompt i {
+  font-style: normal;
+  color: color-mix(in srgb, #2f6bff 80%, var(--muted));
+  opacity: 0.7;
+}
+.as-prompt:active {
+  transform: scale(0.985);
+  border-color: color-mix(in srgb, #2f6bff 30%, var(--line));
+}
+
+/* ---- 7.5 等待与流式 ---- */
+.as-thinking {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 2px 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.as-thinking-dots {
+  display: inline-flex;
+  gap: 3px;
+}
+.as-thinking-dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: color-mix(in srgb, #2f6bff 68%, var(--muted));
+  animation: asBounce 1.05s infinite ease-in-out;
+}
+.as-thinking-dots i:nth-child(2) {
+  animation-delay: 0.14s;
+}
+.as-thinking-dots i:nth-child(3) {
+  animation-delay: 0.28s;
+}
+@keyframes asBounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  30% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+body[data-mode="assistant"] .msg.is-live .bubble::after {
+  content: "";
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-left: 2px;
+  vertical-align: -0.12em;
+  background: #2f6bff;
+  animation: asCaret 1s steps(1) infinite;
+}
+@keyframes asCaret {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* ---- 7.6 代码块 ---- */
+body[data-mode="assistant"] .msg-code {
+  border-radius: 14px;
+  background: color-mix(in srgb, #2f6bff 3%, var(--surface-2));
+  box-shadow: 0 6px 18px color-mix(in srgb, #2f6bff 6%, transparent);
+}
+body[data-mode="assistant"] .msg-code-head {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 6px 10px 6px 12px;
+  background: linear-gradient(180deg, color-mix(in srgb, #2f6bff 6%, var(--surface-2)), transparent);
+}
+body[data-mode="assistant"] .msg-code-lang {
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: color-mix(in srgb, #2f6bff 10%, transparent);
+  color: #2f6bff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+body[data-mode="assistant"] .msg-code-lines {
+  margin-left: auto;
+  margin-right: 4px;
+  font-style: normal;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+body[data-mode="assistant"] .msg-code-copy {
+  padding: 3px 8px;
+  border: 1px solid color-mix(in srgb, #2f6bff 18%, var(--line));
+  border-radius: 7px;
+  background: var(--surface);
+  color: color-mix(in srgb, #2f6bff 82%, var(--text));
+}
+body[data-mode="assistant"] .msg-code pre {
+  padding: 12px 14px;
+}
+
+/* ---- 7.7 正文的富文本 ---- */
+body[data-mode="assistant"] .as-h {
+  margin: 15px 0 8px;
+  font-size: 15px;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+  color: var(--text);
+}
+body[data-mode="assistant"] .as-h::before {
+  content: "";
+  display: inline-block;
+  width: 3px;
+  height: 0.82em;
+  margin-right: 8px;
+  border-radius: 2px;
+  vertical-align: -0.06em;
+  background: linear-gradient(180deg, #2f6bff, #7b5cff);
+}
+body[data-mode="assistant"] .as-h1 {
+  font-size: 17px;
+}
+body[data-mode="assistant"] .as-h2 {
+  font-size: 15.5px;
+}
+body[data-mode="assistant"] .as-h:first-child {
+  margin-top: 2px;
+}
+body[data-mode="assistant"] .as-list {
+  margin: 3px 0 10px;
+  padding-left: 20px;
+}
+body[data-mode="assistant"] .as-list li {
+  margin: 4px 0;
+  line-height: 1.68;
+}
+body[data-mode="assistant"] .as-list li::marker {
+  color: color-mix(in srgb, #2f6bff 65%, var(--muted));
+}
+body[data-mode="assistant"] .as-quote {
+  margin: 9px 0 11px;
+  padding: 7px 12px;
+  border-left: 2px solid color-mix(in srgb, #2f6bff 42%, transparent);
+  border-radius: 0 9px 9px 0;
+  background: color-mix(in srgb, #2f6bff 4%, transparent);
+  color: var(--muted);
+  line-height: 1.7;
+}
+body[data-mode="assistant"] .as-rule {
+  margin: 15px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+body[data-mode="assistant"] .as-table-wrap {
+  margin: 9px 0 12px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+body[data-mode="assistant"] .as-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+body[data-mode="assistant"] .as-table th,
+body[data-mode="assistant"] .as-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
+}
+body[data-mode="assistant"] .as-table th {
+  background: color-mix(in srgb, #2f6bff 5%, var(--surface-2));
+  color: var(--muted);
+  font-weight: 650;
+}
+body[data-mode="assistant"] .as-table tbody tr:nth-child(even) td {
+  background: color-mix(in srgb, #2f6bff 2%, transparent);
+}
+body[data-mode="assistant"] .as-table tr:last-child td {
+  border-bottom: 0;
+}
+body[data-mode="assistant"] .as-line strong {
+  font-weight: 680;
+}
+body[data-mode="assistant"] .as-line em {
+  font-style: italic;
+}
+

@@ -1008,7 +1008,7 @@ function renderHome(force = false) {
         ${homeRow("about", "doc", t("settings.about"), t("settings.aboutHint"))}
       </div>
     </section>
-    <p class="home-foot">${escapeHtml(t("settings.version", { v: "1.9.19" }))} · ${escapeHtml(t("home.localOnly"))}</p>`;
+    <p class="home-foot">${escapeHtml(t("settings.version", { v: "1.9.20" }))} · ${escapeHtml(t("home.localOnly"))}</p>`;
 }
 
 /* =========================================================
@@ -1385,17 +1385,39 @@ function bindModuleScreen() {
     openModuleChat();
   });
   $("#btnModuleChat")?.addEventListener("click", () => openModuleChat());
-  /* assistant pages show code with a copy button */
+  /* 助理页的交互：代码复制、快捷提问、答案复制 / 重新生成；剧本页的「挑剧本」 */
   $("#messageList")?.addEventListener("click", (event) => {
+    const prompt = event.target.closest("[data-as-prompt]");
+    if (prompt) {
+      const input = $("#messageInput");
+      if (!input) return;
+      input.value = t(prompt.dataset.asPrompt);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      autoResizeInput(input);
+      input.focus();
+      const end = input.value.length;
+      try { input.setSelectionRange(end, end); } catch { /* ignore */ }
+      return;
+    }
+    const copy = event.target.closest("[data-as-copy]");
+    if (copy) {
+      const message = (state?.messages || []).find((item) => item.id === copy.dataset.asCopy);
+      if (message) copyText(messagePlainText(message));
+      return;
+    }
+    const regen = event.target.closest("[data-as-regen]");
+    if (regen) {
+      const message = (state?.messages || []).find((item) => item.id === regen.dataset.asRegen);
+      if (message) regenerateFrom(message);
+      return;
+    }
     const button = event.target.closest("[data-copy-code]");
-    if (!button) return;
-    const code = button.closest(".msg-code")?.querySelector("code")?.textContent || "";
-    if (code) copyText(code);
-  });
-  /* roleplay 的空会话：直接去挑一张剧本 */
-  $("#messageList")?.addEventListener("click", (event) => {
-    if (!event.target.closest("[data-open-scenes]")) return;
-    openNewChatSheet();
+    if (button) {
+      const code = button.closest(".msg-code")?.querySelector("code")?.textContent || "";
+      if (code) copyText(code);
+      return;
+    }
+    if (event.target.closest("[data-open-scenes]")) openNewChatSheet();
   });
 }
 
@@ -1503,7 +1525,7 @@ function applyStaticI18n() {
   });
   const input = $("#messageInput");
   if (input) {
-    input.placeholder = t("chat.placeholder");
+    input.placeholder = chatModeOf(state.settings) === "assistant" ? t("chat.placeholderAssistant") : t("chat.placeholder");
     autoResizeInput(input);
   }
 }
@@ -1512,13 +1534,24 @@ function renderHeader() {
   if (!state) return;
   const s = state.settings;
   const name = s.aiName || "Lian";
+  const assistant = chatModeOf(s) === "assistant";
   const aiAvatar = $("#headerAvatar");
   paintAvatar(aiAvatar, { src: s.aiAvatar, role: "ai", name });
   const peerName = $("#peerName");
   if (peerName) peerName.textContent = name;
+  const badge = $("#peerBadge");
+  if (badge) {
+    badge.textContent = t("assistant.label");
+    badge.hidden = !assistant;
+  }
+  const sub = $("#peerSub");
+  if (sub) {
+    sub.textContent = assistant ? t("assistant.sessionSub", { n: state.messages.length }) : "";
+    sub.hidden = !assistant;
+  }
   updatePeerStatus();
   const input = $("#messageInput");
-  if (input) input.placeholder = t("chat.placeholder");
+  if (input) input.placeholder = assistant ? t("chat.placeholderAssistant") : t("chat.placeholder");
   const screen = document.body.dataset.screen;
   if (screen === "chat") document.title = state.onboarded ? `${name} · Lian` : "Lian";
   else if (screen === "contacts") document.title = `${t("tab.contacts")} · Lian`;
@@ -1530,6 +1563,8 @@ function updatePeerStatus() {
   if (!state) return;
   const status = $("#peerStatus");
   const note = $("#peerNote");
+  document.body.dataset.thinking = typingVisible ? "1" : "0";
+  syncAssistantThinking();
   if (status) {
     const typing = typingVisible && state.settings.realism?.typing !== false;
     const blocked = isBlocked();
@@ -1818,34 +1853,235 @@ function renderNarrationMarkup(text) {
   return blocks.join("");
 }
 
-/* 助理页面：正文按段落铺开，代码块单独成块并给一个复制按钮。 */
+/* 助理页面：正文按段落铺开，代码块单独成块并给一个复制按钮。
+ * 1.9.20 起再往前一步：标题 / 列表 / 引用 / 表格 / 粗斜体都认，
+ * 代码块带头部语言、行数和复制，答案下面有「复制 / 重新生成」。 */
+const ASSISTANT_CODE_LANGS = new Set([
+  "js", "jsx", "ts", "tsx", "html", "css", "json", "bash", "sh", "zsh", "shell",
+  "py", "python", "sql", "java", "go", "rust", "rs", "c", "cpp", "csharp", "cs",
+  "yaml", "yml", "md", "markdown", "diff", "text", "txt",
+]);
+
+/** 行内格式：先抽出代码与链接，避免 `*` / `_` 误伤 URL，再还原。 */
+function assistantInline(text) {
+  const codes = [];
+  const links = [];
+  let html = escapeHtml(String(text || ""));
+  html = html.replace(/`([^`\n]{1,200})`/g, (match, code) => {
+    codes.push(code);
+    return `\u0000C${codes.length - 1}\u0000`;
+  });
+  html = html.replace(/(https?:\/\/[^\s<]+[^\s<.,:;!?，。！？；：])/g, (match, url) => {
+    links.push(url);
+    return `\u0000L${links.length - 1}\u0000`;
+  });
+  html = html
+    .replace(/\*\*([^*\n]{1,180})\*\*/g, "<strong>$1</strong>")
+    .replace(/__([^_\n]{1,180})__/g, "<strong>$1</strong>")
+    .replace(/(^|[^*])\*([^*\n]{1,180})\*(?!\*)/g, "$1<em>$2</em>")
+    .replace(/(^|[^_])_([^_\n]{1,180})_(?!_)/g, "$1<em>$2</em>");
+  html = html.replace(/\u0000C(\d+)\u0000/g, (match, index) => `<code class="as-inline">${codes[Number(index)]}</code>`);
+  return html.replace(/\u0000L(\d+)\u0000/g, (match, index) => {
+    const url = links[Number(index)];
+    const safe = url.replaceAll("&amp;", "&");
+    return `<a href="${safe}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+  });
+}
+
+function assistantCodeBlock(lang, body) {
+  const language = String(lang || "code").toLowerCase();
+  const code = String(body || "").replace(/\s+$/, "");
+  const lines = code ? code.split("\n").length : 0;
+  return `<div class="msg-code" data-lang="${escapeHtml(language)}">
+    <div class="msg-code-head">
+      <span class="msg-code-lang">${escapeHtml(language)}</span>
+      <em class="msg-code-lines">${escapeHtml(t("assistant.codeLines", { n: lines }))}</em>
+      <button type="button" class="msg-code-copy" data-copy-code>${escapeHtml(t("common.copy"))}</button>
+    </div>
+    <pre><code>${escapeHtml(code)}</code></pre>
+  </div>`;
+}
+
+function assistantTableMarkup(header, rows) {
+  return `<div class="as-table-wrap"><table class="as-table">
+    <thead><tr>${header.map((cell) => `<th>${assistantInline(cell)}</th>`).join("")}</tr></thead>
+    <tbody>${rows
+      .map((row) => `<tr>${header.map((cell, index) => `<td>${assistantInline(row[index] || "")}</td>`).join("")}</tr>`)
+      .join("")}</tbody>
+  </table></div>`;
+}
+
+/** 段落 / 标题 / 列表 / 引用 / 表格 / 分隔线，逐行解析。 */
+function renderAssistantBlocks(text) {
+  const lines = String(text || "").split("\n");
+  const out = [];
+  let index = 0;
+  const rowCells = (line) => line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
+  while (index < lines.length) {
+    const line = lines[index];
+    if (!line.trim()) {
+      index += 1;
+      continue;
+    }
+    const heading = line.match(/^(#{1,4})\s+(.+)$/);
+    if (heading) {
+      const level = Math.min(4, heading[1].length + 1);
+      out.push(`<h${level} class="as-h as-h${heading[1].length}">${assistantInline(heading[2].trim())}</h${level}>`);
+      index += 1;
+      continue;
+    }
+    if (/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
+      out.push('<hr class="as-rule">');
+      index += 1;
+      continue;
+    }
+    if (line.includes("|") && index + 1 < lines.length && /^\s*\|?[\s:|-]+\|?\s*$/.test(lines[index + 1]) && lines[index + 1].includes("-")) {
+      const header = rowCells(line);
+      const rows = [];
+      index += 2;
+      while (index < lines.length && lines[index].includes("|") && lines[index].trim()) {
+        rows.push(rowCells(lines[index]));
+        index += 1;
+      }
+      out.push(assistantTableMarkup(header, rows));
+      continue;
+    }
+    if (/^\s*[-*•]\s+/.test(line)) {
+      const items = [];
+      while (index < lines.length && /^\s*[-*•]\s+/.test(lines[index])) {
+        items.push(lines[index].replace(/^\s*[-*•]\s+/, ""));
+        index += 1;
+      }
+      out.push(`<ul class="as-list">${items.map((item) => `<li>${assistantInline(item)}</li>`).join("")}</ul>`);
+      continue;
+    }
+    if (/^\s*\d+[.)]\s+/.test(line)) {
+      const items = [];
+      while (index < lines.length && /^\s*\d+[.)]\s+/.test(lines[index])) {
+        items.push(lines[index].replace(/^\s*\d+[.)]\s+/, ""));
+        index += 1;
+      }
+      out.push(`<ol class="as-list">${items.map((item) => `<li>${assistantInline(item)}</li>`).join("")}</ol>`);
+      continue;
+    }
+    if (/^\s*>\s?/.test(line)) {
+      const quote = [];
+      while (index < lines.length && /^\s*>\s?/.test(lines[index])) {
+        quote.push(lines[index].replace(/^\s*>\s?/, ""));
+        index += 1;
+      }
+      out.push(`<blockquote class="as-quote">${quote.map((item) => assistantInline(item)).join("<br>")}</blockquote>`);
+      continue;
+    }
+    out.push(`<p class="as-line">${assistantInline(line.trim())}</p>`);
+    index += 1;
+  }
+  return out.join("");
+}
+
 function renderAssistantMarkup(text) {
   const source = String(text || "");
   const parts = [];
-  const pushText = (chunk) => {
-    for (const line of chunk.split("\n")) {
-      if (!line.trim()) continue;
-      /* inline `code` is common in assistant answers */
-      const html = renderRichText(line).replace(/`([^`\n]{1,80})`/g, '<code class="as-inline">$1</code>');
-      parts.push(`<p class="as-line">${html}</p>`);
-    }
-  };
-  const fence = /```([\w+#.-]*)\r?\n([\s\S]*?)```/g;
+  const fence = /```([\w+#.-]*)[ \t]*\r?\n([\s\S]*?)```/g;
   let index = 0;
   let match = fence.exec(source);
   while (match) {
-    if (match.index > index) pushText(source.slice(index, match.index));
-    const lang = (match[1] || "code").toLowerCase();
-    parts.push(`<div class="msg-code"><div class="msg-code-head"><span>${escapeHtml(lang)}</span><button type="button" class="msg-code-copy" data-copy-code>${escapeHtml(t("common.copy"))}</button></div><pre><code>${escapeHtml(String(match[2]).replace(/\s+$/, ""))}</code></pre></div>`);
+    if (match.index > index) parts.push(renderAssistantBlocks(source.slice(index, match.index)));
+    parts.push(assistantCodeBlock(match[1], match[2]));
     index = match.index + match[0].length;
     match = fence.exec(source);
   }
-  if (index < source.length) pushText(source.slice(index));
-  return parts.join("") || renderRichText(source);
+  if (index < source.length) parts.push(renderAssistantBlocks(source.slice(index)));
+  return parts.join("") || assistantInline(source);
+}
+
+function assistantMetaMarkup(message, role) {
+  const label = role === "user" ? t("assistant.metaUser") : t("assistant.label");
+  const dot = role === "user" ? "" : '<span class="as-dot" aria-hidden="true"></span>';
+  return `<div class="as-meta ${role === "user" ? "is-user" : "is-ai"}">${dot}<span class="as-who">${escapeHtml(label)}</span><time>${escapeHtml(timeLabel(message.ts))}</time></div>`;
+}
+
+function assistantActionsMarkup(message) {
+  return `<div class="as-actions">
+    <button type="button" class="as-action" data-as-copy="${escapeHtml(message.id)}">${icon("doc")}<span>${escapeHtml(t("chat.copy"))}</span></button>
+    <button type="button" class="as-action" data-as-regen="${escapeHtml(message.id)}">${icon("sparkle")}<span>${escapeHtml(t("chat.regenerate"))}</span></button>
+  </div>`;
+}
+
+function assistantWelcomeMarkup() {
+  const prompts = ["code", "write", "error", "notes"];
+  return `<div class="as-welcome" id="asWelcome">
+    <div class="as-welcome-head">
+      <span class="as-orb" aria-hidden="true">${icon("sparkle")}</span>
+      <div class="as-welcome-copy">
+        <b>${escapeHtml(t("assistant.welcomeTitle"))}</b>
+        <small>${escapeHtml(t("assistant.welcomeSub"))}</small>
+      </div>
+    </div>
+    <div class="as-prompts">
+      ${prompts
+        .map(
+          (id) => `<button type="button" class="as-prompt" data-as-prompt="assistant.prompt.${id}Fill">
+            <span>${escapeHtml(t(`assistant.prompt.${id}`))}</span><i aria-hidden="true">→</i>
+          </button>`,
+        )
+        .join("")}
+    </div>
+  </div>`;
+}
+
+function syncAssistantWelcome() {
+  const list = $("#messageList");
+  if (!list || !state) return;
+  const show = chatModeOf(state.settings) === "assistant"
+    && (state.messages || []).length > 0
+    && !(state.messages || []).some((message) => message.role === "user");
+  const existing = list.querySelector("#asWelcome");
+  if (!show) {
+    existing?.remove();
+    return;
+  }
+  if (existing) return;
+  const holder = document.createElement("div");
+  holder.innerHTML = assistantWelcomeMarkup();
+  const node = holder.firstElementChild;
+  const live = list.querySelector(".is-live");
+  if (live) live.before(node);
+  else list.append(node);
+}
+
+function syncAssistantThinking() {
+  const list = $("#messageList");
+  if (!list || !state) return;
+  const show = chatModeOf(state.settings) === "assistant" && typingVisible;
+  const existing = list.querySelector("#asThinking");
+  if (!show) {
+    existing?.remove();
+    return;
+  }
+  if (existing) return;
+  const node = document.createElement("div");
+  node.id = "asThinking";
+  node.className = "as-thinking";
+  node.innerHTML = `<span class="as-thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>${escapeHtml(t("assistant.thinking"))}</span>`;
+  list.append(node);
+  scrollToBottom(false);
+}
+
+/** 助理页专属的装饰：欢迎卡、等待指示、页头会话条数。 */
+function syncAssistantExtras() {
+  if (!state) return;
+  syncAssistantWelcome();
+  syncAssistantThinking();
+  const sub = $("#peerSub");
+  if (sub && chatModeOf(state.settings) === "assistant") {
+    sub.textContent = t("assistant.sessionSub", { n: state.messages.length });
+  }
 }
 
 function messageMarkup(message, isNew, previous = null) {
   const s = state.settings;
+  const mode = chatModeOf(s);
   const role = message.role === "user" ? "user" : "assistant";
   const side = role === "user" ? "user" : "ai";
   const avatar = messageAvatar(message);
@@ -1870,7 +2106,6 @@ function messageMarkup(message, isNew, previous = null) {
   } else {
     let text = String(message.text || "");
     /* roleplay: 旁白、动作、台词各占一行；assistant: 段落 + 代码块 */
-    const mode = chatModeOf(s);
     /* a stray svg block must never be printed as text, whatever the source.
        助理页例外：那里代码就是内容，问「这段 svg 哪错了」时必须看得见源码。 */
     if (mode !== "assistant" && /<svg\b/i.test(text)) text = stripSvgSource(text) || t("chat.drawingBroken");
@@ -1887,6 +2122,14 @@ function messageMarkup(message, isNew, previous = null) {
   }
   if ((message.kind === "image" || message.kind === "file") && String(message.text || "").trim()) {
     content += `<div class="bubble">${renderRichText(String(message.text).trim())}</div>`;
+  }
+  /* 助理页：每题上方一行「AI 助理 · 时间」，回答下方给复制 / 重新生成。
+     流式预览只是临时气泡，不挂这两样。 */
+  if (mode === "assistant" && message.kind !== "report" && message.id !== "live_preview") {
+    content = `${assistantMetaMarkup(message, role)}${content}`;
+    if (role === "assistant" && message.kind === "text" && !message.greeting && String(message.text || "").trim()) {
+      content += assistantActionsMarkup(message);
+    }
   }
 
   const time = message.kind === "sticker" || message.kind === "report" ? "" : `<span class="msg-time">${escapeHtml(timeLabel(message.ts))}</span>`;
@@ -2006,6 +2249,7 @@ function renderChat({ forceScroll = false, animateId = null, force = false } = {
     renderedEnd = 0;
     renderStart = 0;
     renderedSig = "";
+    syncAssistantExtras();
     updateJumpButton();
     return;
   }
@@ -2016,6 +2260,7 @@ function renderChat({ forceScroll = false, animateId = null, force = false } = {
   // Nothing new on screen: keep the DOM untouched (this is the common case
   // after a message was already appended by the caller).
   if (stillSame && renderedEnd === messages.length) {
+    syncAssistantExtras();
     if (forceScroll) scrollToBottom(false);
     updateJumpButton();
     return;
@@ -2026,12 +2271,15 @@ function renderChat({ forceScroll = false, animateId = null, force = false } = {
     list.insertAdjacentHTML("beforeend", chatMessagesMarkup(messages, renderedEnd, { animateId }));
     renderedEnd = messages.length;
     renderedSig = rangeSignature(messages, renderStart, renderedEnd);
+    syncAssistantExtras();
     if (forceScroll || wasNearBottom) scrollToBottom(false);
     updateJumpButton();
     return;
   }
 
   rebuildChatWindow({ forceScroll: forceScroll || wasNearBottom, animateId });
+  syncAssistantExtras();
+  if (forceScroll || wasNearBottom) scrollToBottom(false);
 }
 
 function loadEarlierMessages() {
@@ -2863,6 +3111,8 @@ function bindMessageMenu() {
     "pointerdown",
     (event) => {
       if (event.pointerType === "mouse" && event.button !== 0) return;
+      /* 助理页的答案操作条 / 快捷提问是普通按钮，不要顺手把长按菜单叫出来 */
+      if (event.target.closest(".as-actions, .as-prompts")) return;
       const holder = event.target.closest(".msg[data-message]");
       if (!holder || holder.classList.contains("is-live")) return;
       cancel();

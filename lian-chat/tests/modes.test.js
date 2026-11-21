@@ -158,7 +158,8 @@ test("the module page is the bottom-bar home of the two modes", () => {
 test("roleplay narration is rendered as separate blocks", () => {
   const app = read("js/app.js");
   const start = app.indexOf("function renderNarrationMarkup");
-  const end = app.indexOf("function renderAssistantMarkup");
+  /* 到下一个函数为止；助理页的富文本渲染器在它后面，自己会用 <br> */
+  const end = app.indexOf("function assistantInline");
   assert.ok(start > 0 && end > start, "renderers missing");
   const body = app.slice(start, end);
   for (const cls of ["rp-action", "rp-narration", "rp-line"]) {
@@ -245,4 +246,21 @@ test("module threads have copy in both languages", () => {
   }
   assert.ok(t("module.assistantHello").includes("在"), "the assistant hello should be neutral");
   assert.ok(!/宝贝/.test(t("module.assistantHello")), "the assistant hello must not use pet names");
+});
+
+test("assistant page design copy exists in both languages", () => {
+  const i18n = read("js/i18n.js");
+  const keys = [
+    "chat.placeholderAssistant", "assistant.label", "assistant.sessionSub", "assistant.metaUser",
+    "assistant.thinking", "assistant.codeLines", "assistant.welcomeTitle", "assistant.welcomeSub",
+    "assistant.prompt.code", "assistant.prompt.codeFill", "assistant.prompt.write", "assistant.prompt.writeFill",
+    "assistant.prompt.error", "assistant.prompt.errorFill", "assistant.prompt.notes", "assistant.prompt.notesFill",
+  ];
+  for (const key of keys) {
+    const hits = (i18n.match(new RegExp(`"${key.replaceAll(".", "\\.")}"`, "g")) || []).length;
+    assert.equal(hits, 2, `${key} needs a Chinese and an English line`);
+    assert.notEqual(t(key), key, `${key} is missing from the dictionary`);
+  }
+  assert.ok(t("assistant.sessionSub", { n: 3 }).includes("3"), "the session count placeholder should be filled");
+  assert.ok(t("assistant.codeLines", { n: 7 }).includes("7"), "the line count placeholder should be filled");
 });

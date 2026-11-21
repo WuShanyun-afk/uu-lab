@@ -400,6 +400,65 @@ const sendText = async (text) => {
   check("the chat switched to gets no borrowed memories", (chatB?.memories || []).length === 0, JSON.stringify(chatB?.memories));
 }
 
+/* ================= 9. assistant welcome + quick prompts ================= */
+{
+  const greeting = { ...msg("g1", "assistant", "在。要处理什么？", now - 60000), greeting: true };
+  await boot(wrap(baseSettings("assistant"), [
+    chat("c1", "companion", "沈砚", [msg("m1", "assistant", "老位置。", now - 5000)]),
+    chat("c3", "assistant", "Lian", [greeting], { updatedAt: now }),
+  ], "c3", [greeting], { companion: "c1", roleplay: "", assistant: "c3" }));
+  await openRow("Lian");
+  const welcome = await evaluate(`({
+    present: !!document.querySelector("#asWelcome"),
+    prompts: document.querySelectorAll(".as-prompt").length,
+    greetingActions: document.querySelectorAll('[data-message="g1"] .as-actions').length,
+  })`);
+  check("the idle assistant page shows the welcome card", welcome.present && welcome.prompts === 4, JSON.stringify(welcome));
+  check("the greeting has no copy/regenerate actions", welcome.greetingActions === 0, String(welcome.greetingActions));
+  await evaluate(`document.querySelector(".as-prompt")?.click()`);
+  await sleep(160);
+  const filled = await evaluate(`document.querySelector("#messageInput").value`);
+  check("a quick prompt fills the composer", String(filled).startsWith("帮我解释这段代码"), filled.slice(0, 20));
+  await send("Emulation.setDeviceMetricsOverride", {
+    width: 320, height: 568, deviceScaleFactor: 2, mobile: true, screenWidth: 320, screenHeight: 568,
+  });
+  await sleep(360);
+  const narrow = await evaluate(`(() => {
+    const header = document.querySelector(".chat-header");
+    const heights = (selector) => [...document.querySelectorAll(selector)].map((node) => node.getBoundingClientRect().height);
+    return {
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      headerOverflow: header ? header.scrollWidth - header.clientWidth : 0,
+      actionMin: Math.min(99, ...heights(".as-action")),
+      promptMin: Math.min(99, ...heights(".as-prompt")),
+    };
+  })()`);
+  check("the assistant header fits a 320px screen", narrow.overflow <= 0 && narrow.headerOverflow <= 0, JSON.stringify(narrow));
+  check("assistant quick prompts stay tappable", narrow.promptMin >= 24, JSON.stringify(narrow));
+  await send("Emulation.setDeviceMetricsOverride", {
+    width: 390, height: 844, deviceScaleFactor: 2, mobile: true, screenWidth: 390, screenHeight: 844,
+  });
+  await sleep(260);
+  await mockReply("先看边界条件。", 900);
+  await evaluate(`(() => {
+    const input = document.querySelector("#messageInput");
+    input.value = "解释一下";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    document.querySelector("#btnSend").click();
+  })()`);
+  await sleep(2100);
+  const after = await evaluate(`({
+    welcome: !!document.querySelector("#asWelcome"),
+    actions: document.querySelectorAll(".as-actions").length,
+    meta: document.querySelectorAll(".as-meta").length,
+    thinking: !!document.querySelector("#asThinking"),
+  })`);
+  check("the welcome card disappears after the first question", after.welcome === false, String(after.welcome));
+  check("the answer offers copy / regenerate", after.actions >= 1, String(after.actions));
+  check("every assistant-page message has a meta line", after.meta >= 3, String(after.meta));
+  check("the thinking indicator is gone after the reply", after.thinking === false, String(after.thinking));
+}
+
 check("no console errors", consoleErrors.length === 0, consoleErrors.slice(0, 2).join(" | "));
 
 const failed = results.filter((item) => !item.ok);

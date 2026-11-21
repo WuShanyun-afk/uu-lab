@@ -609,7 +609,7 @@ ${switchRow(t("settings.optDrawings"), t("settings.optDrawingsHint"), Boolean(op
       <div class="danger-row-copy"><b>${escapeHtml(t("settings.clearAll"))}</b><small>${escapeHtml(t("settings.clearAllHint"))}</small></div>
       <button type="button" class="btn btn-danger" id="clearAll">${escapeHtml(t("common.delete"))}</button>
     </div>
-    <p class="token-line">${escapeHtml(t("settings.version", { v: "1.9.19" }))}</p>`;
+    <p class="token-line">${escapeHtml(t("settings.version", { v: "1.9.20" }))}</p>`;
 
   const aboutBody = `
     <div class="about-box">
