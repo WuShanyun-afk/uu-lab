@@ -788,3 +788,33 @@ body[data-mode="assistant"] .as-line em {
   border-color: color-mix(in srgb, #2f6bff 30%, var(--line));
 }
 
+/* ---- 7.10 回答末尾的「⋯」：轻到几乎看不见，但不用长按也能点 ---- */
+.as-more-row {
+  display: flex;
+  align-self: stretch;
+  justify-content: flex-end;
+  margin-top: 2px;
+}
+.as-more {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  opacity: 0.5;
+  transition: opacity var(--t-fast), color var(--t-fast);
+}
+.as-more .icon {
+  width: 15px;
+  height: 15px;
+}
+.as-more:active {
+  opacity: 1;
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+}
+

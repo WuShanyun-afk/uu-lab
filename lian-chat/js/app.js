@@ -1448,8 +1448,13 @@ function bindModuleScreen() {
     openModuleChat();
   });
   $("#btnModuleChat")?.addEventListener("click", () => openModuleChat());
-  /* 消息列表里只剩代码复制和剧本页的「挑剧本」；助理页的复制 / 重新生成走长按菜单。 */
+  /* 消息列表里只剩代码复制、助理回答的「⋯」和剧本页的「挑剧本」。 */
   $("#messageList")?.addEventListener("click", (event) => {
+    const more = event.target.closest("[data-msg-menu]");
+    if (more) {
+      openMessageMenu(more.dataset.msgMenu, more);
+      return;
+    }
     const button = event.target.closest("[data-copy-code]");
     if (button) {
       const code = button.closest(".msg-code")?.querySelector("code")?.textContent || "";
@@ -2185,6 +2190,10 @@ function messageMarkup(message, isNew, previous = null) {
     const reasoning = message.kind === "text" ? assistantReasoningMarkup(message) : "";
     const sources = message.kind === "text" ? assistantSourcesMarkup(message) : "";
     content = `${reasoning}${content}${sources}`;
+    /* 回答末尾一枚很轻的「⋯」：不用长按也能找到复制 / 重新生成。 */
+    if (role === "assistant" && message.kind === "text" && String(message.text || "").trim()) {
+      content += `<div class="as-more-row"><button type="button" class="as-more" data-msg-menu="${escapeHtml(message.id)}" aria-label="${escapeHtml(t("common.more"))}">${icon("more")}</button></div>`;
+    }
   }
 
   const time = message.kind === "sticker" || message.kind === "report" ? "" : `<span class="msg-time">${escapeHtml(timeLabel(message.ts))}</span>`;
@@ -3174,7 +3183,7 @@ function bindMessageMenu() {
     (event) => {
       if (event.pointerType === "mouse" && event.button !== 0) return;
       /* 助理页的答案操作条 / 快捷提问 / 思考面板 / 来源是普通控件，不要顺手把长按菜单叫出来 */
-      if (event.target.closest(".as-think, .as-sources")) return;
+      if (event.target.closest(".as-think, .as-sources, [data-msg-menu]")) return;
       const holder = event.target.closest(".msg[data-message]");
       if (!holder || holder.classList.contains("is-live")) return;
       cancel();

@@ -483,6 +483,21 @@ const sendText = async (text) => {
   await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
   await send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
   await sleep(200);
+  const more = await evaluate(`({
+    present: !!document.querySelector(".as-more[data-msg-menu]"),
+    label: document.querySelector(".as-more")?.getAttribute("aria-label") || "",
+  })`);
+  check("every answer carries one quiet more button", more.present && more.label === "更多", JSON.stringify(more));
+  await evaluate(`document.querySelector(".as-more")?.click()`);
+  await sleep(420);
+  const moreMenu = await evaluate(`({
+    copy: !!document.querySelector(".msg-menu [data-menu='copy']"),
+    regen: !!document.querySelector(".msg-menu [data-menu='regen']"),
+  })`);
+  check("the more button opens the same actions", moreMenu.copy && moreMenu.regen, JSON.stringify(moreMenu));
+  await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+  await send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+  await sleep(200);
 }
 
 /* ================= 10. MiMo: provider name, web search + deep thinking ================= */
