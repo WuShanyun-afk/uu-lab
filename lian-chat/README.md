@@ -2,7 +2,7 @@
 
 一个 **纯前端** 的 LINE 风格手机聊天应用。没有账号、没有后端、没有模型名；填入自己的 API Key 就能用。聊天、记忆、头像、表情和密钥都只留在当前设备。
 
-> 当前版本：**1.9.20**  
+> 当前版本：**1.9.21**  
 > 形态：PWA / 静态网页 / Android APK  
 > 默认接口：MiMo（小米）OpenAI 兼容接口  
 > 重来：长按「重新生成」只重做那一条，后面的消息保留（画面消息是「重画一张」）
@@ -10,7 +10,8 @@
 > 表情：内置 69 张两套「menhera君 44 + menhera酱 25」，支持导入自己的图片；AI 表情可选自由风格、颜文字猫、软萌动物或 emoji 梗图
 > 外观：16 套配色 + 8 种聊天页版式（经典 LINE / 讯息 iMessage / 信笺 / 泡泡 / 素页 / 手账 / 时间轴 / 漫画），改的是头部、气泡、输入栏的结构
 > 模式：陪伴 / 角色扮演（8 张剧本卡 + `*动作*` 渲染）/ 纯 AI 助理（自带「助理」主题，不出贴纸）；三类对话各有自己的会话，互不串消息
-> 助理页：AI 工作台——渐变徽记与独立会话条数、欢迎卡与快捷提问、标题 / 列表 / 引用 / 表格、代码块（语言 + 行数 + 复制）、复制 / 重新生成、思考中的三点与流式光标
+> 助理页：AI 工作台——服务商名（MiMo / OpenAI / DeepSeek）、渐变徽记、欢迎卡与快捷提问、标题 / 列表 / 引用 / 表格、代码块（语言 + 行数 + 复制）、复制 / 重新生成、思考中的三点与流式光标
+> 助理能力：输入栏上方可切「联网」与「深度思考」（MiMo 原生）；回答里可展开「思考过程」，联网结果带「联网来源」
 > 工具盘：「+」在输入栏里张开一层盘，表情分成「最近 + 笑脸 / 撒娇 / 心意 / 手势 / 日常」六组，点过的会自动排到「最近」
 > 其他页面：聊天列表有问候与「全部 / 未读」筛选，主页每天一道「今日一问」，通讯录把句数和记忆数摊出来；强调色改成输入色号
 
@@ -23,6 +24,61 @@
 <img src="docs/preview-snow.png" width="260" alt="雪站沉浸主题">
 <img src="docs/preview-studio.png" width="260" alt="AI 表情工坊">
 <img src="docs/preview-drawing.png" width="260" alt="TA 现场画的画面">
+
+---
+
+## 1.9.21 助理页二轮：图标、服务商名、联网与深度思考（2026-11-21）
+
+这一版接着 1.9.20 的「AI 工作台」往下做，三件事：
+
+<img src="docs/assistant-welcome.png" width="250" alt="助理页：线稿徽记、服务商名、联网 / 深度思考开关">
+<img src="docs/assistant-reasoning.png" width="250" alt="展开的思考过程">
+<img src="docs/assistant-answer.png" width="250" alt="联网来源与回答操作">
+<img src="docs/assistant-thinking.png" width="250" alt="正在深度思考">
+
+### 4.1 图标：从彩色渐变改成线稿徽记
+
+- 页头的 38px 三色渐变方块换成 36px 的淡蓝玻璃砖：`radial-gradient` 极浅蓝、1px 细边、白色内高光、极轻投影；
+- 里面的四角星从「实心」改成「描边」（`fill:none; stroke:currentColor; 1.45`），不再有廉价的高饱和渐变和彩色投影；
+- 欢迎卡的小图标同步换成同一套，不再出现两个风格。
+
+### 4.2 助理名字 = 服务商名
+
+- 页头、聊天列表、通讯录里的助理会话都显示服务商短名：`MiMo` / `OpenAI` / `DeepSeek` / `自定义`，由会话绑定的 Key 决定；
+- 不再显示陪伴角色的名字（「沈砚 · AI 助理」的混搭没有了）；
+- 助理 prompt 也改成「你是对方的私人 AI 助理，当前服务是 MiMo」，不再自称恋人的名字；
+- 设置里的人设提示补了一句：页头名字显示服务商，关系和人设只影响陪伴与剧本。
+
+### 4.3 输入栏上方的两个能力开关
+
+- 助理模式下，输入框上方出现「联网」「深度思考」两枚胶囊开关；
+- 开关状态存进 `settings.assistant`，切会话 / 重启都保留；
+- 非 MiMo 服务商：开关可见但禁用，点一下提示「目前只有 MiMo 支持」；
+- 深度思考开启时，等待提示从「正在整理答案…」变成「正在深度思考…」；联网开启时是「正在联网查找…」。
+
+### 4.4 深度思考（MiMo）
+
+- 请求体带 `thinking: { type: "enabled" | "disabled" }`——MiMo v2.6 默认开启，所以关掉时必须显式 `disabled`；
+- 开启时 `max_tokens` 提到 4096（reasoning tokens 也算完成额度）；
+- 接口返回的 `reasoning_content` 存在回答消息上，界面渲染成可折叠的「思考过程 · N 字」；
+- 流式响应同样收集 `reasoning_content`，只是最后一次性放进折叠面板；
+- 不是 MiMo 但用了自带 reasoning 的模型（例如 `deepseek-reasoner`）时，只要返回 `reasoning_content` 也会显示面板。
+
+### 4.5 联网搜索（MiMo）
+
+- 请求体带 MiMo 原生工具：`tools: [{ type: "web_search", max_keyword: 3, force_search: true, limit: 1 }]` + `tool_choice: "auto"`；
+- 回答里的 `annotations`（`url_citation`）被收成 `message.sources`，界面在回答下方渲染「联网来源」小胶囊（站点名，点开新窗口）；
+- 不加载远端 favicon，避免隐私和 CSP 问题；
+- 需要先在 MiMo 控制台开通「联网服务插件」；设置里的人设卡有这句提示；
+- 目前只接了 MiMo；OpenAI / DeepSeek / 自定义服务商还不会联网。
+
+### 4.6 验证
+
+| 项 | 结果 |
+|---|---|
+| 单测 | **159 / 159**（新增：服务商名 prompt、assistant 开关清洗、文案中英齐全） |
+| 新回归 | `scripts/thread-check.mjs` **48 / 48**（新增：服务商标题、开关禁用/按下、MiMo 请求体 `thinking` + `web_search`、4096 额度、思考面板、来源链接） |
+| 其余检查 | mode 61、audit 262、boot 14、leak 19、tray 21、drawing 14、regen 10、stream 8、sticker 20、ux 14 全绿 |
 
 ---
 

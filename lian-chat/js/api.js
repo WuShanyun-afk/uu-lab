@@ -129,6 +129,36 @@ function extractContent(message) {  const content = message?.content;
   return "";
 }
 
+/* 深度思考：MiMo / DeepSeek 都把思考过程放在 reasoning_content；
+   有些网关用 reasoning。两者都收。 */
+function extractReasoning(message) {
+  const value = message?.reasoning_content ?? message?.reasoning ?? "";
+  return typeof value === "string" ? value.trim() : "";
+}
+
+/* 联网来源：MiMo 的 web_search 把引用放在 message.annotations（url_citation）。 */
+export function extractSources(message) {
+  const raw = message?.annotations;
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const item of raw) {
+    if (!item || item.type !== "url_citation" || !item.url) continue;
+    const url = String(item.url);
+    if (seen.has(url)) continue;
+    seen.add(url);
+    out.push({
+      url,
+      title: String(item.title || "").slice(0, 300),
+      siteName: String(item.site_name || "").slice(0, 60),
+      summary: String(item.summary || "").slice(0, 500),
+      publishTime: String(item.publish_time || ""),
+    });
+    if (out.length >= 8) break;
+  }
+  return out;
+}
+
 /* Set once a provider proves it cannot stream, so we stop paying for a failed
    SSE attempt on every message. Reset on reload. */
 let streamUnavailable = false;
@@ -143,6 +173,7 @@ export async function chatCompletion({
   signal,
   retryJson = true,
   onDelta = null,
+  extraBody = null,
 } = {}) {
   const body = {
     model: model || settings.model,
@@ -153,6 +184,7 @@ export async function chatCompletion({
     stream: false,
   };
   if (json) body.response_format = { type: "json_object" };
+  if (extraBody && typeof extraBody === "object") Object.assign(body, extraBody);
   if (typeof onDelta === "function" && !json && !streamUnavailable) {
     const streamed = await streamChatCompletion({
       settings,
@@ -162,6 +194,7 @@ export async function chatCompletion({
       temperature,
       signal,
       onDelta,
+      extraBody,
     }).catch((error) => {
       // Any failure before/while streaming falls back to a normal request so a
       // provider without SSE support still works, just without the live text.
@@ -185,12 +218,14 @@ export async function chatCompletion({
       content,
       usage: normaliseUsage(payload?.usage),
       finish: choice?.finish_reason || "",
+      reasoning: extractReasoning(choice?.message),
+      sources: extractSources(choice?.message),
       raw: payload,
     };
   } catch (error) {
     const canRetry = json && retryJson && error instanceof ApiError && [400, 422].includes(error.status);
     if (canRetry) {
-      return chatCompletion({ settings, messages, model, maxTokens, temperature, json: false, retryJson: false, signal });
+      return chatCompletion({ settings, messages, model, maxTokens, temperature, json: false, retryJson: false, signal, extraBody });
     }
     throw error;
   }
@@ -206,7 +241,7 @@ function estimateTokens(text) {
  * OpenAI-compatible SSE streaming. Calls onDelta(fullText, delta) on every
  * chunk and resolves with the same shape as chatCompletion.
  */
-async function streamChatCompletion({ settings, messages, model, maxTokens, temperature, signal, onDelta }) {
+async function streamChatCompletion({ settings, messages, model, maxTokens, temperature, signal, onDelta, extraBody = null }) {
   const base = normaliseBaseUrl(settings.baseUrl);
   if (!settings.apiKey) throw new ApiError("Missing API key", { code: "missing_key" });
   if (!base) throw new ApiError("Missing Base URL", { code: "missing_base" });
@@ -219,8 +254,16 @@ async function streamChatCompletion({ settings, messages, model, maxTokens, temp
     stream: true,
     stream_options: { include_usage: true },
   };
+  if (extraBody && typeof extraBody === "object") Object.assign(body, extraBody);
   const timed = timeoutSignal(150000, signal);
   let content = "";
+  let reasoning = "";
+  const sourceMap = new Map();
+  const collectSources = (node) => {
+    for (const source of extractSources(node)) {
+      if (!sourceMap.has(source.url)) sourceMap.set(source.url, source);
+    }
+  };
   try {
     const response = await fetch(`${base}/chat/completions`, {
       method: "POST",
@@ -275,6 +318,11 @@ async function streamChatCompletion({ settings, messages, model, maxTokens, temp
           content += delta;
           onDelta(content, delta);
         }
+        const think = choice?.delta?.reasoning_content ?? choice?.delta?.reasoning;
+        if (typeof think === "string" && think) reasoning += think;
+        collectSources(payload);
+        collectSources(choice?.delta);
+        collectSources(choice?.message);
         if (choice?.finish_reason) finish = choice.finish_reason;
       }
     }
@@ -286,6 +334,8 @@ async function streamChatCompletion({ settings, messages, model, maxTokens, temp
       usage: normalised.total ? normalised : { prompt: 0, completion: estimateTokens(text), total: estimateTokens(text), estimated: true },
       finish,
       streamed: true,
+      reasoning: reasoning.trim(),
+      sources: [...sourceMap.values()],
     };
   } catch (error) {
     if (error instanceof ApiError) {
@@ -297,6 +347,8 @@ async function streamChatCompletion({ settings, messages, model, maxTokens, temp
           usage: { prompt: 0, completion: estimateTokens(text), total: estimateTokens(text), estimated: true },
           finish: "partial",
           streamed: true,
+          reasoning: reasoning.trim(),
+          sources: [...sourceMap.values()],
         };
       }
       throw error;
@@ -310,6 +362,8 @@ async function streamChatCompletion({ settings, messages, model, maxTokens, temp
         usage: { prompt: 0, completion: estimateTokens(text), total: estimateTokens(text), estimated: true },
         finish: "partial",
         streamed: true,
+        reasoning: reasoning.trim(),
+        sources: [...sourceMap.values()],
       };
     }
     if (!content.trim()) throw new ApiError("Network or CORS failure", { code: "network", detail: error?.message || String(error) });
@@ -319,6 +373,8 @@ async function streamChatCompletion({ settings, messages, model, maxTokens, temp
       usage: { prompt: 0, completion: estimateTokens(text), total: estimateTokens(text), estimated: true },
       finish: "partial",
       streamed: true,
+      reasoning: reasoning.trim(),
+      sources: [...sourceMap.values()],
     };
   } finally {
     timed.clear();

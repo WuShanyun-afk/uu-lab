@@ -96,7 +96,7 @@ const evaluate = async (expression) => {
 const now = Date.now();
 const msg = (id, role, text, ts) => ({ id, role, kind: "text", text, ts });
 const settings = {
-  provider: "custom", apiKey: "seed", baseUrl: "http://127.0.0.1:1/v1", model: "m",
+  provider: "mimo", apiKey: "seed", baseUrl: "https://api.xiaomimimo.com/v1", model: "mimo-v2.6-flash",
   aiName: "沈砚", userName: "小满", relationship: "客栈老板与常来的刀客", persona: "话少。",
   theme: "assistant", accent: "#2F6BFF", layout: "line", mode: "assistant",
   realism: { enabled: false }, optimize: { streaming: false, quotes: false, segments: false },
@@ -108,7 +108,7 @@ const chat = (messages) => ({
   createdAt: now - 86400000, updatedAt: now,
 });
 const wrap = (messages) => ({
-  onboarded: true, settings, chats: [chat(messages)], keys: [{ id: "k1", name: "Mock", provider: "custom", apiKey: "seed", baseUrl: "http://127.0.0.1:1/v1", model: "m", createdAt: now }],
+  onboarded: true, settings, chats: [chat(messages)], keys: [{ id: "k1", name: "MiMo", provider: "mimo", apiKey: "seed", baseUrl: "https://api.xiaomimimo.com/v1", model: "mimo-v2.6-flash", createdAt: now }],
   activeChatId: "c3", activeKeyId: "k1", activeByMode: { companion: "", roleplay: "", assistant: "c3" },
   messages, memories: [], memoryMeta: { lastUserCount: 0, lastAttemptAt: 0, lastAt: 0 },
 });
@@ -131,10 +131,7 @@ async function boot(state) {
   })()`);
   await send("Page.reload");
   await waitBoot();
-  await evaluate(`(() => {
-    const row = [...document.querySelectorAll("[data-chat-open]")].find((node) => node.textContent.includes("沈砚"));
-    row?.click();
-  })()`);
+  await evaluate(`document.querySelector('[data-chat-open="c3"]')?.click()`);
   await sleep(700);
 }
 async function shot(name) {
@@ -144,7 +141,7 @@ async function shot(name) {
 }
 
 /* ---- 1. welcome (greeting only) ---- */
-await boot(wrap([msg("g1", "assistant", "在。要处理什么？", now - 60000)]));
+await boot(wrap([{ ...msg("g1", "assistant", "在。要处理什么？", now - 60000), greeting: true }]));
 await shot("assistant-welcome.png");
 console.log("welcome:", await evaluate(`({ welcome: !!document.querySelector("#asWelcome"), prompts: document.querySelectorAll(".as-prompt").length, sub: document.querySelector("#peerSub")?.textContent })`));
 
@@ -178,7 +175,11 @@ const answer = [
 ].join("\n");
 const rich = [
   msg("u1", "user", "帮我看看这个防抖，顺便列一下问题和改法", now - 200000),
-  msg("a1", "assistant", answer, now - 190000),
+  {
+    ...msg("a1", "assistant", answer, now - 190000),
+    reasoning: "先判断这段防抖的问题：定时器没清理、wait 没有默认值。再给出改法和一张对照表，最后提醒卸载时 clearTimeout。",
+    sources: [{ url: "https://developer.mozilla.org/zh-CN/docs/Web/API/setTimeout", title: "setTimeout - MDN", siteName: "MDN" }],
+  },
   msg("u2", "user", "返回 cancel 那版也给我看看", now - 60000),
   msg("a2", "assistant", "可以，在 `debounce` 里暴露一个 `cancel` 就行：\n\n```js\nexport function debounce(fn, wait = 300) {\n  let timer = 0;\n  const run = (...args) => {\n    clearTimeout(timer);\n    timer = setTimeout(() => fn(...args), wait);\n  };\n  run.cancel = () => clearTimeout(timer);\n  return run;\n}\n```", now - 50000),
 ];
@@ -186,6 +187,13 @@ await boot(wrap(rich));
 await evaluate(`(() => { const scroll = document.querySelector("#chatScroll"); if (scroll) scroll.scrollTop = 0; })()`);
 await sleep(320);
 await shot("assistant-answer-top.png");
+await evaluate(`(() => {
+  const think = document.querySelector(".as-think");
+  if (think) think.open = true;
+  think?.scrollIntoView({ block: "start" });
+})()`);
+await sleep(320);
+await shot("assistant-reasoning.png");
 await evaluate(`(() => { const scroll = document.querySelector("#chatScroll"); if (scroll) scroll.scrollTop = scroll.scrollHeight; })()`);
 await sleep(320);
 await shot("assistant-answer.png");
@@ -197,8 +205,10 @@ console.log("inline:", await evaluate(`(() => {
   return { bg: cs.backgroundColor, color: cs.color, accent: getComputedStyle(document.body).getPropertyValue("--accent").trim(), theme: document.body.dataset.theme };
 })()`));
 
-/* ---- 3. waiting for an answer ---- */
-await boot(wrap([msg("g1", "assistant", "在。要处理什么？", now - 60000)]));
+/* ---- 3. waiting for an answer (deep thinking on) ---- */
+await boot(wrap([{ ...msg("g1", "assistant", "在。要处理什么？", now - 60000), greeting: true }]));
+await evaluate(`document.querySelector('[data-assistant-tool="thinking"]')?.click()`);
+await sleep(200);
 await evaluate(`(() => {
   const real = window.fetch;
   window.fetch = (url, opts) => {

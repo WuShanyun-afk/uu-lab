@@ -259,6 +259,11 @@ export function normaliseState(raw) {
   /* 1.9.19：自定义色号（theme=custom）也要能原样带回来。 */
   merged.settings.modeAccent =
     typeof merged.settings.modeAccent === "string" ? merged.settings.modeAccent.slice(0, 30) : "";
+  /* 1.9.21：助理页的联网 / 深度思考开关 */
+  merged.settings.assistant = {
+    web: Boolean(merged.settings.assistant?.web),
+    thinking: Boolean(merged.settings.assistant?.thinking),
+  };
   merged.settings.layout = ["line", "imessage", "letter", "bubble", "plain", "journal", "timeline", "comic"].includes(merged.settings.layout)
     ? merged.settings.layout
     : "line";
@@ -306,6 +311,11 @@ function trimForFallback(state) {
       delete m.file.dataUrl;
       m.file.missing = true;
     }
+    /* 思考过程可能很长：降级存储只留开头，答案本身不丢。 */
+    if (typeof m.reasoning === "string" && m.reasoning.length > 4000) {
+      m.reasoning = `${m.reasoning.slice(0, 4000)}…`;
+    }
+    if (Array.isArray(m.sources) && m.sources.length > 5) m.sources = m.sources.slice(0, 5);
     return m;
   });
   clone.messages = trim(clone.messages);

@@ -55,3 +55,10 @@ test("normaliseState keeps the pre-assistant theme and accent", () => {
   const bad = normaliseState({ settings: { modeAccent: 42 } });
   assert.equal(bad.settings.modeAccent, "");
 });
+
+test("normaliseState keeps the assistant capability switches", () => {
+  const state = normaliseState({ settings: { assistant: { web: true, thinking: 1 } } });
+  assert.equal(state.settings.assistant.web, true);
+  assert.equal(state.settings.assistant.thinking, true);
+  assert.deepEqual(normaliseState({}).settings.assistant, { web: false, thinking: false });
+});

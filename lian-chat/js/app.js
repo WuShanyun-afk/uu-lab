@@ -263,6 +263,28 @@ function providerShort(provider) {
   return PROVIDERS[provider]?.short || PROVIDERS[provider]?.label || "Key";
 }
 
+/** 一条会话用哪家服务商：由会话绑定的 key 决定，老数据回落到当前设置。 */
+function providerOfChat(chat) {
+  const key = (state?.keys || []).find((item) => item.id === (chat?.keyId || state.activeKeyId));
+  return key?.provider || state?.settings?.provider || "custom";
+}
+
+/** 助理页显示服务商名（MiMo / OpenAI / DeepSeek / 自定义）；其它模块用会话自己的名字。 */
+function chatDisplayName(chat) {
+  if (modeOfChat(chat) === "assistant") return providerShort(providerOfChat(chat));
+  return chat?.name || "Lian";
+}
+
+/** 联网 / 深度思考目前由 MiMo 的原生插件提供。 */
+function isMimoService(settings = state?.settings) {
+  return Boolean(settings) && (settings.provider === "mimo" || /xiaomimimo\.com/i.test(settings.baseUrl || ""));
+}
+
+function assistantCapabilities(settings = state?.settings) {
+  const mimo = isMimoService(settings);
+  return { web: mimo, thinking: mimo };
+}
+
 function keyFromSettings() {
   const s = state.settings;
   return {
@@ -664,7 +686,7 @@ function renderChatList() {
   renderListFilters();
   const query = normaliseQuery(listQuery);
   const matched = query
-    ? state.chats.filter((chat) => chatHaystack(chat, chatPreview(chat), chat.messages).toLowerCase().includes(query))
+    ? state.chats.filter((chat) => `${chatHaystack(chat, chatPreview(chat), chat.messages)} ${chatDisplayName(chat)}`.toLowerCase().includes(query))
     : state.chats;
   const visible = listFilter === "unread" ? matched.filter((chat) => Number(chat.unread) > 0) : matched;
   if (!state.chats.length) {
@@ -690,11 +712,12 @@ function renderChatList() {
     .map((chat) => {
       const key = state.keys.find((item) => item.id === chat.keyId);
       const unread = Number(chat.unread) || 0;
+      const displayName = chatDisplayName(chat);
       const preview = query ? matchSnippet(chat.messages, query) || chatPreview(chat) : chatPreview(chat);
       return `<button type="button" class="chat-row ${chat.id === state.activeChatId ? "is-active" : ""} ${unread ? "has-unread" : ""}" data-chat-open="${escapeHtml(chat.id)}">
-        <span class="chat-row-avatar">${avatarMarkup({ src: chat.avatar, role: "ai", name: chat.name, size: 46 })}</span>
+        <span class="chat-row-avatar">${avatarMarkup({ src: chat.avatar, role: "ai", name: displayName, size: 46 })}</span>
         <span class="chat-row-copy">
-          <span class="chat-row-top"><b>${searchMarkup(chat.name || "Lian", query)}</b>${modeBadgeMarkup(chat)}${unread ? `<i class="chat-unread">${unread > 99 ? "99+" : unread}</i>` : ""}<time>${escapeHtml(timeLabel(chat.updatedAt || chat.createdAt))}</time></span>
+          <span class="chat-row-top"><b>${searchMarkup(displayName, query)}</b>${modeBadgeMarkup(chat)}${unread ? `<i class="chat-unread">${unread > 99 ? "99+" : unread}</i>` : ""}<time>${escapeHtml(timeLabel(chat.updatedAt || chat.createdAt))}</time></span>
           <small>${searchMarkup(preview, query)}</small>
           <span class="chat-row-foot">${escapeHtml(chat.relationship || t("chatList.noRelation"))}${key ? ` · ${escapeHtml(key.name)}` : ""}</span>
         </span>
@@ -859,17 +882,18 @@ function renderContacts() {
   }
   const sorted = state.chats
     .slice()
-    .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), state.settings.uiLang === "en" ? "en" : "zh-CN"));
+    .sort((a, b) => chatDisplayName(a).localeCompare(chatDisplayName(b), state.settings.uiLang === "en" ? "en" : "zh-CN"));
   list.innerHTML = `<p class="contacts-group-label">${escapeHtml(t("contacts.all"))}</p>${sorted
     .map((chat) => {
       const last = chat.messages?.at(-1);
       const key = state.keys.find((item) => item.id === chat.keyId);
       const lines = chat.messages?.length || 0;
       const memories = chat.memories?.length || 0;
+      const displayName = chatDisplayName(chat);
       return `<button type="button" class="contact-row ${chat.id === state.activeChatId ? "is-active" : ""}" data-chat-open="${escapeHtml(chat.id)}">
-        <span class="contact-avatar">${avatarMarkup({ src: chat.avatar, role: "ai", name: chat.name, size: 48 })}</span>
+        <span class="contact-avatar">${avatarMarkup({ src: chat.avatar, role: "ai", name: displayName, size: 48 })}</span>
         <span class="contact-copy">
-          <span class="contact-top"><b>${escapeHtml(chat.name || "Lian")}</b>${modeBadgeMarkup(chat)}${chat.id === state.activeChatId ? `<i class="contact-now">${escapeHtml(t("contacts.current"))}</i>` : ""}</span>
+          <span class="contact-top"><b>${escapeHtml(displayName)}</b>${modeBadgeMarkup(chat)}${chat.id === state.activeChatId ? `<i class="contact-now">${escapeHtml(t("contacts.current"))}</i>` : ""}</span>
           <small>${escapeHtml(chat.relationship || t("contacts.noRelation"))}</small>
           <span class="contact-line">${escapeHtml(chatPreview(chat))}</span>
           <span class="contact-chips">
@@ -1008,7 +1032,7 @@ function renderHome(force = false) {
         ${homeRow("about", "doc", t("settings.about"), t("settings.aboutHint"))}
       </div>
     </section>
-    <p class="home-foot">${escapeHtml(t("settings.version", { v: "1.9.20" }))} · ${escapeHtml(t("home.localOnly"))}</p>`;
+    <p class="home-foot">${escapeHtml(t("settings.version", { v: "1.9.21" }))} · ${escapeHtml(t("home.localOnly"))}</p>`;
 }
 
 /* =========================================================
@@ -1533,8 +1557,9 @@ function applyStaticI18n() {
 function renderHeader() {
   if (!state) return;
   const s = state.settings;
-  const name = s.aiName || "Lian";
   const assistant = chatModeOf(s) === "assistant";
+  /* 助理页不继承恋人名字：标题直接显示服务商，避免「沈砚 · AI 助理」这种混搭。 */
+  const name = assistant ? providerShort(s.provider) : s.aiName || "Lian";
   const aiAvatar = $("#headerAvatar");
   paintAvatar(aiAvatar, { src: s.aiAvatar, role: "ai", name });
   const peerName = $("#peerName");
@@ -1549,6 +1574,7 @@ function renderHeader() {
     sub.textContent = assistant ? t("assistant.sessionSub", { n: state.messages.length }) : "";
     sub.hidden = !assistant;
   }
+  syncAssistantTools();
   updatePeerStatus();
   const input = $("#messageInput");
   if (input) input.placeholder = assistant ? t("chat.placeholderAssistant") : t("chat.placeholder");
@@ -2008,6 +2034,35 @@ function assistantActionsMarkup(message) {
   </div>`;
 }
 
+/** 深度思考的折叠面板：默认收起，不挡住答案。 */
+function assistantReasoningMarkup(message) {
+  const text = String(message.reasoning || "").trim().slice(0, 12000);
+  if (!text) return "";
+  const chars = [...String(message.reasoning || "").trim()].length;
+  return `<details class="as-think">
+    <summary><span>${escapeHtml(t("assistant.reasoning"))}</span><em>${escapeHtml(t("assistant.reasoningChars", { n: chars }))}</em></summary>
+    <div class="as-think-body">${escapeHtml(text).replace(/\n/g, "<br>")}</div>
+  </details>`;
+}
+
+/** 联网来源：只留站点名，点开新窗口；不加载远端 favicon。 */
+function assistantSourcesMarkup(message) {
+  const sources = (message.sources || []).filter((source) => source?.url && /^https?:\/\//i.test(source.url));
+  if (!sources.length) return "";
+  return `<div class="as-sources">
+    <span class="as-sources-label">${escapeHtml(t("assistant.webSources"))}</span>
+    ${sources
+      .slice(0, 5)
+      .map((source) => {
+        let host = "";
+        try { host = new URL(source.url).hostname.replace(/^www\./, ""); } catch { host = ""; }
+        const label = source.siteName || host || source.title || source.url;
+        return `<a href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(source.title || label)}">${escapeHtml(label)}</a>`;
+      })
+      .join("")}
+  </div>`;
+}
+
 function assistantWelcomeMarkup() {
   const prompts = ["code", "write", "error", "notes"];
   return `<div class="as-welcome" id="asWelcome">
@@ -2054,25 +2109,53 @@ function syncAssistantThinking() {
   const list = $("#messageList");
   if (!list || !state) return;
   const show = chatModeOf(state.settings) === "assistant" && typingVisible;
+  const caps = assistantCapabilities();
+  const toggles = state.settings.assistant || {};
+  const label = caps.thinking && toggles.thinking
+    ? t("assistant.deepThinking")
+    : caps.web && toggles.web ? t("assistant.webSearching") : t("assistant.thinking");
   const existing = list.querySelector("#asThinking");
   if (!show) {
     existing?.remove();
     return;
   }
-  if (existing) return;
+  if (existing) {
+    const textNode = existing.querySelector("span:last-child");
+    if (textNode) textNode.textContent = label;
+    return;
+  }
   const node = document.createElement("div");
   node.id = "asThinking";
   node.className = "as-thinking";
-  node.innerHTML = `<span class="as-thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>${escapeHtml(t("assistant.thinking"))}</span>`;
+  node.innerHTML = `<span class="as-thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>${escapeHtml(label)}</span>`;
   list.append(node);
   scrollToBottom(false);
 }
 
-/** 助理页专属的装饰：欢迎卡、等待指示、页头会话条数。 */
+/** 输入栏上方的「联网 / 深度思考」两个开关；非助理模式整条收起。 */
+function syncAssistantTools() {
+  const box = $("#assistantTools");
+  if (!box || !state) return;
+  const assistant = chatModeOf(state.settings) === "assistant";
+  box.hidden = !assistant;
+  if (!assistant) return;
+  const caps = assistantCapabilities();
+  const toggles = state.settings.assistant || {};
+  box.querySelectorAll("[data-assistant-tool]").forEach((button) => {
+    const key = button.dataset.assistantTool;
+    const supported = Boolean(caps[key]);
+    button.disabled = !supported;
+    button.setAttribute("aria-pressed", supported && toggles[key] ? "true" : "false");
+    button.title = supported ? "" : t("assistant.capabilityMimoOnly");
+  });
+}
+
+/** 助理页专属的装饰：欢迎卡、等待指示、输入栏开关、页头会话条数。 */
 function syncAssistantExtras() {
   if (!state) return;
   syncAssistantWelcome();
   syncAssistantThinking();
+  syncAssistantTools();
   const sub = $("#peerSub");
   if (sub && chatModeOf(state.settings) === "assistant") {
     sub.textContent = t("assistant.sessionSub", { n: state.messages.length });
@@ -2124,9 +2207,11 @@ function messageMarkup(message, isNew, previous = null) {
     content += `<div class="bubble">${renderRichText(String(message.text).trim())}</div>`;
   }
   /* 助理页：每题上方一行「AI 助理 · 时间」，回答下方给复制 / 重新生成。
-     流式预览只是临时气泡，不挂这两样。 */
+     流式预览只是临时气泡，不挂这些。 */
   if (mode === "assistant" && message.kind !== "report" && message.id !== "live_preview") {
-    content = `${assistantMetaMarkup(message, role)}${content}`;
+    const reasoning = message.kind === "text" ? assistantReasoningMarkup(message) : "";
+    const sources = message.kind === "text" ? assistantSourcesMarkup(message) : "";
+    content = `${assistantMetaMarkup(message, role)}${reasoning}${content}${sources}`;
     if (role === "assistant" && message.kind === "text" && !message.greeting && String(message.text || "").trim()) {
       content += assistantActionsMarkup(message);
     }
@@ -2162,6 +2247,8 @@ function messageSignature(message) {
     message.ts || 0,
     message.report?.createdAt || 0,
     message.stickerId || "",
+    String(message.reasoning || "").length,
+    (message.sources || []).length,
   ].join(":");
 }
 
@@ -3078,6 +3165,9 @@ async function regenerateFrom(message) {
       return;
     }
     if (result.usage) target.usage = result.usage;
+    /* 重新生成走的是普通请求，旧的思考过程与联网来源不能留在新答案上。 */
+    delete target.reasoning;
+    delete target.sources;
     if (originChat) originChat.updatedAt = Date.now();
     persist();
     if (threadStillActive(context)) renderChat({ force: true });
@@ -3111,8 +3201,8 @@ function bindMessageMenu() {
     "pointerdown",
     (event) => {
       if (event.pointerType === "mouse" && event.button !== 0) return;
-      /* 助理页的答案操作条 / 快捷提问是普通按钮，不要顺手把长按菜单叫出来 */
-      if (event.target.closest(".as-actions, .as-prompts")) return;
+      /* 助理页的答案操作条 / 快捷提问 / 思考面板 / 来源是普通控件，不要顺手把长按菜单叫出来 */
+      if (event.target.closest(".as-actions, .as-prompts, .as-think, .as-sources")) return;
       const holder = event.target.closest(".msg[data-message]");
       if (!holder || holder.classList.contains("is-live")) return;
       cancel();
@@ -3453,6 +3543,20 @@ async function requestAssistant(userMessage, { proactive = false, manual = false
      用户还停在原地。 */
   const context = threadContext();
   const originSettings = { ...state.settings };
+  /* 助理页的两个能力：只有 MiMo 原生支持；陪伴 / 剧本永远不带这些参数。 */
+  const caps = assistantCapabilities(originSettings);
+  const assistantMode = chatModeOf(originSettings) === "assistant";
+  const useWeb = Boolean(assistantMode && caps.web && originSettings.assistant?.web);
+  const useThinking = Boolean(assistantMode && caps.thinking && originSettings.assistant?.thinking);
+  const extraBody = {};
+  if (assistantMode && caps.thinking) {
+    /* MiMo v2.6 默认就开深度思考；不开的时候要显式关掉。 */
+    extraBody.thinking = { type: useThinking ? "enabled" : "disabled" };
+  }
+  if (useWeb) {
+    extraBody.tools = [{ type: "web_search", max_keyword: 3, force_search: true, limit: 1 }];
+    extraBody.tool_choice = "auto";
+  }
   sending = true;
   segmentAbort = false;
   hideError();
@@ -3468,23 +3572,22 @@ async function requestAssistant(userMessage, { proactive = false, manual = false
     const quoteCatalog = buildQuoteCatalog(state, userMessage?.id);
     const streamable = !useVision && !proactive && !afterBlock && originSettings.optimize?.streaming !== false;
     let streamedAny = false;
+    const baseTokens = afterBlock
+      ? 260
+      : proactive
+        ? 220
+        : originSettings.optimize?.drawings || /(画|绘制|插画|svg|draw|illustrat)/i.test(String(userMessage?.text || ""))
+          ? 2600
+          : 720;
     const result = await chatCompletion({
       settings: originSettings,
       messages,
       model,
-      /* a drawing is a few hundred lines of markup: 720 tokens cut it in half,
-         which is how raw <svg> used to end up in a bubble. A model also draws
-         when the switch is off if the user asks it in words, so look at the
-         request as well. */
-      maxTokens: afterBlock
-        ? 260
-        : proactive
-          ? 220
-          : originSettings.optimize?.drawings || /(画|绘制|插画|svg|draw|illustrat)/i.test(String(userMessage?.text || ""))
-            ? 2600
-            : 720,
+      /* 深度思考的 reasoning tokens 也算在完成额度里，留足空间。 */
+      maxTokens: useThinking ? 4096 : useWeb ? Math.max(2400, baseTokens) : baseTokens,
       temperature: afterBlock ? 0.82 : proactive ? 0.92 : 0.88,
       signal: controller.signal,
+      extraBody,
       onDelta: streamable
         ? (full) => {
             if (!streamedAny) {
@@ -3600,6 +3703,11 @@ async function requestAssistant(userMessage, { proactive = false, manual = false
         text: parsed.quote.text,
       };
     }
+    /* 思考过程与联网来源挂在第一条回答上；历史里的旧消息没有这两个字段。 */
+    const reasoning = String(result.reasoning || "").trim();
+    const sources = Array.isArray(result.sources) ? result.sources.filter((source) => source?.url).slice(0, 5) : [];
+    if (created.length && reasoning) created[0].reasoning = reasoning;
+    if (created.length && sources.length) created[0].sources = sources;
 
     let stillActive = threadStillActive(context);
     for (let i = 0; i < created.length; i += 1) {
@@ -5268,6 +5376,24 @@ function bindGlobalEvents() {
     }
     setComposerTray(false);
     handleSend();
+  });
+  /* 助理页输入栏上方的两个能力开关 */
+  $("#assistantTools")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-assistant-tool]");
+    if (!button || !state) return;
+    const key = button.dataset.assistantTool;
+    if (key !== "web" && key !== "thinking") return;
+    if (!assistantCapabilities()[key]) {
+      toast(t("assistant.capabilityUnsupported"));
+      return;
+    }
+    if (!state.settings.assistant || typeof state.settings.assistant !== "object") {
+      state.settings.assistant = { web: false, thinking: false };
+    }
+    state.settings.assistant[key] = !state.settings.assistant[key];
+    syncAssistantTools();
+    syncAssistantThinking();
+    persist();
   });
 
   const input = $("#messageInput");

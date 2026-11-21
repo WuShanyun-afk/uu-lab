@@ -223,6 +223,8 @@ test("the assistant prompt drops the lover persona and pet names", () => {
   assert.ok(!prompt.includes("你们的关系"), "assistant should not be told about a relationship");
   assert.ok(prompt.includes("不要喊「宝贝」"), "the assistant prompt should ban pet names");
   assert.ok(!prompt.includes("【现场画画面】"), "the assistant page shows svg as code, so it must not draw");
+  assert.ok(!prompt.includes("你的名字是"), "the assistant no longer takes the companion name");
+  assert.ok(prompt.includes("MiMo"), "the assistant should know which provider it is");
 
   /* 陪伴模式仍然带着关系和人设 */
   const companion = modeState("companion");
@@ -255,6 +257,9 @@ test("assistant page design copy exists in both languages", () => {
     "assistant.thinking", "assistant.codeLines", "assistant.welcomeTitle", "assistant.welcomeSub",
     "assistant.prompt.code", "assistant.prompt.codeFill", "assistant.prompt.write", "assistant.prompt.writeFill",
     "assistant.prompt.error", "assistant.prompt.errorFill", "assistant.prompt.notes", "assistant.prompt.notesFill",
+    "assistant.web", "assistant.thinkingLabel", "assistant.deepThinking", "assistant.webSearching",
+    "assistant.reasoning", "assistant.reasoningChars", "assistant.webSources",
+    "assistant.capabilityUnsupported", "assistant.capabilityMimoOnly", "settings.assistantCapHint",
   ];
   for (const key of keys) {
     const hits = (i18n.match(new RegExp(`"${key.replaceAll(".", "\\.")}"`, "g")) || []).length;

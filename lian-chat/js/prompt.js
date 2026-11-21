@@ -1,4 +1,4 @@
-import { BUILTIN_STICKERS, getSticker } from "./config.js";
+import { BUILTIN_STICKERS, PROVIDERS, getSticker } from "./config.js";
 import { DRAWING_LIMITS, extractDrawings } from "./drawing.js";
 import { chatModeOf } from "./roleplay.js";
 import { SCENE_LABELS } from "./scenes.js";
@@ -26,13 +26,18 @@ export function languageInstruction(settings) {
   }
 }
 
+function providerName(settings) {
+  return PROVIDERS[settings?.provider]?.short || PROVIDERS[settings?.provider]?.label || "AI";
+}
+
 function personaBlock(state, chatMode = "companion") {
   const s = state.settings;
   const lines = [];
   if (chatMode === "assistant") {
     /* 助理不是「关系」：恋人关系、人设、亲昵称呼都不进 prompt。
-       以前三类对话共用一套设置，于是它会在写代码的间隙喊「宝贝」。 */
-    lines.push(`你正在帮「${s.userName || "对方"}」处理事情。你的名字是「${s.aiName || "Lian"}」。`);
+       名字也不再继承陪伴的角色，直接用当前服务商（MiMo / OpenAI / DeepSeek）。 */
+    lines.push(`你正在帮「${s.userName || "对方"}」处理事情。你是对方的私人 AI 助理，当前服务是「${providerName(s)}」。`);
+    lines.push(`当前日期：${new Date().toISOString().slice(0, 10)}。`);
   } else {
     lines.push(`你正在手机上与「${s.userName || "对方"}」聊天。你的名字是「${s.aiName || "Lian"}」。`);
     if (s.relationship) lines.push(`你们的关系：${s.relationship}`);
@@ -156,7 +161,7 @@ function sceneBlock(state, chatMode) {
   const s = state.settings;
   if (chatMode === "assistant") {
     return `【你的身份】
-你是「${s.aiName || "Lian"}」，对方的私人 AI 助理。你不扮演恋人、朋友或任何角色，也不要用亲昵称呼、撒娇或调情。
+你是对方的私人 AI 助理，当前服务是「${providerName(s)}」。你不扮演恋人、朋友或任何角色，也不要用亲昵称呼、撒娇或调情。
 - 不要喊「宝贝」「亲爱的」「宝宝」「乖乖」这类称呼；需要称呼时用对方的名字或「你」。
 - 不要主动关心情绪、不要暧昧、不要说「想你了」。
 ${languageInstruction(s)}

@@ -423,19 +423,26 @@ body[data-mode="assistant"] .peer {
   gap: 11px;
 }
 body[data-mode="assistant"] .peer-mark {
+  position: relative;
   display: grid;
   place-items: center;
   flex: none;
-  width: 38px;
-  height: 38px;
-  border-radius: 13px;
-  background: linear-gradient(140deg, #2f6bff 0%, #7b5cff 58%, #ff7ac2 120%);
-  color: #fff;
-  box-shadow: 0 6px 16px color-mix(in srgb, #2f6bff 24%, transparent);
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, #2f6bff 15%, transparent);
+  background: radial-gradient(130% 130% at 26% 14%, #ffffff 0%, #f4f8ff 42%, #e4edff 100%);
+  color: #2458d8;
+  box-shadow: 0 1px 2px rgba(17, 36, 80, 0.06), inset 0 1px 0 #fff;
 }
 body[data-mode="assistant"] .peer-mark .icon {
   width: 19px;
   height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.45;
+  stroke-linejoin: round;
+  stroke-linecap: round;
 }
 body[data-mode="assistant"] .peer-title {
   max-width: 100%;
@@ -533,8 +540,8 @@ body[data-mode="assistant"] .as-action:active {
   border: 1px solid color-mix(in srgb, #2f6bff 15%, var(--line));
   border-radius: 18px;
   background:
-    radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, #7b5cff 10%, transparent), transparent 62%),
-    color-mix(in srgb, #2f6bff 4%, var(--surface));
+    radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, #2f6bff 9%, transparent), transparent 62%),
+    color-mix(in srgb, #2f6bff 3%, var(--surface));
 }
 .as-welcome-head {
   display: flex;
@@ -543,19 +550,26 @@ body[data-mode="assistant"] .as-action:active {
   margin-bottom: 13px;
 }
 .as-orb {
+  position: relative;
   display: grid;
   place-items: center;
   flex: none;
   width: 36px;
   height: 36px;
   border-radius: 12px;
-  background: linear-gradient(140deg, #2f6bff 0%, #7b5cff 70%);
-  color: #fff;
-  box-shadow: 0 5px 14px color-mix(in srgb, #2f6bff 22%, transparent);
+  border: 1px solid color-mix(in srgb, #2f6bff 15%, transparent);
+  background: radial-gradient(130% 130% at 26% 14%, #ffffff 0%, #f4f8ff 42%, #e4edff 100%);
+  color: #2458d8;
+  box-shadow: 0 1px 2px rgba(17, 36, 80, 0.06), inset 0 1px 0 #fff;
 }
 .as-orb .icon {
-  width: 18px;
-  height: 18px;
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.45;
+  stroke-linejoin: round;
+  stroke-linecap: round;
 }
 .as-welcome-copy b {
   display: block;
@@ -780,5 +794,121 @@ body[data-mode="assistant"] .as-line strong {
 }
 body[data-mode="assistant"] .as-line em {
   font-style: italic;
+}
+
+/* ---- 7.8 联网 / 深度思考开关 ---- */
+.assistant-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 2px 7px;
+}
+#assistantTools[hidden] {
+  display: none !important;
+}
+.assistant-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1;
+  transition: color var(--t-fast), border-color var(--t-fast), background var(--t-fast);
+}
+.assistant-tool .icon {
+  width: 13px;
+  height: 13px;
+}
+.assistant-tool[aria-pressed="true"] {
+  color: #2f6bff;
+  border-color: color-mix(in srgb, #2f6bff 30%, var(--line));
+  background: color-mix(in srgb, #2f6bff 8%, var(--surface));
+}
+.assistant-tool:disabled {
+  opacity: 0.45;
+}
+
+/* ---- 7.9 思考过程 / 联网来源 ---- */
+.as-think {
+  margin: 2px 0 10px;
+  border: 1px solid color-mix(in srgb, #2f6bff 12%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, #2f6bff 3%, var(--surface));
+  overflow: hidden;
+}
+.as-think summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 11px;
+  color: var(--muted);
+  font-size: 11.5px;
+  cursor: pointer;
+  list-style: none;
+}
+.as-think summary::-webkit-details-marker {
+  display: none;
+}
+.as-think summary::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid color-mix(in srgb, #2f6bff 60%, var(--muted));
+  transition: transform var(--t-fast);
+}
+.as-think[open] summary::before {
+  transform: rotate(90deg);
+}
+.as-think summary em {
+  margin-left: auto;
+  font-style: normal;
+  font-size: 10.5px;
+  opacity: 0.7;
+}
+.as-think-body {
+  padding: 8px 12px 11px;
+  border-top: 1px dashed var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.68;
+}
+.as-sources {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 2px;
+}
+.as-sources-label {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.as-sources a {
+  display: inline-flex;
+  align-items: center;
+  max-width: 46%;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: color-mix(in srgb, #2f6bff 68%, var(--text));
+  font-size: 10.5px;
+  line-height: 1.5;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.as-sources a:active {
+  border-color: color-mix(in srgb, #2f6bff 30%, var(--line));
 }
 

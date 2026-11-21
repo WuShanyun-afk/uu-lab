@@ -377,6 +377,8 @@ export function defaultState() {
       /* 进助理模式前的那套配色，退出助理模式时换回来 */
       modeTheme: "paper",
       modeAccent: "",
+      /* 助理页的两个开关：联网搜索、深度思考（MiMo 原生支持） */
+      assistant: { web: false, thinking: false },
       greeting: DEFAULT_GREETING,
       theme: "line",
       accent: THEMES[0].accent,

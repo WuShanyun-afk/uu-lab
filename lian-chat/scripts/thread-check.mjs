@@ -168,6 +168,10 @@ const openRow = async (name) => {
   await evaluate(`(() => { const row = [...document.querySelectorAll("[data-chat-open]")].find((n) => n.textContent.includes(${JSON.stringify(name)})); row?.click(); })()`);
   await sleep(520);
 };
+const openChatById = async (id) => {
+  await evaluate(`document.querySelector('[data-chat-open="${id}"]')?.click()`);
+  await sleep(520);
+};
 const openModuleTab = async () => {
   await evaluate(`document.querySelector('[data-tab="module"]').click()`);
   await sleep(360);
@@ -176,15 +180,17 @@ const pickModule = async (mode) => {
   await evaluate(`document.querySelector('[data-module-pick="${mode}"]')?.click()`);
   await sleep(650);
 };
-const mockReply = async (content, delay = 1500) => {
+const mockReply = async (content, delay = 1500, extra = {}) => {
   await evaluate(`(() => {
     window.__mockCalls = 0;
+    window.__lastBody = null;
     const real = window.fetch;
     window.fetch = (url, opts) => {
       if (String(url).includes("/chat/completions")) {
         window.__mockCalls += 1;
+        try { window.__lastBody = JSON.parse(opts?.body || "null"); } catch { window.__lastBody = null; }
         return new Promise((resolve) => setTimeout(() => resolve(new Response(JSON.stringify({
-          id: "x", choices: [{ index: 0, message: { role: "assistant", content: ${JSON.stringify(content)} }, finish_reason: "stop" }],
+          id: "x", choices: [{ index: 0, message: { role: "assistant", content: ${JSON.stringify(content)}, ...${JSON.stringify(extra)} }, finish_reason: "stop" }],
           usage: { prompt_tokens: 10, completion_tokens: 10, total_tokens: 20 },
         }), { status: 200, headers: { "content-type": "application/json" } })), ${delay}));
       }
@@ -316,7 +322,7 @@ const sendText = async (text) => {
     chat("c1", "companion", "沈砚", [msg("m1", "assistant", "老位置。", now - 5000)]),
     chat("c3", "assistant", "Lian", assistant, { updatedAt: now }),
   ], "c3", assistant, { companion: "c1", roleplay: "", assistant: "c3" }));
-  await openRow("Lian");
+  await openChatById("c3");
   await mockReply("给你一个卡片：\n\n```html\n<div class=\"card\">你好</div>\n```", 900);
   await sendText("给我一个 html 卡片");
   await sleep(2200);
@@ -342,7 +348,7 @@ const sendText = async (text) => {
     chat("c1", "companion", "沈砚", [msg("m1", "assistant", "老位置。", now - 5000)]),
     chat("c3", "assistant", "Lian", history, { updatedAt: now }),
   ], "c3", history, { companion: "c1", roleplay: "", assistant: "c3" }));
-  await openRow("Lian");
+  await openChatById("c3");
   const view = await evaluate(`(() => ({
     msgs: document.querySelectorAll(".msg").length,
     art: document.querySelectorAll(".msg-art").length,
@@ -407,14 +413,20 @@ const sendText = async (text) => {
     chat("c1", "companion", "沈砚", [msg("m1", "assistant", "老位置。", now - 5000)]),
     chat("c3", "assistant", "Lian", [greeting], { updatedAt: now }),
   ], "c3", [greeting], { companion: "c1", roleplay: "", assistant: "c3" }));
-  await openRow("Lian");
+  await openChatById("c3");
   const welcome = await evaluate(`({
     present: !!document.querySelector("#asWelcome"),
     prompts: document.querySelectorAll(".as-prompt").length,
     greetingActions: document.querySelectorAll('[data-message="g1"] .as-actions').length,
+    header: document.querySelector("#peerName")?.textContent,
+    toolsHidden: document.querySelector("#assistantTools")?.hidden,
+    webDisabled: document.querySelector('[data-assistant-tool="web"]')?.disabled,
+    thinkingDisabled: document.querySelector('[data-assistant-tool="thinking"]')?.disabled,
   })`);
   check("the idle assistant page shows the welcome card", welcome.present && welcome.prompts === 4, JSON.stringify(welcome));
   check("the greeting has no copy/regenerate actions", welcome.greetingActions === 0, String(welcome.greetingActions));
+  check("the assistant header shows the provider name", welcome.header === "自定义", String(welcome.header));
+  check("the capability bar is visible, but disabled off MiMo", welcome.toolsHidden === false && welcome.webDisabled === true && welcome.thinkingDisabled === true, JSON.stringify(welcome));
   await evaluate(`document.querySelector(".as-prompt")?.click()`);
   await sleep(160);
   const filled = await evaluate(`document.querySelector("#messageInput").value`);
@@ -457,6 +469,65 @@ const sendText = async (text) => {
   check("the answer offers copy / regenerate", after.actions >= 1, String(after.actions));
   check("every assistant-page message has a meta line", after.meta >= 3, String(after.meta));
   check("the thinking indicator is gone after the reply", after.thinking === false, String(after.thinking));
+}
+
+/* ================= 10. MiMo: provider name, web search + deep thinking ================= */
+{
+  const greeting = { ...msg("g1", "assistant", "在。要处理什么？", now - 60000), greeting: true };
+  const mimoSettings = {
+    ...baseSettings("assistant"),
+    provider: "mimo",
+    baseUrl: "https://api.xiaomimimo.com/v1",
+    model: "mimo-v2.6-flash",
+  };
+  const seed = wrap(mimoSettings, [
+    chat("c3", "assistant", "Lian", [greeting], { updatedAt: now, keyId: "k2" }),
+  ], "c3", [greeting], { companion: "", roleplay: "", assistant: "c3" });
+  seed.keys = [{ ...key, id: "k2", name: "MiMo", provider: "mimo", baseUrl: "https://api.xiaomimimo.com/v1", model: "mimo-v2.6-flash" }];
+  seed.activeKeyId = "k2";
+  await boot(seed);
+  await openChatById("c3");
+  const header = await evaluate(`document.querySelector("#peerName")?.textContent`);
+  check("a MiMo assistant is titled MiMo", header === "MiMo", String(header));
+  const caps = await evaluate(`({
+    web: document.querySelector('[data-assistant-tool="web"]')?.disabled,
+    thinking: document.querySelector('[data-assistant-tool="thinking"]')?.disabled,
+  })`);
+  check("MiMo enables both capability toggles", caps.web === false && caps.thinking === false, JSON.stringify(caps));
+  await evaluate(`document.querySelector('[data-assistant-tool="web"]')?.click()`);
+  await evaluate(`document.querySelector('[data-assistant-tool="thinking"]')?.click()`);
+  await sleep(200);
+  const pressed = await evaluate(`({
+    web: document.querySelector('[data-assistant-tool="web"]')?.getAttribute("aria-pressed"),
+    thinking: document.querySelector('[data-assistant-tool="thinking"]')?.getAttribute("aria-pressed"),
+    thinkingText: document.querySelector("#asThinking")?.innerText || "",
+  })`);
+  check("the toggles show their pressed state", pressed.web === "true" && pressed.thinking === "true", JSON.stringify(pressed));
+  await mockReply("武汉明天多云，22~25℃，记得带伞。", 700, {
+    reasoning_content: "先确认日期，再查武汉的天气。",
+    annotations: [
+      { type: "url_citation", url: "https://example.com/weather/wuhan", title: "武汉天气预报", site_name: "示例天气" },
+    ],
+  });
+  await evaluate(`(() => {
+    const input = document.querySelector("#messageInput");
+    input.value = "武汉明天天气怎么样？";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    document.querySelector("#btnSend").click();
+  })()`);
+  await sleep(1900);
+  const body = await evaluate(`window.__lastBody || null`);
+  check("the request turns on MiMo deep thinking", body?.thinking?.type === "enabled", JSON.stringify(body?.thinking));
+  check("the request sends the native web_search tool", body?.tools?.[0]?.type === "web_search" && body?.tool_choice === "auto", JSON.stringify(body?.tools));
+  check("thinking is given a larger token budget", Number(body?.max_tokens) >= 4096, String(body?.max_tokens));
+  const rendered = await evaluate(`({
+    think: !!document.querySelector(".as-think"),
+    thinkText: document.querySelector(".as-think-body")?.textContent || "",
+    sources: document.querySelectorAll(".as-sources a").length,
+    sourceHref: document.querySelector(".as-sources a")?.getAttribute("href") || "",
+  })`);
+  check("the reasoning panel is rendered", rendered.think && rendered.thinkText.includes("先确认日期"), JSON.stringify(rendered.thinkText?.slice(0, 30)));
+  check("web sources are rendered as links", rendered.sources === 1 && rendered.sourceHref.includes("example.com"), JSON.stringify({ n: rendered.sources, href: rendered.sourceHref }));
 }
 
 check("no console errors", consoleErrors.length === 0, consoleErrors.slice(0, 2).join(" | "));
