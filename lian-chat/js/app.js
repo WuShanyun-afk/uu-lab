@@ -80,7 +80,7 @@ import {
 } from "./utils.js";
 
 /* 与 index.html 的 __LIAN_HTML_BUILD__ 对齐；不一致时由页内脚本清缓存重载。 */
-window.__LIAN_APP_BUILD__ = "1.9.26";
+window.__LIAN_APP_BUILD__ = "1.9.27";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -1408,7 +1408,6 @@ function applyAppearance() {
 const MODULE_CARDS = [
   { id: "assistant", icon: "sparkle", nameKey: "module.assistantName", descKey: "module.assistantDesc" },
   { id: "roleplay", icon: "heart", nameKey: "module.roleplayName", descKey: "module.roleplayDesc" },
-  { id: "companion", icon: "chat", nameKey: "module.companionName", descKey: "module.companionDesc" },
 ];
 
 function moduleThreadInfo(mode) {
@@ -1427,19 +1426,32 @@ function renderModuleHome() {
   const box = $("#moduleBody");
   if (!box || !state) return;
   const current = chatModeOf(state.settings);
+  const scripts = state.chats.filter((chat) => modeOfChat(chat) === "roleplay").length;
   box.innerHTML = MODULE_CARDS.map((card) => {
     const on = card.id === current;
     const info = moduleThreadInfo(card.id);
+    const thread = modeThread(card.id);
+    let meta = info.text;
+    if (card.id === "assistant" && thread) {
+      const key = state.keys.find((item) => item.id === (thread.keyId || state.activeKeyId));
+      const provider = providerShort(providerOfChat(thread));
+      const model = String(key?.model || state.settings.model || "").trim();
+      meta = [provider, model].filter(Boolean).join(" · ");
+      if (info.count) meta += ` · ${t("module.threadCount", { n: info.count })}`;
+    } else if (card.id === "roleplay") {
+      const count = scripts ? t("module.scriptCount", { n: scripts }) : t("module.scriptEmpty");
+      meta = info.count ? `${count} · ${info.text}` : count;
+    }
     return `<button type="button" class="module-card${on ? " is-on" : ""}" data-module-pick="${card.id}" aria-pressed="${on}">
       <span class="module-card-icon">${icon(card.icon)}</span>
       <span class="module-card-copy">
         <b>${escapeHtml(t(card.nameKey))}</b>
         <small>${escapeHtml(t(card.descKey))}</small>
-        <em class="module-card-thread">${escapeHtml(info.text)}</em>
+        <em class="module-card-thread">${escapeHtml(meta)}</em>
       </span>
       <span class="module-card-state">${escapeHtml(on ? t("module.current") : info.count ? t("module.use") : t("module.start"))}</span>
     </button>`;
-  }).join("");
+  }).join("") + `<button type="button" class="module-characters" data-module-characters>${escapeHtml(t("module.charactersNote"))} <span aria-hidden="true">→</span></button>`;
 }
 
 function openModuleChat() {
@@ -1454,6 +1466,10 @@ function openModuleChat() {
 
 function bindModuleScreen() {
   $("#moduleBody")?.addEventListener("click", (event) => {
+    if (event.target.closest("[data-module-characters]")) {
+      openTab("contacts");
+      return;
+    }
     const card = event.target.closest("[data-module-pick]");
     if (!card) return;
     setChatMode(card.dataset.modulePick);

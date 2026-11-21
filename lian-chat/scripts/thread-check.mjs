@@ -370,9 +370,11 @@ const sendText = async (text) => {
   await openModuleTab();
   await pickModule("assistant");
   await sleep(400);
-  await openModuleTab();
-  await pickModule("companion");
-  await sleep(600);
+  /* 陪伴不在模块页：回列表点回沈砚 */
+  await evaluate(`document.querySelector('[data-tab="list"]').click()`);
+  await sleep(420);
+  await openRow("沈砚");
+  await sleep(420);
   const state = await readChats();
   const accent = await evaluate(`getComputedStyle(document.body).getPropertyValue("--accent").trim().toUpperCase()`);
   check("the custom theme id comes back", state?.settings.theme === "custom", `${state?.settings.theme}/${state?.settings.modeTheme}`);

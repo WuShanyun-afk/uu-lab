@@ -98,6 +98,20 @@ body[data-screen="module"] .tabbar {
   border-color: color-mix(in srgb, var(--accent) 45%, transparent);
   color: var(--accent-strong, var(--accent));
 }
+.module-characters {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 14px 2px 0;
+  padding: 9px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+.module-characters span {
+  color: var(--accent-strong, var(--accent));
+}
 
 /* ---- 2. 纯 AI 助理：不显示头像、不套气泡 ---- */
 body[data-mode="assistant"] .chat-header #headerAvatar,

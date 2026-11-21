@@ -235,11 +235,12 @@ let modulePage = await evaluate(`(() => ({
   current: document.querySelector(".module-card.is-on")?.dataset.modulePick || "",
 }))()`);
 check("the module page opens from the bottom bar", modulePage.screen === "module" && modulePage.visible, modulePage.screen);
-check("it offers assistant / roleplay / companion", modulePage.cards.join(",") === "assistant,roleplay,companion", modulePage.cards.join(","));
-check("it marks the current module", modulePage.current === "companion", modulePage.current);
+check("it offers only the assistant and roleplay modules", modulePage.cards.join(",") === "assistant,roleplay", modulePage.cards.join(","));
+check("a companion chat is not a module", modulePage.current === "", modulePage.current);
 let cards = await evaluate(cardText);
-check("each module shows its own thread size", cards.companion.includes("3") && cards.roleplay.includes("3") && cards.assistant.includes("2"), JSON.stringify(cards));
+check("each module shows its own thread size", cards.roleplay.includes("3") && cards.assistant.includes("2"), JSON.stringify(cards));
 check("a module with a thread says 切换", cards.roleplayState.length > 0 && cards.assistantState.length > 0, `${cards.roleplayState}/${cards.assistantState}`);
+check("the module page links back to characters", await evaluate(`!!document.querySelector("[data-module-characters]")`), "characters link");
 await capture("module-home.png");
 
 /* ================= 角色扮演：剧本页 + 自己的消息 ================= */
@@ -313,10 +314,9 @@ await capture("module-assistant.png");
 
 /* ================= 切回陪伴：原会话原封不动 ================= */
 await evaluate(`document.querySelector("#btnChatBack").click()`);
-await sleep(350);
-await openModuleTab();
-await evaluate(`document.querySelector('[data-module-pick="companion"]').click()`);
-await sleep(700);
+await sleep(420);
+await evaluate(`document.querySelector('[data-chat-open="c1"]')?.click()`);
+await sleep(600);
 const back = await evaluate(`(() => ({
   mode: document.body.dataset.mode,
   theme: document.body.dataset.theme,
@@ -356,8 +356,7 @@ check("the new scene does not inherit the old scene", !scene.text.includes("今�
 
 await openModuleTab();
 cards = await evaluate(cardText);
-check("the roleplay module now counts the new scene", cards.roleplay.includes("1"), cards.roleplay);
-check("the companion thread is untouched", cards.companion.includes("3"), cards.companion);
+check("the roleplay module now counts the new script", cards.roleplay.includes("2 个剧本"), cards.roleplay);
 check("the assistant thread is untouched", cards.assistant.includes("2"), cards.assistant);
 
 /* ================= 列表里能分清哪条是模块会话 ================= */
@@ -402,10 +401,11 @@ const restored = await evaluate(`(() => ({
 }))()`);
 check("its messages survive the reload too", restored.mode === "assistant" && restored.text.includes("你好，需要什么帮助吗？"), restored.text.slice(0, 40));
 
-/* 切回陪伴，历史还在 */
-await openModuleTab();
-await evaluate(`document.querySelector('[data-module-pick="companion"]').click()`);
-await sleep(700);
+/* 切回陪伴，历史还在（陪伴不在模块页，从聊天列表回去） */
+await evaluate(`document.querySelector('[data-tab="list"]').click()`);
+await sleep(420);
+await evaluate(`document.querySelector('[data-chat-open="c1"]')?.click()`);
+await sleep(600);
 const legacyBack = await evaluate(`(() => ({
   mode: document.body.dataset.mode,
   text: document.querySelector("#messageList").innerText,
