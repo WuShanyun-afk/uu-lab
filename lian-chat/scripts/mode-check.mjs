@@ -338,7 +338,7 @@ await sleep(350);
 await evaluate(`document.querySelector("#btnNewChat").click()`);
 await sleep(450);
 const chips = await evaluate(`Array.from(document.querySelectorAll("#newChatPresets [data-preset]")).map((node) => node.dataset.preset)`);
-check("roleplay offers the scenario cards", chips.length === ROLEPLAY_PRESETS.length, `${chips.length}`);
+check("roleplay offers the scenario cards", chips.length === ROLEPLAY_PRESETS.length + 1 && chips.includes("custom"), `${chips.length}`);
 await evaluate(`document.querySelector('[data-preset="orbit"]').click()`);
 await sleep(200);
 const filled = await evaluate(`document.querySelector("#newChatName").value`);

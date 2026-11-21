@@ -483,12 +483,13 @@ ${switchRow(t("settings.optDrawings"), t("settings.optDrawingsHint"), Boolean(op
     <div class="settings-field">
       <div class="field-label">${escapeHtml(t("settings.theme"))} <small>${escapeHtml(t("settings.themeHint"))}</small></div>
       <div class="theme-wrap">
-        ${THEMES.map(
+        ${THEMES.filter((theme) => theme.id !== "assistant").map(
           (theme) => `<button type="button" class="theme-swatch ${s.theme === theme.id ? "is-on" : ""}" data-theme="${theme.id}" title="${escapeHtml(themeLabel(theme, s.uiLang))}">
             <i style="background:${theme.swatch || theme.accent}"></i><span class="swatch-label">${escapeHtml(themeLabel(theme, s.uiLang))}</span>
           </button>`,
         ).join("")}
       </div>
+      ${s.theme === "assistant" ? `<p class="field-hint">${escapeHtml(t("settings.assistantThemeAuto"))}</p>` : ""}
       <div class="accent-editor">
         <span class="accent-chip" id="accentChip" style="background:${escapeHtml(s.accent)}"></span>
         <input class="input accent-hex" id="accentHex" maxlength="7" spellcheck="false" autocomplete="off"
@@ -610,7 +611,7 @@ ${switchRow(t("settings.optDrawings"), t("settings.optDrawingsHint"), Boolean(op
       <div class="danger-row-copy"><b>${escapeHtml(t("settings.clearAll"))}</b><small>${escapeHtml(t("settings.clearAllHint"))}</small></div>
       <button type="button" class="btn btn-danger" id="clearAll">${escapeHtml(t("common.delete"))}</button>
     </div>
-    <p class="token-line">${escapeHtml(t("settings.version", { v: "1.9.25" }))}</p>`;
+    <p class="token-line">${escapeHtml(t("settings.version", { v: "1.9.26" }))}</p>`;
 
   const aboutBody = `
     <div class="about-box">

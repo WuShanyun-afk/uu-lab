@@ -341,7 +341,7 @@
     /* 资源版本自检：新 HTML 配到旧 JS（Service Worker / HTTP 缓存混用）时，
        自动清掉旧的 Service Worker 与缓存并重载一次；仍然不一致就提示。
        不再用固定延时，否则冷启动慢的机器会误判。 */
-    window.__LIAN_HTML_BUILD__ = "1.9.25";
+    window.__LIAN_HTML_BUILD__ = "1.9.26";
     (() => {
       const started = Date.now();
       const repair = async () => {
@@ -387,6 +387,6 @@
       tick();
     })();
   </script>
-  <script type="module" src="js/app.js?v=1.9.25"></script>
+  <script type="module" src="js/app.js?v=1.9.26"></script>
 </body>
 </html>

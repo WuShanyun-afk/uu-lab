@@ -54,7 +54,7 @@ function personaBlock(state, chatMode = "companion") {
     if (s.relationship) lines.push(`你们的关系：${s.relationship}`);
     if (s.persona) lines.push(`你的人设：${s.persona}`);
   }
-  if (state.memories?.length) {
+  if (state.memories?.length && chatMode !== "assistant") {
     lines.push("【你记得的事】");
     for (const memory of state.memories.slice(-40)) lines.push(`- ${memory.text}`);
     lines.push("这些是背景，不要逐条复述，也不要说「根据我的记忆」。");
@@ -348,9 +348,10 @@ export function buildChatMessages(state, currentMessage, { proactive = false, af
   });
   const messages = [{ role: "system", content: system }];
   const history = historyForApi(state, currentMessage?.id);
-  /* DeepSeek 带 tools 时要求历史轮次的 reasoning_content 一起回传；
+  /* MiMo / DeepSeek 带 tools 时要求历史轮次的 reasoning_content 一起回传；
      只在「助理页 + 联网开着」时补，避免给别的服务商塞无用字段。 */
-  const replayReasoning = providerId(state.settings) === "deepseek"
+  const provider = providerId(state.settings);
+  const replayReasoning = (provider === "deepseek" || provider === "mimo")
     && state.settings?.mode === "assistant"
     && Boolean(state.settings?.assistant?.web);
   for (const message of history) {

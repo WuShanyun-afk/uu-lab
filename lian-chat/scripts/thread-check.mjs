@@ -303,7 +303,7 @@ const sendText = async (text) => {
   await sleep(500);
   const presets = await evaluate(`document.querySelectorAll("[data-preset]").length`);
   check("the empty roleplay page offers the scene cards", presets > 0, String(presets));
-  await evaluate(`document.querySelector("[data-preset]")?.click()`);
+  await evaluate(`document.querySelector('[data-preset]:not([data-preset="custom"])')?.click()`);
   await sleep(250);
   await evaluate(`document.querySelector("#newChatForm button[type='submit']")?.click()`);
   await sleep(1100);
@@ -630,6 +630,55 @@ const sendText = async (text) => {
   check("DeepSeek reasoning is rendered", rendered.think.includes("官方文档"), rendered.think.slice(0, 24));
   check("a nested url_citation still renders one source", rendered.sources.length === 1 && rendered.sources[0].includes("api-docs.deepseek.com"), JSON.stringify(rendered.sources));
   check("DeepSeek answers keep the clean layout", rendered.meta === 0, String(rendered.meta));
+}
+
+/* ================= 12. web search rejected: fall back to a plain answer ================= */
+{
+  const greeting = { ...msg("g1", "assistant", "你好，需要什么帮助吗？", now - 60000), greeting: true };
+  const mimoSettings = {
+    ...baseSettings("assistant"),
+    provider: "mimo",
+    baseUrl: "https://api.xiaomimimo.com/v1",
+    model: "mimo-v2.6-flash",
+  };
+  const seed = wrap(mimoSettings, [
+    chat("c3", "assistant", "Lian", [greeting], { updatedAt: now, keyId: "k2" }),
+  ], "c3", [greeting], { companion: "", roleplay: "", assistant: "c3" });
+  seed.keys = [{ ...key, id: "k2", name: "MiMo", provider: "mimo", baseUrl: "https://api.xiaomimimo.com/v1", model: "mimo-v2.6-flash" }];
+  seed.activeKeyId = "k2";
+  await boot(seed);
+  await openChatById("c3");
+  await evaluate(`document.querySelector('[data-assistant-tool="web"]')?.click()`);
+  await sleep(160);
+  await evaluate(`(() => {
+    const real = window.fetch;
+    window.__bodies = [];
+    window.fetch = (url, opts) => {
+      if (String(url).includes("/chat/completions")) {
+        window.__bodies.push(JSON.parse(opts?.body || "null"));
+        if (window.__bodies.length === 1) {
+          return Promise.resolve(new Response(JSON.stringify({ error: { message: "Param Incorrect" } }), { status: 400, headers: { "content-type": "application/json" } }));
+        }
+        return Promise.resolve(new Response(JSON.stringify({
+          id: "x", choices: [{ index: 0, message: { role: "assistant", content: "联网被拒，先用普通回答。" }, finish_reason: "stop" }],
+          usage: { prompt_tokens: 10, completion_tokens: 10, total_tokens: 20 },
+        }), { status: 200, headers: { "content-type": "application/json" } }));
+      }
+      return real(url, opts);
+    };
+  })()`);
+  await sendText("搜一下今天的新闻");
+  await sleep(2200);
+  const fallback = await evaluate(`({
+    calls: window.__bodies.length,
+    firstTools: window.__bodies[0]?.tools?.length || 0,
+    secondTools: window.__bodies[1]?.tools?.length || 0,
+    text: document.querySelector("#messageList")?.innerText || "",
+  })`);
+  check("a rejected web request is retried exactly once", fallback.calls === 2, String(fallback.calls));
+  check("the first attempt carries the web tool", fallback.firstTools >= 1, String(fallback.firstTools));
+  check("the retry drops the web tool", fallback.secondTools === 0, String(fallback.secondTools));
+  check("the fallback answer still lands in the thread", fallback.text.includes("联网被拒，先用普通回答"), fallback.text.slice(0, 40));
 }
 
 check("no console errors", consoleErrors.length === 0, consoleErrors.slice(0, 2).join(" | "));

@@ -243,6 +243,29 @@ test("the assistant prompt follows the provider, even behind a custom base URL",
   assert.ok(buildSystemPrompt(state).includes("DeepSeek"), "a deepseek.com base URL should still be named DeepSeek");
 });
 
+test("companion memories never leak into the assistant prompt", () => {
+  const state = modeState("assistant");
+  state.memories = [{ text: "这是陪伴会话里的私密记忆" }];
+  const prompt = buildSystemPrompt(state);
+  assert.ok(!prompt.includes("这是陪伴会话里的私密记忆"), "assistant must not inherit companion memories");
+  assert.ok(!prompt.includes("【你记得的事】"), "assistant should not get the memory block at all");
+  /* 陪伴模式仍然带着记忆 */
+  const companion = modeState("companion");
+  companion.memories = [{ text: "这是陪伴会话里的私密记忆" }];
+  assert.ok(buildSystemPrompt(companion).includes("这是陪伴会话里的私密记忆"));
+});
+
+test("the assistant theme is not offered as a normal theme", () => {
+  const settings = read("js/settings.js");
+  assert.ok(settings.includes('THEMES.filter((theme) => theme.id !== "assistant")'), "the assistant theme must be filtered out");
+  assert.ok(settings.includes("settings.assistantThemeAuto"), "the settings page should explain where the assistant theme lives");
+});
+
+test("contacts lists characters only, not module threads", () => {
+  const app = read("js/app.js");
+  assert.ok(app.includes('state.chats.filter((chat) => modeOfChat(chat) === "companion")'), "contacts must filter out module chats");
+});
+
 test("DeepSeek web turns replay earlier reasoning_content", () => {
   const state = modeState("assistant");
   state.settings.provider = "deepseek";
@@ -258,6 +281,12 @@ test("DeepSeek web turns replay earlier reasoning_content", () => {
   /* 关掉联网就不塞这个字段，别给普通对话增加 token。 */
   state.settings.assistant.web = false;
   assert.equal(buildChatMessages(state, null).find((message) => message.role === "assistant")?.reasoning_content, undefined);
+
+  /* MiMo 的联网工具也要求回传思考内容，规则与 DeepSeek 一致。 */
+  state.settings.provider = "mimo";
+  state.settings.baseUrl = "https://api.xiaomimimo.com/v1";
+  state.settings.assistant.web = true;
+  assert.equal(buildChatMessages(state, null).find((message) => message.role === "assistant")?.reasoning_content, "先确认日期。");
 });
 
 test("module threads have copy in both languages", () => {

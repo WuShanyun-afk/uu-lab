@@ -80,7 +80,7 @@ import {
 } from "./utils.js";
 
 /* 与 index.html 的 __LIAN_HTML_BUILD__ 对齐；不一致时由页内脚本清缓存重载。 */
-window.__LIAN_APP_BUILD__ = "1.9.25";
+window.__LIAN_APP_BUILD__ = "1.9.26";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -918,9 +918,11 @@ function renderContacts() {
   ensureChatState();
   const list = $("#contactsList");
   if (!list) return;
+  /* 通讯录只放「角色」；助理 / 剧本是独立模块，不混进角色列表。 */
+  const characters = state.chats.filter((chat) => modeOfChat(chat) === "companion");
   const meta = $("#contactsMeta");
-  if (meta) meta.textContent = t("contacts.meta", { n: state.chats.length });
-  if (!state.chats.length) {
+  if (meta) meta.textContent = t("contacts.meta", { n: characters.length });
+  if (!characters.length) {
     list.innerHTML = `<div class="chat-list-empty contacts-empty">
       <span class="empty-symbol">${icon("contacts")}</span>
       <b>${escapeHtml(t("contacts.emptyTitle"))}</b>
@@ -929,7 +931,7 @@ function renderContacts() {
     </div>`;
     return;
   }
-  const sorted = state.chats
+  const sorted = characters
     .slice()
     .sort((a, b) => chatDisplayName(a).localeCompare(chatDisplayName(b), state.settings.uiLang === "en" ? "en" : "zh-CN"));
   list.innerHTML = `<p class="contacts-group-label">${escapeHtml(t("contacts.all"))}</p>${sorted
@@ -3583,7 +3585,7 @@ async function requestAssistant(userMessage, { proactive = false, manual = false
         : originSettings.optimize?.drawings || /(画|绘制|插画|svg|draw|illustrat)/i.test(String(userMessage?.text || ""))
           ? 2600
           : 720;
-    const result = await chatCompletion({
+    const body = {
       settings: originSettings,
       messages,
       model,
@@ -3602,7 +3604,23 @@ async function requestAssistant(userMessage, { proactive = false, manual = false
             updateLiveReply(full);
           }
         : null,
-    });
+    };
+    let result;
+    try {
+      result = await chatCompletion(body);
+    } catch (error) {
+      /* 联网工具被服务商拒绝（常见：插件未开通、400 参数校验）时，
+         不把整条回答丢掉：退一步用普通请求，并说明原因。 */
+      if (useWeb && Number(error?.status) === 400) {
+        const fallback = { ...extraBody };
+        delete fallback.tools;
+        delete fallback.tool_choice;
+        toast(t("assistant.webFallback"), { timeout: 5200 });
+        result = await chatCompletion({ ...body, extraBody: fallback });
+      } else {
+        throw error;
+      }
+    }
     endLiveReply();
     recordUsage(result.usage);
     const parsed = parseReply(result.content, { ...state, settings: originSettings }, { quoteCatalog });
@@ -4055,6 +4073,7 @@ function openNewChatSheet() {
         chatModeOf(state.settings) === "roleplay"
           ? `<p class="field-label">${escapeHtml(t("newChat.presets"))}</p>
       <div class="preset-chips" id="newChatPresets">
+        <button type="button" class="preset-chip" data-preset="custom">${escapeHtml(t("newChat.customScript"))}<small>${escapeHtml(t("newChat.customScriptTag"))}</small></button>
         ${ROLEPLAY_PRESETS.map((preset) => `<button type="button" class="preset-chip" data-preset="${escapeHtml(preset.id)}">${escapeHtml(state.settings.uiLang === "en" ? preset.titleEn : preset.title)}<small>${escapeHtml(state.settings.uiLang === "en" ? preset.tagEn : preset.tag)}</small></button>`).join("")}
       </div>
       <p class="field-hint" style="margin:6px 0 12px">${escapeHtml(t("newChat.presetsHint"))}</p>`
@@ -4080,16 +4099,25 @@ function openNewChatSheet() {
       sheet.querySelector("#newChatPresets")?.addEventListener("click", (event) => {
         const chip = event.target.closest("[data-preset]");
         if (!chip) return;
-        const preset = ROLEPLAY_PRESETS.find((item) => item.id === chip.dataset.preset);
-        if (!preset) return;
         const fill = (id, value) => {
           const input = sheet.querySelector(id);
           if (input) input.value = value;
         };
-        fill("#newChatName", preset.name);
-        fill("#newChatRelation", preset.relationship);
-        fill("#newChatPersona", preset.persona);
-        fill("#newChatGreeting", preset.greeting);
+        if (chip.dataset.preset === "custom") {
+          /* 自定义剧本：清空预设，只留下自己的角色、场景和开场白。 */
+          fill("#newChatName", "");
+          fill("#newChatRelation", "");
+          fill("#newChatPersona", "");
+          fill("#newChatGreeting", "");
+          sheet.querySelector("#newChatName")?.focus();
+        } else {
+          const preset = ROLEPLAY_PRESETS.find((item) => item.id === chip.dataset.preset);
+          if (!preset) return;
+          fill("#newChatName", preset.name);
+          fill("#newChatRelation", preset.relationship);
+          fill("#newChatPersona", preset.persona);
+          fill("#newChatGreeting", preset.greeting);
+        }
         sheet.querySelectorAll("[data-preset]").forEach((node) => node.classList.toggle("is-on", node === chip));
       });
       sheet.querySelector("[data-new-chat-settings]")?.addEventListener("click", () => {
@@ -4106,7 +4134,8 @@ function openNewChatSheet() {
         const keyId = sheet.querySelector("#newChatKey")?.value || "";
         const relationship = sheet.querySelector("#newChatRelation")?.value.trim() || "";
         const persona = sheet.querySelector("#newChatPersona")?.value.trim() || "";
-        const greeting = sheet.querySelector("#newChatGreeting")?.value.trim() || DEFAULT_GREETING;
+        const fallbackGreeting = chatModeOf(state.settings) === "roleplay" ? "" : DEFAULT_GREETING;
+        const greeting = sheet.querySelector("#newChatGreeting")?.value.trim() || fallbackGreeting;
         closeSheet();
         createChat({ name, relationship, persona, greeting, keyId });
         toast(t("chatList.created", { name }));
