@@ -263,10 +263,30 @@ function providerShort(provider) {
   return PROVIDERS[provider]?.short || PROVIDERS[provider]?.label || "Key";
 }
 
+/** 服务商 id：设置里选了「自定义」但填的是官方地址时，按地址认回来。 */
+function providerIdOf(settings = state?.settings) {
+  if (!settings) return "custom";
+  const id = settings.provider || "custom";
+  if (PROVIDERS[id] && id !== "custom") return id;
+  const base = String(settings.baseUrl || "");
+  if (/deepseek\.com/i.test(base)) return "deepseek";
+  if (/xiaomimimo\.com/i.test(base)) return "mimo";
+  if (/api\.openai\.com/i.test(base)) return "openai";
+  return id;
+}
+
+/** 页头徽记 / 欢迎卡上的字母：一眼看出是哪家服务。 */
+function providerMonogram(provider) {
+  if (provider === "mimo") return "M";
+  if (provider === "openai") return "O";
+  if (provider === "deepseek") return "D";
+  return t("assistant.monogramCustom") || "AI";
+}
+
 /** 一条会话用哪家服务商：由会话绑定的 key 决定，老数据回落到当前设置。 */
 function providerOfChat(chat) {
   const key = (state?.keys || []).find((item) => item.id === (chat?.keyId || state.activeKeyId));
-  return key?.provider || state?.settings?.provider || "custom";
+  return providerIdOf(key || state?.settings || {});
 }
 
 /** 助理页显示服务商名（MiMo / OpenAI / DeepSeek / 自定义）；其它模块用会话自己的名字。 */
@@ -275,14 +295,31 @@ function chatDisplayName(chat) {
   return chat?.name || "Lian";
 }
 
-/** 联网 / 深度思考目前由 MiMo 的原生插件提供。 */
+/** 联网 / 深度思考由服务商的原生插件提供：MiMo 与 DeepSeek 都支持。 */
 function isMimoService(settings = state?.settings) {
-  return Boolean(settings) && (settings.provider === "mimo" || /xiaomimimo\.com/i.test(settings.baseUrl || ""));
+  return providerIdOf(settings) === "mimo";
+}
+
+function isDeepSeekService(settings = state?.settings) {
+  return providerIdOf(settings) === "deepseek";
 }
 
 function assistantCapabilities(settings = state?.settings) {
-  const mimo = isMimoService(settings);
-  return { web: mimo, thinking: mimo };
+  const provider = providerIdOf(settings);
+  const native = provider === "mimo" || provider === "deepseek";
+  return { web: native, thinking: native };
+}
+
+/** 老 Key 里可能还存着 deepseek-chat / deepseek-reasoner（2026-07 已下线）。 */
+function modelForRequest(settings, { vision = false } = {}) {
+  let model = String((vision ? settings.visionModel : settings.model) || "").trim();
+  const provider = providerIdOf(settings);
+  if (provider === "deepseek") {
+    if (!model || /^deepseek-(chat|reasoner)$/i.test(model)) model = "deepseek-flash";
+    /* 联网工具目前只有 deepseek-flash 支持。 */
+    if (settings.assistant?.web) model = "deepseek-flash";
+  }
+  return model;
 }
 
 function keyFromSettings() {
@@ -1559,11 +1596,18 @@ function renderHeader() {
   const s = state.settings;
   const assistant = chatModeOf(s) === "assistant";
   /* 助理页不继承恋人名字：标题直接显示服务商，避免「沈砚 · AI 助理」这种混搭。 */
-  const name = assistant ? providerShort(s.provider) : s.aiName || "Lian";
+  const name = assistant ? providerShort(providerIdOf(s)) : s.aiName || "Lian";
   const aiAvatar = $("#headerAvatar");
   paintAvatar(aiAvatar, { src: s.aiAvatar, role: "ai", name });
   const peerName = $("#peerName");
   if (peerName) peerName.textContent = name;
+  /* 页头徽记：深墨砖 + 服务商首字母，比通用星形更有产品身份。 */
+  const mark = $("#peerMark");
+  if (mark) {
+    const provider = providerIdOf(s);
+    mark.dataset.provider = provider;
+    mark.textContent = assistant ? providerMonogram(provider) : "";
+  }
   const badge = $("#peerBadge");
   if (badge) {
     badge.textContent = t("assistant.label");
@@ -1571,7 +1615,7 @@ function renderHeader() {
   }
   const sub = $("#peerSub");
   if (sub) {
-    sub.textContent = assistant ? t("assistant.sessionSub", { n: state.messages.length }) : "";
+    sub.textContent = assistant ? assistantSubline() : "";
     sub.hidden = !assistant;
   }
   syncAssistantTools();
@@ -2022,7 +2066,8 @@ function renderAssistantMarkup(text) {
 }
 
 function assistantMetaMarkup(message, role) {
-  const label = role === "user" ? t("assistant.metaUser") : t("assistant.label");
+  /* 助理页不出现人设名：AI 那一侧直接写服务商，和页头、会话列表保持一致。 */
+  const label = role === "user" ? t("assistant.metaUser") : providerShort(providerIdOf());
   const dot = role === "user" ? "" : '<span class="as-dot" aria-hidden="true"></span>';
   return `<div class="as-meta ${role === "user" ? "is-user" : "is-ai"}">${dot}<span class="as-who">${escapeHtml(label)}</span><time>${escapeHtml(timeLabel(message.ts))}</time></div>`;
 }
@@ -2065,12 +2110,14 @@ function assistantSourcesMarkup(message) {
 
 function assistantWelcomeMarkup() {
   const prompts = ["code", "write", "error", "notes"];
+  const provider = providerIdOf();
   return `<div class="as-welcome" id="asWelcome">
     <div class="as-welcome-head">
-      <span class="as-orb" aria-hidden="true">${icon("sparkle")}</span>
+      <span class="as-orb" data-provider="${escapeHtml(provider)}" aria-hidden="true">${escapeHtml(providerMonogram(provider))}</span>
       <div class="as-welcome-copy">
         <b>${escapeHtml(t("assistant.welcomeTitle"))}</b>
         <small>${escapeHtml(t("assistant.welcomeSub"))}</small>
+        <small class="as-welcome-meta">${escapeHtml(assistantWelcomeMeta())}</small>
       </div>
     </div>
     <div class="as-prompts">
@@ -2085,6 +2132,16 @@ function assistantWelcomeMarkup() {
   </div>`;
 }
 
+/** 欢迎卡第二行：告诉用户这张卡后面接着哪家服务、哪些能力可用。 */
+function assistantWelcomeMeta() {
+  const s = state.settings;
+  const provider = providerIdOf(s);
+  const model = String(s.model || "").trim();
+  const head = model ? t("assistant.welcomeMeta", { provider: providerShort(provider), model }) : providerShort(provider);
+  const caps = assistantCapabilities(s);
+  return caps.web || caps.thinking ? `${head} · ${t("assistant.capReady")}` : head;
+}
+
 function syncAssistantWelcome() {
   const list = $("#messageList");
   if (!list || !state) return;
@@ -2096,7 +2153,17 @@ function syncAssistantWelcome() {
     existing?.remove();
     return;
   }
-  if (existing) return;
+  if (existing) {
+    const provider = providerIdOf();
+    const orb = existing.querySelector(".as-orb");
+    if (orb) {
+      orb.dataset.provider = provider;
+      orb.textContent = providerMonogram(provider);
+    }
+    const meta = existing.querySelector(".as-welcome-meta");
+    if (meta) meta.textContent = assistantWelcomeMeta();
+    return;
+  }
   const holder = document.createElement("div");
   holder.innerHTML = assistantWelcomeMarkup();
   const node = holder.firstElementChild;
@@ -2158,8 +2225,15 @@ function syncAssistantExtras() {
   syncAssistantTools();
   const sub = $("#peerSub");
   if (sub && chatModeOf(state.settings) === "assistant") {
-    sub.textContent = t("assistant.sessionSub", { n: state.messages.length });
+    sub.textContent = assistantSubline();
   }
+}
+
+/** 页头第二行：模型 + 会话条数，服务商身份具体到型号。 */
+function assistantSubline() {
+  const count = t("assistant.sessionSub", { n: (state.messages || []).length });
+  const model = String(state.settings.model || "").trim();
+  return model ? `${model} · ${count}` : count;
 }
 
 function messageMarkup(message, isNew, previous = null) {
@@ -3543,19 +3617,29 @@ async function requestAssistant(userMessage, { proactive = false, manual = false
      用户还停在原地。 */
   const context = threadContext();
   const originSettings = { ...state.settings };
-  /* 助理页的两个能力：只有 MiMo 原生支持；陪伴 / 剧本永远不带这些参数。 */
+  /* 助理页的两个能力：MiMo 与 DeepSeek 的原生插件；陪伴 / 剧本永远不带这些参数。 */
+  const provider = providerIdOf(originSettings);
   const caps = assistantCapabilities(originSettings);
   const assistantMode = chatModeOf(originSettings) === "assistant";
   const useWeb = Boolean(assistantMode && caps.web && originSettings.assistant?.web);
   const useThinking = Boolean(assistantMode && caps.thinking && originSettings.assistant?.thinking);
   const extraBody = {};
   if (assistantMode && caps.thinking) {
-    /* MiMo v2.6 默认就开深度思考；不开的时候要显式关掉。 */
+    /* 两家默认都开深度思考（MiMo v2.6 / DeepSeek V4），不开时要显式关掉。 */
     extraBody.thinking = { type: useThinking ? "enabled" : "disabled" };
   }
+  if (assistantMode && provider === "deepseek" && useThinking) {
+    extraBody.reasoning_effort = "high";
+  }
   if (useWeb) {
-    extraBody.tools = [{ type: "web_search", max_keyword: 3, force_search: true, limit: 1 }];
-    extraBody.tool_choice = "auto";
+    if (provider === "mimo") {
+      extraBody.tools = [{ type: "web_search", max_keyword: 3, force_search: true, limit: 1 }];
+      extraBody.tool_choice = "auto";
+    } else if (provider === "deepseek") {
+      /* DeepSeek 的服务端联网工具，搜索 / 抓取都在服务端完成。
+         tool_choice 不能强制指定这两个工具，交给模型决定。 */
+      extraBody.tools = [{ type: "deepseek_web_search" }, { type: "deepseek_read_url" }];
+    }
   }
   sending = true;
   segmentAbort = false;
@@ -3567,7 +3651,7 @@ async function requestAssistant(userMessage, { proactive = false, manual = false
   abortController = controller;
   try {
     const useVision = userMessage?.kind === "image" && originSettings.visionModel?.trim();
-    const model = useVision ? originSettings.visionModel.trim() : originSettings.model;
+    const model = modelForRequest(originSettings, { vision: useVision });
     const messages = buildChatMessages(state, userMessage, { proactive, afterBlock });
     const quoteCatalog = buildQuoteCatalog(state, userMessage?.id);
     const streamable = !useVision && !proactive && !afterBlock && originSettings.optimize?.streaming !== false;

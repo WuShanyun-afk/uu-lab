@@ -1,7 +1,7 @@
 {
   "name": "lian-chat",
   "private": true,
-  "version": "1.9.21",
+  "version": "1.9.22",
   "type": "module",
   "description": "Lian - a pure frontend LINE-style companion chat app.",
   "scripts": {

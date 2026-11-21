@@ -26,8 +26,19 @@ export function languageInstruction(settings) {
   }
 }
 
+function providerId(settings) {
+  const id = settings?.provider || "custom";
+  if (PROVIDERS[id] && id !== "custom") return id;
+  const base = String(settings?.baseUrl || "");
+  if (/deepseek\.com/i.test(base)) return "deepseek";
+  if (/xiaomimimo\.com/i.test(base)) return "mimo";
+  if (/api\.openai\.com/i.test(base)) return "openai";
+  return id;
+}
+
 function providerName(settings) {
-  return PROVIDERS[settings?.provider]?.short || PROVIDERS[settings?.provider]?.label || "AI";
+  const provider = PROVIDERS[providerId(settings)];
+  return provider?.short || provider?.label || "AI";
 }
 
 function personaBlock(state, chatMode = "companion") {
@@ -337,13 +348,23 @@ export function buildChatMessages(state, currentMessage, { proactive = false, af
   });
   const messages = [{ role: "system", content: system }];
   const history = historyForApi(state, currentMessage?.id);
+  /* DeepSeek 带 tools 时要求历史轮次的 reasoning_content 一起回传；
+     只在「助理页 + 联网开着」时补，避免给别的服务商塞无用字段。 */
+  const replayReasoning = providerId(state.settings) === "deepseek"
+    && state.settings?.mode === "assistant"
+    && Boolean(state.settings?.assistant?.web);
   for (const message of history) {
     if (message.role === "assistant") {
       // Replaying our own "[I sent a sticker]" bookkeeping teaches some models
       // to type that literal sentence. The sticker itself adds little context.
       if (message.kind === "sticker") continue;
       const text = messageTextForApi(message, state);
-      if (text?.trim()) messages.push({ role: "assistant", content: text });
+      if (!text?.trim()) continue;
+      const entry = { role: "assistant", content: text };
+      if (replayReasoning && message.reasoning) {
+        entry.reasoning_content = String(message.reasoning).slice(-4000);
+      }
+      messages.push(entry);
       continue;
     }
     const content = contentForUserMessage(message, state, false);

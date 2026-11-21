@@ -2,7 +2,7 @@
 
 一个 **纯前端** 的 LINE 风格手机聊天应用。没有账号、没有后端、没有模型名；填入自己的 API Key 就能用。聊天、记忆、头像、表情和密钥都只留在当前设备。
 
-> 当前版本：**1.9.21**  
+> 当前版本：**1.9.22**  
 > 形态：PWA / 静态网页 / Android APK  
 > 默认接口：MiMo（小米）OpenAI 兼容接口  
 > 重来：长按「重新生成」只重做那一条，后面的消息保留（画面消息是「重画一张」）
@@ -10,8 +10,8 @@
 > 表情：内置 69 张两套「menhera君 44 + menhera酱 25」，支持导入自己的图片；AI 表情可选自由风格、颜文字猫、软萌动物或 emoji 梗图
 > 外观：16 套配色 + 8 种聊天页版式（经典 LINE / 讯息 iMessage / 信笺 / 泡泡 / 素页 / 手账 / 时间轴 / 漫画），改的是头部、气泡、输入栏的结构
 > 模式：陪伴 / 角色扮演（8 张剧本卡 + `*动作*` 渲染）/ 纯 AI 助理（自带「助理」主题，不出贴纸）；三类对话各有自己的会话，互不串消息
-> 助理页：AI 工作台——服务商名（MiMo / OpenAI / DeepSeek）、渐变徽记、欢迎卡与快捷提问、标题 / 列表 / 引用 / 表格、代码块（语言 + 行数 + 复制）、复制 / 重新生成、思考中的三点与流式光标
-> 助理能力：输入栏上方可切「联网」与「深度思考」（MiMo 原生）；回答里可展开「思考过程」，联网结果带「联网来源」
+> 助理页：AI 工作台——服务商名（MiMo / OpenAI / DeepSeek）、深墨徽记（服务商首字母 + 渐变细环）、欢迎卡与快捷提问、标题 / 列表 / 引用 / 表格、代码块（语言 + 行数 + 复制）、复制 / 重新生成、思考中的三点与流式光标
+> 助理能力：输入栏上方可切「联网」与「深度思考」（MiMo / DeepSeek 原生；DeepSeek 走 deepseek-flash 的服务端工具）；回答里可展开「思考过程」，联网结果带「联网来源」
 > 工具盘：「+」在输入栏里张开一层盘，表情分成「最近 + 笑脸 / 撒娇 / 心意 / 手势 / 日常」六组，点过的会自动排到「最近」
 > 其他页面：聊天列表有问候与「全部 / 未读」筛选，主页每天一道「今日一问」，通讯录把句数和记忆数摊出来；强调色改成输入色号
 
@@ -24,6 +24,44 @@
 <img src="docs/preview-snow.png" width="260" alt="雪站沉浸主题">
 <img src="docs/preview-studio.png" width="260" alt="AI 表情工坊">
 <img src="docs/preview-drawing.png" width="260" alt="TA 现场画的画面">
+
+---
+
+## 1.9.22 徽记再设计 + 接入 DeepSeek 原生联网（2026-11-21）
+
+<img src="docs/assistant-welcome.png" width="250" alt="MiMo 助理页：深墨 M 徽记、模型副标题、联网 / 深度思考">
+<img src="docs/assistant-deepseek.png" width="250" alt="DeepSeek 助理页：D 徽记、deepseek-flash、两个开关已打开">
+
+### 1. 徽记：深墨砖 + 衬线首字母 + 渐变细环
+
+上一版是淡蓝玻璃砖 + 线稿星，还是偏「通用 AI」；这一版把徽记做成每个服务商自己的商标：
+
+- 36px 深墨砖（`#272c3a → #0b0e15`），1px 渐变细环按服务商换色：MiMo 蓝紫、OpenAI 青绿、DeepSeek 蓝、自定义灰；
+- 中间不再是通用星形，而是服务商首字母 `M` / `O` / `D` / `自`，用 Georgia / 宋体衬线字，像一枚印章；
+- 欢迎卡换成 44px 同款徽记，页头和欢迎卡不再两个风格；
+- 页头副标题从「独立会话 · N 条」升级为「模型 · N 条」，例如 `deepseek-flash · 独立会话 · 4 条`；
+- 每条回答上方的小标也从「AI 助理」改成服务商名，和页头、列表、prompt 一致。
+
+### 2. DeepSeek：换成当前模型，接上原生联网与思考
+
+DeepSeek 的 API 在 2026-11 已经换了代：`deepseek-chat` / `deepseek-reasoner` 下线，当前是 `deepseek-flash`（V4.1 Flash），并且原生支持服务端联网工具。这一版按新接口接：
+
+- **模型**：默认 `deepseek-flash`，老 Key 里存的 `deepseek-chat` / `deepseek-reasoner` 自动映射到 `deepseek-flash`；开了联网时强制用 `deepseek-flash`（联网工具只在它上面有）；
+- **深度思考**：请求带 `thinking: { type: "enabled" | "disabled" }` + `reasoning_effort: "high"`，返回的 `reasoning_content` 渲染成「思考过程」；
+- **联网**：请求带 `tools: [{ type: "deepseek_web_search" }, { type: "deepseek_read_url" }]`，不设 `tool_choice`（DeepSeek 不允许强制指定这两个工具）；搜索、打开网页、页内查找都在服务端完成；
+- **来源**：`annotations` 里两种形状都收——MiMo 的扁平 `{url, title}` 和 DeepSeek / OpenAI 的 `{url_citation: {url, title}}`；
+- **多轮**：开着联网时，历史 assistant 消息会带上 `reasoning_content`（DeepSeek 在 tools 请求里要求回传），其它服务商不受影响；
+- **服务商识别**：选了「自定义」但填的是 `deepseek.com` / `xiaomimimo.com` 地址时，页头、prompt 和能力开关都按真实服务商走，不会显示「自定义」却开不了联网。
+
+`OpenAI` / 其它自定义接口仍然不显示这两个能力：开关可见但禁用，点一下提示由 MiMo / DeepSeek 提供。
+
+### 3. 验证
+
+| 项 | 结果 |
+|---|---|
+| 单测 | **163 / 163**（新增：嵌套 `url_citation`、DeepSeek prompt 命名、`reasoning_content` 回传） |
+| 新回归 | `scripts/thread-check.mjs` **63 / 63**（新增：D 徽记与 `data-provider`、DeepSeek 开关、请求体 `thinking` + `reasoning_effort` + 两个服务端工具、`deepseek-flash`、嵌套来源、回答小标） |
+| 其余检查 | mode 61、audit 262、boot 14、leak 19、tray 21、drawing 14、regen 10、stream 8、sticker 20、ux 14 全绿 |
 
 ---
 

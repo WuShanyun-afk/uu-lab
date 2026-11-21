@@ -19,3 +19,18 @@ test("MiMo url citations become deduplicated web sources", () => {
   assert.deepEqual(extractSources({}), []);
   assert.deepEqual(extractSources({ annotations: "nope" }), []);
 });
+
+test("OpenAI-style nested url_citation is accepted too", () => {
+  const sources = extractSources({
+    annotations: [
+      {
+        type: "url_citation",
+        url_citation: { url: "https://example.com/deep", title: "DeepSeek 文档", start_index: 0, end_index: 9 },
+      },
+      { type: "url_citation", url_citation: { url: "not-a-url", title: "bad" } },
+    ],
+  });
+  assert.equal(sources.length, 1);
+  assert.equal(sources[0].url, "https://example.com/deep");
+  assert.equal(sources[0].title, "DeepSeek 文档");
+});

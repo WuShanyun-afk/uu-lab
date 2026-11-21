@@ -136,23 +136,26 @@ function extractReasoning(message) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-/* 联网来源：MiMo 的 web_search 把引用放在 message.annotations（url_citation）。 */
+/* 联网来源：MiMo / DeepSeek 都把引用放在 message.annotations。
+   两种形状都收：扁平的 {type,url,title}，以及 OpenAI 风格的
+   {type:"url_citation", url_citation:{url,title}}。 */
 export function extractSources(message) {
   const raw = message?.annotations;
   if (!Array.isArray(raw)) return [];
   const seen = new Set();
   const out = [];
   for (const item of raw) {
-    if (!item || item.type !== "url_citation" || !item.url) continue;
-    const url = String(item.url);
-    if (seen.has(url)) continue;
+    if (!item || item.type !== "url_citation") continue;
+    const cite = item.url_citation && typeof item.url_citation === "object" ? item.url_citation : item;
+    const url = String(cite.url || "");
+    if (!/^https?:\/\//i.test(url) || seen.has(url)) continue;
     seen.add(url);
     out.push({
       url,
-      title: String(item.title || "").slice(0, 300),
-      siteName: String(item.site_name || "").slice(0, 60),
-      summary: String(item.summary || "").slice(0, 500),
-      publishTime: String(item.publish_time || ""),
+      title: String(cite.title || "").slice(0, 300),
+      siteName: String(cite.site_name || item.site_name || "").slice(0, 60),
+      summary: String(cite.summary || "").slice(0, 500),
+      publishTime: String(cite.publish_time || ""),
     });
     if (out.length >= 8) break;
   }

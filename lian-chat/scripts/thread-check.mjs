@@ -530,6 +530,81 @@ const sendText = async (text) => {
   check("web sources are rendered as links", rendered.sources === 1 && rendered.sourceHref.includes("example.com"), JSON.stringify({ n: rendered.sources, href: rendered.sourceHref }));
 }
 
+/* ================= 11. DeepSeek: monogram, native tools, nested citations ================= */
+{
+  const greeting = { ...msg("g1", "assistant", "在。要处理什么？", now - 60000), greeting: true };
+  const deepseekSettings = {
+    ...baseSettings("assistant"),
+    provider: "deepseek",
+    baseUrl: "https://api.deepseek.com/v1",
+    model: "deepseek-flash",
+  };
+  const seed = wrap(deepseekSettings, [
+    chat("c3", "assistant", "Lian", [greeting], { updatedAt: now, keyId: "k3" }),
+  ], "c3", [greeting], { companion: "", roleplay: "", assistant: "c3" });
+  seed.keys = [{ ...key, id: "k3", name: "DeepSeek", provider: "deepseek", baseUrl: "https://api.deepseek.com/v1", model: "deepseek-flash" }];
+  seed.activeKeyId = "k3";
+  await boot(seed);
+  await openChatById("c3");
+  const marks = await evaluate(`({
+    header: document.querySelector("#peerName")?.textContent,
+    mark: document.querySelector("#peerMark")?.textContent,
+    provider: document.querySelector("#peerMark")?.dataset.provider,
+    orb: document.querySelector(".as-orb")?.textContent,
+    orbProvider: document.querySelector(".as-orb")?.dataset.provider,
+    meta: document.querySelector(".as-welcome-meta")?.textContent || "",
+    sub: document.querySelector("#peerSub")?.textContent || "",
+  })`);
+  check("a DeepSeek assistant is titled DeepSeek", marks.header === "DeepSeek", String(marks.header));
+  check("the header mark becomes a D monogram", marks.mark === "D" && marks.provider === "deepseek", JSON.stringify(marks));
+  check("the welcome card carries the same monogram", marks.orb === "D" && marks.orbProvider === "deepseek", JSON.stringify(marks));
+  check("the welcome card names the model and its capabilities", marks.meta.includes("deepseek-flash") && marks.meta.includes("联网"), marks.meta);
+  check("the header sub line shows the model", marks.sub.includes("deepseek-flash"), marks.sub);
+  const caps = await evaluate(`({
+    web: document.querySelector('[data-assistant-tool="web"]')?.disabled,
+    thinking: document.querySelector('[data-assistant-tool="thinking"]')?.disabled,
+  })`);
+  check("DeepSeek enables both capability toggles", caps.web === false && caps.thinking === false, JSON.stringify(caps));
+  await evaluate(`document.querySelector('[data-assistant-tool="web"]')?.click()`);
+  await evaluate(`document.querySelector('[data-assistant-tool="thinking"]')?.click()`);
+  await sleep(200);
+  await mockReply("DeepSeek 的服务端联网工具已经接入。", 700, {
+    reasoning_content: "先查一下官方文档的字段名。",
+    annotations: [
+      {
+        type: "url_citation",
+        url_citation: {
+          url: "https://api-docs.deepseek.com/zh-cn/guides/web_tools/",
+          title: "联网工具 | DeepSeek API Docs",
+          start_index: 0,
+          end_index: 8,
+        },
+      },
+    ],
+  });
+  await sendText("DeepSeek 的联网怎么开？");
+  await sleep(1900);
+  const body = await evaluate(`window.__lastBody || null`);
+  check("DeepSeek gets an explicit thinking switch", body?.thinking?.type === "enabled", JSON.stringify(body?.thinking));
+  check("DeepSeek thinking uses a high effort", body?.reasoning_effort === "high", String(body?.reasoning_effort));
+  check(
+    "DeepSeek declares its own server-side web tools",
+    body?.tools?.[0]?.type === "deepseek_web_search" && body?.tools?.[1]?.type === "deepseek_read_url",
+    JSON.stringify(body?.tools),
+  );
+  check("DeepSeek web tools are never force-called", body?.tool_choice === undefined, JSON.stringify(body?.tool_choice));
+  check("DeepSeek web requests use deepseek-flash", body?.model === "deepseek-flash", String(body?.model));
+  check("DeepSeek thinking is given a larger token budget", Number(body?.max_tokens) >= 4096, String(body?.max_tokens));
+  const rendered = await evaluate(`({
+    think: document.querySelector(".as-think-body")?.textContent || "",
+    sources: [...document.querySelectorAll(".as-sources a")].map((a) => a.getAttribute("href")),
+    meta: document.querySelector(".as-meta.is-ai .as-who")?.textContent || "",
+  })`);
+  check("DeepSeek reasoning is rendered", rendered.think.includes("官方文档"), rendered.think.slice(0, 24));
+  check("a nested url_citation still renders one source", rendered.sources.length === 1 && rendered.sources[0].includes("api-docs.deepseek.com"), JSON.stringify(rendered.sources));
+  check("the per-message label is the provider, not a persona", rendered.meta === "DeepSeek", rendered.meta);
+}
+
 check("no console errors", consoleErrors.length === 0, consoleErrors.slice(0, 2).join(" | "));
 
 const failed = results.filter((item) => !item.ok);

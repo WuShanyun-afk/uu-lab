@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { THEMES, defaultState } from "../js/config.js";
 import { normaliseState } from "../js/store.js";
 import { CHAT_MODES, MODE_THREADS, ROLEPLAY_PRESETS, chatModeOf, modeOfChat, parseNarration } from "../js/roleplay.js";
-import { buildSystemPrompt, parseReply } from "../js/prompt.js";
+import { buildChatMessages, buildSystemPrompt, parseReply } from "../js/prompt.js";
 import { t } from "../js/i18n.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -232,6 +232,32 @@ test("the assistant prompt drops the lover persona and pet names", () => {
   const companionPrompt = buildSystemPrompt(companion);
   assert.ok(companionPrompt.includes("认识三年的恋人"));
   assert.ok(companionPrompt.includes("你们的关系"));
+});
+
+test("the assistant prompt follows the provider, even behind a custom base URL", () => {
+  const state = modeState("assistant");
+  state.settings.provider = "deepseek";
+  state.settings.baseUrl = "https://api.deepseek.com/v1";
+  assert.ok(buildSystemPrompt(state).includes("DeepSeek"), "DeepSeek should be named in the prompt");
+  state.settings.provider = "custom";
+  assert.ok(buildSystemPrompt(state).includes("DeepSeek"), "a deepseek.com base URL should still be named DeepSeek");
+});
+
+test("DeepSeek web turns replay earlier reasoning_content", () => {
+  const state = modeState("assistant");
+  state.settings.provider = "deepseek";
+  state.settings.assistant = { web: true, thinking: true };
+  state.messages = [
+    { id: "u1", role: "user", text: "查一下天气", ts: 1 },
+    { id: "a1", role: "assistant", text: "多云。", reasoning: "先确认日期。", ts: 2 },
+  ];
+  const messages = buildChatMessages(state, null);
+  const assistant = messages.find((message) => message.role === "assistant");
+  assert.ok(assistant, "the assistant turn should be replayed");
+  assert.equal(assistant.reasoning_content, "先确认日期。");
+  /* 关掉联网就不塞这个字段，别给普通对话增加 token。 */
+  state.settings.assistant.web = false;
+  assert.equal(buildChatMessages(state, null).find((message) => message.role === "assistant")?.reasoning_content, undefined);
 });
 
 test("module threads have copy in both languages", () => {

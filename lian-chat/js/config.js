@@ -25,9 +25,9 @@ export const PROVIDERS = {
     label: "DeepSeek",
     short: "DeepSeek",
     baseUrl: "https://api.deepseek.com/v1",
-    model: "deepseek-chat",
-    visionModel: "",
-    note: "文本模型 · 图片需另配视觉模型",
+    model: "deepseek-flash",
+    visionModel: "deepseek-flash",
+    note: "V4.1 Flash · 原生联网 / 深度思考",
   },
   custom: {
     id: "custom",

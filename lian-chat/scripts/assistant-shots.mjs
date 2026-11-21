@@ -107,8 +107,12 @@ const chat = (messages) => ({
   memoryMeta: { lastUserCount: 0, lastAttemptAt: 0, lastAt: 0 }, block: null, blockFollowUp: null,
   createdAt: now - 86400000, updatedAt: now,
 });
-const wrap = (messages) => ({
-  onboarded: true, settings, chats: [chat(messages)], keys: [{ id: "k1", name: "MiMo", provider: "mimo", apiKey: "seed", baseUrl: "https://api.xiaomimimo.com/v1", model: "mimo-v2.6-flash", createdAt: now }],
+const key = { id: "k1", name: "MiMo", provider: "mimo", apiKey: "seed", baseUrl: "https://api.xiaomimimo.com/v1", model: "mimo-v2.6-flash", createdAt: now };
+const wrap = (messages, override = null) => ({
+  onboarded: true,
+  settings: override?.settings || settings,
+  chats: [chat(messages)],
+  keys: [override?.key || key],
   activeChatId: "c3", activeKeyId: "k1", activeByMode: { companion: "", roleplay: "", assistant: "c3" },
   messages, memories: [], memoryMeta: { lastUserCount: 0, lastAttemptAt: 0, lastAt: 0 },
 });
@@ -143,7 +147,24 @@ async function shot(name) {
 /* ---- 1. welcome (greeting only) ---- */
 await boot(wrap([{ ...msg("g1", "assistant", "在。要处理什么？", now - 60000), greeting: true }]));
 await shot("assistant-welcome.png");
-console.log("welcome:", await evaluate(`({ welcome: !!document.querySelector("#asWelcome"), prompts: document.querySelectorAll(".as-prompt").length, sub: document.querySelector("#peerSub")?.textContent })`));
+console.log("welcome:", await evaluate(`({ welcome: !!document.querySelector("#asWelcome"), prompts: document.querySelectorAll(".as-prompt").length, mark: document.querySelector("#peerMark")?.textContent, sub: document.querySelector("#peerSub")?.textContent })`));
+
+/* ---- 1b. DeepSeek: D monogram + both native capabilities on ---- */
+const deepseekSettings = {
+  ...settings,
+  provider: "deepseek",
+  baseUrl: "https://api.deepseek.com/v1",
+  model: "deepseek-flash",
+};
+const deepseekKey = { id: "k1", name: "DeepSeek", provider: "deepseek", apiKey: "seed", baseUrl: "https://api.deepseek.com/v1", model: "deepseek-flash", createdAt: now };
+await boot(wrap([{ ...msg("g1", "assistant", "在。要处理什么？", now - 60000), greeting: true }], { settings: deepseekSettings, key: deepseekKey }));
+await evaluate(`(() => {
+  document.querySelector('[data-assistant-tool="web"]')?.click();
+  document.querySelector('[data-assistant-tool="thinking"]')?.click();
+})()`);
+await sleep(240);
+await shot("assistant-deepseek.png");
+console.log("deepseek:", await evaluate(`({ mark: document.querySelector("#peerMark")?.textContent, provider: document.querySelector("#peerMark")?.dataset.provider, meta: document.querySelector(".as-welcome-meta")?.textContent, pressed: [...document.querySelectorAll("[data-assistant-tool]")].map((b) => b.getAttribute("aria-pressed")) })`));
 
 /* ---- 2. a rich answer ---- */
 const answer = [
