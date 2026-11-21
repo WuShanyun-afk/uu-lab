@@ -173,8 +173,81 @@ export function buildReportFromRaw(raw, state) {
   const summary = String(parsed.summary || "").trim().slice(0, 160);
   const blocks = normaliseBlocks(parsed.blocks);
   if (blocks.length >= 2) return { title, summary, blocks, html: "" };
-  const clean = sanitizeReportHtml(parsed.html || "");
-  return { title, summary, blocks: [], html: clean || `<h2>${escapeHtml(title)}</h2><p>${escapeHtml(summary || "今天也有一点小事，想讲给你听。")}</p>` };
+  /* A failed parse used to hand the raw JSON to sanitizeReportHtml, which keeps
+     text as text — so the viewer showed `{"title":"…"` verbatim. JSON is never
+     report content, and it is checked before the DOM sanitiser runs. */
+  const rawHtml = String(parsed.html || "").trim();
+  const safeHtml = rawHtml && !looksLikeJson(rawHtml) ? sanitizeReportHtml(rawHtml) : "";
+  if (blocks.length === 1 && !safeHtml) return { title, summary, blocks, html: "" };
+  if (safeHtml) return { title, summary, blocks: [], html: safeHtml };
+  const salvaged = salvageReport(rawHtml || summary || "");
+  return {
+    title: title || salvaged.title,
+    summary: summary || salvaged.summary,
+    blocks: salvaged.blocks,
+    html: "",
+  };
+}
+
+const JSON_LOOK = /^\s*[\{\[]/;
+
+export function looksLikeJson(text) {
+  return JSON_LOOK.test(String(text || ""));
+}
+
+function unescapeJsonText(text) {
+  try {
+    return JSON.parse(`"${text}"`);
+  } catch {
+    return String(text).replace(/\\(["\\/nrt])/g, (match, code) =>
+      ({ '"': '"', "\\": "\\", "/": "/", n: "\n", r: "\r", t: "\t" })[code] || match,
+    );
+  }
+}
+
+function readJsonString(raw, key) {
+  const closed = new RegExp(`"${key}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"`, "i").exec(raw);
+  if (closed) return unescapeJsonText(closed[1]);
+  /* a value cut off by max_tokens has no closing quote */
+  const open = new RegExp(`"${key}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)$`, "i").exec(raw);
+  return open ? unescapeJsonText(open[1]) : "";
+}
+
+/**
+ * Last resort when the model's JSON never becomes valid (cut off mid-string,
+ * wrapped in prose, wrong shape). Pull out whatever fields are readable and
+ * never let the raw source reach the viewer.
+ */
+export function salvageReport(raw) {
+  const content = String(raw || "")
+    .replace(/^[ \t]*```[a-z]*[ \t]*$/gim, "")
+    .trim();
+  const title = readJsonString(content, "title").trim().slice(0, 60);
+  const summary = readJsonString(content, "summary").trim().slice(0, 160);
+  const blockTexts = [...content.matchAll(/"text"\s*:\s*"((?:[^"\\]|\\.)*)"/gi)]
+    .map((match) => unescapeJsonText(match[1]).replace(/<[^>]*>/g, "").trim())
+    .filter(Boolean);
+  /* the last block may be cut off mid-sentence, so it has no closing quote */
+  const cutBlock = /"text"\s*:\s*"((?:[^"\\]|\\.)*)$/i.exec(content);
+  if (cutBlock) {
+    const text = unescapeJsonText(cutBlock[1]).replace(/<[^>]*>/g, "").trim();
+    if (text) blockTexts.push(text);
+  }
+  if (blockTexts.length) {
+    return {
+      title,
+      summary,
+      blocks: blockTexts.slice(0, MAX_BLOCKS).map((text) => ({ text: text.slice(0, MAX_BLOCK_CHARS), scene: "" })),
+    };
+  }
+  if (title || summary) return { title, summary, blocks: [] };
+  if (looksLikeJson(content)) return { title: "", summary: "", blocks: [] };
+  const paragraphs = content
+    .split(/\n{2,}/)
+    .map((part) => part.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .slice(0, MAX_BLOCKS);
+  return { title: "", summary: "", blocks: paragraphs.map((text) => ({ text: text.slice(0, MAX_BLOCK_CHARS), scene: "" })) };
 }
 
 /**

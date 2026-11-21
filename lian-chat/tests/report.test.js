@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { defaultState } from "../js/config.js";
 import { SCENE_IDS, sceneSvg } from "../js/scenes.js";
-import { buildReportFromRaw, normaliseBlocks, reportBlocksHtml } from "../js/report.js";
+import { buildReportFromRaw, normaliseBlocks, reportBlocksHtml, salvageReport } from "../js/report.js";
 import { buildReportMessages } from "../js/prompt.js";
 
 test("every scene renders a self-contained, script-free SVG", () => {
@@ -71,4 +71,35 @@ test("report prompt asks for blocks and lists every scene id", () => {
   for (const id of SCENE_IDS) assert.ok(all.includes(`${id}（`), id);
   assert.ok(all.includes("none"));
   assert.ok(!all.includes("【HTML 规则】"));
+});
+
+test("a report that is cut off mid-JSON is salvaged, not shown as source", () => {
+  /* the phone bug: the reply ran out of tokens inside "summary", the viewer
+     then displayed the raw object text */
+  const raw = '{"title":"凌晨一点的日常","summary":"改代码改到现在';
+  const report = buildReportFromRaw(salvageReport(raw));
+  assert.equal(report.title, "凌晨一点的日常");
+  assert.equal(report.summary, "改代码改到现在");
+  assert.equal(report.html, "");
+  assert.ok(report.blocks.every((block) => !block.text.includes('"title"')));
+});
+
+test("salvage keeps readable blocks when only some of them arrived", () => {
+  const raw = '{"title":"夜","blocks":[{"text":"吃了面","scene":"egg"},{"text":"然后写代码","scene":"moon"},{"text":"还没写完';
+  const salvaged = salvageReport(raw);
+  assert.deepEqual(salvaged.blocks.map((block) => block.text), ["吃了面", "然后写代码", "还没写完"]);
+  const report = buildReportFromRaw(salvaged);
+  assert.deepEqual(report.blocks.map((block) => block.text), ["吃了面", "然后写代码", "还没写完"]);
+});
+
+test("raw JSON is never accepted as report HTML", () => {
+  const report = buildReportFromRaw({ title: "今天的报备", summary: "", html: '{"title":"凌晨一点的日常","summary":"改代码"}' });
+  assert.equal(report.html, "");
+  assert.ok(!report.html.includes('"title"'));
+});
+
+test("plain prose that never became JSON still becomes a readable report", () => {
+  const report = buildReportFromRaw(salvageReport("今天下了很久的雨。\n\n晚上煮了面，加了两个蛋。"));
+  assert.equal(report.blocks.length, 2);
+  assert.ok(report.blocks[0].text.includes("雨"));
 });

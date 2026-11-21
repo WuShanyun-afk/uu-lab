@@ -29,7 +29,7 @@ import {
 import { buildMemoryMessages, mergeMemories, parseMemoryReply } from "./memory.js";
 import { buildHtmlDocument, buildSvgDataUri, drawingLabel } from "./drawing.js";
 import { accentStrong, mineBubble, relativeLuminance } from "./palette.js";
-import { buildReportFromRaw, reportBlocksHtml, sanitizeReportHtml } from "./report.js";
+import { buildReportFromRaw, reportBlocksHtml, salvageReport, sanitizeReportHtml } from "./report.js";
 import { chatHaystack, matchMessageIndexes, matchSnippet, normaliseQuery, splitByMatches } from "./search.js";
 import { chatStats, dailyQuestionIndex, greetingPeriod } from "./insights.js";
 import { renderSetup } from "./setup.js";
@@ -777,7 +777,7 @@ function renderHome(force = false) {
         ${homeRow("about", "doc", t("settings.about"), t("settings.aboutHint"))}
       </div>
     </section>
-    <p class="home-foot">${escapeHtml(t("settings.version", { v: "1.9.12" }))} · ${escapeHtml(t("home.localOnly"))}</p>`;
+    <p class="home-foot">${escapeHtml(t("settings.version", { v: "1.9.13" }))} · ${escapeHtml(t("home.localOnly"))}</p>`;
 }
 
 /* =========================================================
@@ -2779,7 +2779,9 @@ async function requestAssistant(userMessage, { proactive = false, manual = false
       settings: state.settings,
       messages,
       model,
-      maxTokens: afterBlock ? 260 : proactive ? 220 : 720,
+      /* a drawing is a few hundred lines of markup: 720 tokens cut it in half,
+         which is how raw <svg> used to end up in a bubble */
+      maxTokens: afterBlock ? 260 : proactive ? 220 : state.settings.optimize?.drawings ? 2000 : 720,
       temperature: afterBlock ? 0.82 : proactive ? 0.92 : 0.88,
       signal: controller.signal,
       onDelta: streamable
@@ -2813,6 +2815,11 @@ async function requestAssistant(userMessage, { proactive = false, manual = false
     // A proactive / after-block message is one bubble; a drawing there would
     // arrive out of nowhere, so it is dropped rather than half-rendered.
     const drawings = proactive ? [] : parsed.drawings || [];
+    /* The model tried to draw but the markup was cut off or malformed. The
+       source was already stripped, so say one line instead of going silent. */
+    if (parsed.drawingBroken && !parts.length && !stickers.length && !drawings.length && !proactive) {
+      parts = [t("chat.drawingBroken")];
+    }
     if (!parts.length && !stickers.length && !drawings.length && !(parsed.blockRequested && state.settings.blocking?.enabled)) {
       throw new Error(t("error.empty"));
     }
@@ -3576,22 +3583,19 @@ async function generateReport(button) {
       settings: state.settings,
       messages: buildReportMessages(state),
       model: state.settings.model,
-      maxTokens: 1400,
+      maxTokens: 2400,
       temperature: 0.86,
       json: true,
     });
     recordUsage(result.usage);
-    let parsed = null;
+    /* Reports used to fall back to dumping the raw reply into the viewer when
+       the JSON did not parse — on a phone that looked like `{"title":"…`.
+       Salvage the readable fields instead, and never render the source. */
+    let report = null;
     try {
-      parsed = parseJsonReply(result.content);
+      report = buildReportFromRaw(parseJsonReply(result.content), state);
     } catch {
-      parsed = { title: t("report.titleFallback"), summary: "", html: result.content };
-    }
-    let report;
-    try {
-      report = buildReportFromRaw(parsed, state);
-    } catch {
-      report = buildReportFromRaw({ title: t("report.titleFallback"), summary: "", html: result.content }, state);
+      report = buildReportFromRaw(salvageReport(result.content), state);
     }
     const createdAt = Date.now();
     const message = {
@@ -3624,11 +3628,15 @@ function openReportViewer(message) {
   const report = message.report || {};
   const fallback = `<h2>${escapeHtml(report.title || t("report.titleFallback"))}</h2><p>${escapeHtml(report.summary || t("report.emptyBody"))}</p>`;
   // New reports are plain text + a local scene illustration; old saved reports
-  // still fall back to the sanitised HTML fragment.
-  const safeHtml =
-    reportBlocksHtml(report.blocks) ||
-    sanitizeReportHtml(report.html || "") ||
-    fallback;
+  // still fall back to the sanitised HTML fragment. The title/teaser used to be
+  // dropped here, which made a salvaged report look like loose paragraphs.
+  const blocksHtml = reportBlocksHtml(report.blocks);
+  const lead = blocksHtml
+    ? `${report.title ? `<h2>${escapeHtml(report.title)}</h2>` : ""}${report.summary ? `<p>${escapeHtml(report.summary)}</p>` : ""}`
+    : "";
+  const safeHtml = blocksHtml
+    ? `${lead}${blocksHtml}`
+    : sanitizeReportHtml(report.html || "") || fallback;
   const createdAt = report.createdAt || message.ts || Date.now();
   const modal = openModal(`<header class="report-cinema-head" id="reportHead">
       <div class="report-cinema-title">

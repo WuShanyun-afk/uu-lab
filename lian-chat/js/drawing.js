@@ -18,6 +18,10 @@ export const DRAWING_LIMITS = {
 };
 
 const FENCE = /```[ \t]*(svg|html)[ \t]*\r?\n([\s\S]*?)```/gi;
+/* A reply that ran into the token limit stops mid-markup: no closing ``` ever
+   arrives. Those still have to be taken out of the text, or the bubble shows
+   raw <svg> source. */
+const OPEN_FENCE = /```[ \t]*(svg|html)[ \t]*\r?\n([\s\S]*)$/i;
 
 const HTML_HINT = /<(html|body|style|div|section|main|svg|p|span|h1|h2|h3)\b/i;
 const SVG_HINT = /^<svg\b/i;
@@ -32,10 +36,19 @@ function svgStart(body) {
     .trim();
 }
 
+/** Cut everything after the last `</svg>`: models like to add a note in the fence. */
+function svgTail(markup) {
+  const text = String(markup || "");
+  const closes = [...text.matchAll(/<\/svg\s*>/gi)];
+  if (!closes.length) return text;
+  const last = closes[closes.length - 1];
+  return text.slice(0, last.index + last[0].length);
+}
+
 export function isSvgDrawing(body) {
-  const text = svgStart(body);
+  const text = svgTail(svgStart(body));
   if (!SVG_HINT.test(text)) return false;
-  if (!/<\/svg\s*>\s*$/i.test(text)) return false;
+  if (!/<\/svg\s*>$/i.test(text)) return false;
   return text.length <= DRAWING_LIMITS.maxSvgChars;
 }
 
@@ -115,7 +128,7 @@ export function buildSvgDataUri(svg) {
 function makeDrawing(type, body) {
   if (type === "svg") {
     if (!isSvgDrawing(body)) return null;
-    return { type: "svg", markup: svgStart(body) };
+    return { type: "svg", markup: svgTail(svgStart(body)) };
   }
   if (!isHtmlDrawing(body)) return null;
   return { type: "html", markup: stripActiveHtml(body).trim() };
@@ -124,20 +137,30 @@ function makeDrawing(type, body) {
 /**
  * Pull drawing fences out of a model reply.
  * Anything that does not look like a drawing is left in the text untouched,
- * so "write me an SVG snippet" still shows the code instead of eating it.
+ * so "write me an SVG snippet" still shows the code instead of eating it —
+ * except for an svg/html fence that we *tried* and failed to build (too big,
+ * cut off, malformed): that source never belongs in a bubble, so it is removed
+ * and counted in `broken`.
  */
 export function extractDrawings(raw, { limit = DRAWING_LIMITS.maxPerReply } = {}) {
   const drawings = [];
+  let broken = 0;
   let text = String(raw || "");
   text = text.replace(FENCE, (match, lang, body) => {
-    if (drawings.length >= limit) return match;
-    const made = makeDrawing(String(lang || "").toLowerCase(), body);
-    if (!made) return match;
-    drawings.push(made);
+    const made = drawings.length >= limit ? null : makeDrawing(String(lang || "").toLowerCase(), body);
+    if (made) {
+      drawings.push(made);
+      return "\n";
+    }
+    broken += 1;
+    return "\n";
+  });
+  text = text.replace(OPEN_FENCE, () => {
+    broken += 1;
     return "\n";
   });
   text = text.replace(/\n{3,}/g, "\n\n").trim();
-  return { text, drawings };
+  return { text, drawings, broken };
 }
 
 export function drawingLabel(drawing) {

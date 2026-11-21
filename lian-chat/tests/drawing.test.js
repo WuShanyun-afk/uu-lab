@@ -56,6 +56,23 @@ test("only one drawing per reply, and oversized ones are refused", () => {
   assert.equal(extractDrawings(`\`\`\`svg\n${huge}\n\`\`\``).drawings.length, 0);
 });
 
+test("a reply cut off mid-drawing never leaks its svg source", () => {
+  /* this is the phone bug: max_tokens stopped the reply inside <svg>, the
+     closing fence never arrived, and the raw source showed up in a bubble */
+  const out = extractDrawings('看这个。\n```svg\n<svg viewBox="0 0 320 320"><circle cx="160"');
+  assert.equal(out.drawings.length, 0);
+  assert.equal(out.broken, 1);
+  assert.equal(out.text, "看这个。");
+  assert.ok(!out.text.includes("<svg"));
+});
+
+test("a fence with a note after </svg> still renders", () => {
+  const out = extractDrawings(`\`\`\`svg\n${SVG}\n<!-- 画好了 -->\n\`\`\``);
+  assert.equal(out.drawings.length, 1);
+  assert.ok(out.drawings[0].markup.endsWith("</svg>"));
+  assert.ok(!out.drawings[0].markup.includes("画好了"));
+});
+
 test("the html sandbox document forbids scripts, links and external loads", () => {
   const doc = buildHtmlDocument(`<script>alert(1)</script><a href="javascript:alert(2)" onclick="x()">hi</a><img src="https://example.com/x.png"><link rel="stylesheet" href="//cdn/x.css">`);
   assert.ok(!/<script/i.test(doc));
@@ -138,4 +155,28 @@ test("parseReply skips drawing fences unless enabled", () => {
   assert.equal(parsedOn.drawings.length, 1);
   assert.equal(parsedOn.text, "看这个。");
   assert.deepEqual(parsedOn.parts, ["看这个。"]);
+});
+
+test("a cut-off drawing leaves clean words and a flag, never raw markup", () => {
+  const s = defaultState();
+  s.settings.apiKey = "test";
+  s.settings.optimize.autoSticker = false;
+  s.settings.optimize.drawings = true;
+  const parsed = parseReply('在睡觉。拍糊了。\n\n```svg\n<svg viewBox="0 0 320 320"><path d="M100 130 L82', s);
+  assert.equal(parsed.drawings.length, 0);
+  assert.equal(parsed.drawingBroken, true);
+  assert.equal(parsed.text, "在睡觉。拍糊了。");
+  assert.ok(!parsed.text.includes("```"));
+  assert.ok(!parsed.text.includes("<svg"));
+  assert.deepEqual(parsed.parts, ["在睡觉。拍糊了。"]);
+});
+
+test("with drawings off the markers go but the code the user asked for stays", () => {
+  const s = defaultState();
+  s.settings.apiKey = "test";
+  s.settings.optimize.autoSticker = false;
+  const parsed = parseReply(`给你代码：\n\`\`\`svg\n${SVG}\n\`\`\``, s);
+  assert.ok(!parsed.text.includes("```"));
+  assert.ok(parsed.text.includes("<svg"));
+  assert.equal(parsed.drawingBroken, false);
 });

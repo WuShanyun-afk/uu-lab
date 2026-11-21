@@ -156,6 +156,25 @@ test("JSON report parsing tolerates code fences and prose", () => {
   assert.equal(parsed.title, "窗边");
 });
 
+test("a JSON reply cut off by max_tokens is repaired", () => {
+  const cut = '{"title":"凌晨一点的日常","summary":"改代码改到现在","blocks":[{"text":"第一段","scene":"moon"},{"text":"第二段';
+  const parsed = parseJsonReply(cut);
+  assert.equal(parsed.title, "凌晨一点的日常");
+  assert.equal(parsed.blocks.length, 2);
+  assert.equal(parsed.blocks[1].text, "第二段");
+});
+
+test("a JSON reply cut in the middle of a key still yields what it had", () => {
+  const parsed = parseJsonReply('{"title":"窗边","summ');
+  assert.equal(parsed.title, "窗边");
+  assert.equal(parsed.summ, undefined);
+});
+
+test("nonsense that is not JSON still throws", () => {
+  assert.throws(() => parseJsonReply("今天下了雨。"));
+  assert.throws(() => parseJsonReply(""));
+});
+
 test("AI-made stickers resolve by id, caption and mixed directives", () => {
   const s = state();
   s.customStickers = [

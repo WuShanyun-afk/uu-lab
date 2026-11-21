@@ -596,10 +596,17 @@ export function parseReply(raw, state, options = {}) {
   // Pull drawings out first: the fence stripping below would eat the closing
   // ``` of a drawing block and leave it unparseable.
   let drawings = [];
+  let drawingBroken = false;
   if (state.settings.optimize?.drawings) {
     const drawn = extractDrawings(text, { limit: DRAWING_LIMITS.maxPerReply });
     text = drawn.text;
     drawings = drawn.drawings;
+    // a fence was there but no picture could be built (cut off / malformed)
+    drawingBroken = drawn.broken > 0 && !drawn.drawings.length;
+  } else {
+    /* drawings are off, so a fence is the user's own code request: keep the
+       code, drop the marker lines — no bubble should open with ```svg */
+    text = text.replace(/^[ \t]*```[ \t]*(?:svg|html)[ \t]*$/gim, "");
   }
   text = text.replace(/^\s*```[a-z]*\s*/i, "").replace(/\s*```\s*$/i, "");
 
@@ -635,6 +642,7 @@ export function parseReply(raw, state, options = {}) {
     parts,
     stickerIds,
     drawings,
+    drawingBroken,
     text,
     quote,
     blockRequested,
@@ -643,15 +651,93 @@ export function parseReply(raw, state, options = {}) {
   };
 }
 
-export function parseJsonReply(raw) {
-  let text = String(raw || "").trim();
-  text = text.replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "");
+/** Drop ```json fences anywhere in the reply, not just at its edges. */
+function stripFences(raw) {
+  return String(raw || "")
+    .replace(/^[ \t]*```[a-z]*[ \t]*$/gim, "")
+    .trim();
+}
+
+/**
+ * A reply that hit max_tokens stops mid-JSON. Close the open string and the
+ * open brackets so the half-finished object can still be read. Returns "" when
+ * the text cannot be repaired.
+ */
+export function repairJson(raw) {
+  const text = String(raw || "");
   const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start >= 0 && end > start) text = text.slice(start, end + 1);
-  const parsed = JSON.parse(text);
-  if (!parsed || typeof parsed !== "object") throw new Error("not an object");
-  return parsed;
+  if (start < 0) return "";
+  let out = "";
+  const stack = [];
+  let inString = false;
+  let escaped = false;
+  for (const ch of text.slice(start)) {
+    if (inString) {
+      out += ch;
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      out += ch;
+      continue;
+    }
+    if (ch === "{" || ch === "[") {
+      stack.push(ch === "{" ? "}" : "]");
+      out += ch;
+      continue;
+    }
+    if (ch === "}" || ch === "]") {
+      if (!stack.length || stack[stack.length - 1] !== ch) return "";
+      stack.pop();
+      out += ch;
+      continue;
+    }
+    out += ch;
+  }
+  let fixed = out;
+  if (inString) fixed += '"';
+  // a key or a comma left without a value: `"summary":` / `"blocks": [`
+  fixed = fixed.replace(/,\s*"[^"]*"\s*:?\s*$/, "");
+  fixed = fixed.replace(/,\s*$/, "");
+  while (stack.length) fixed += stack.pop();
+  try {
+    JSON.parse(fixed);
+    return fixed;
+  } catch {
+    return "";
+  }
+}
+
+export function parseJsonReply(raw) {
+  const text = stripFences(raw);
+  const start = text.indexOf("{");
+  if (start < 0) throw new Error("no json object");
+  const body = text.slice(start);
+  try {
+    const parsed = JSON.parse(body);
+    if (!parsed || typeof parsed !== "object") throw new Error("not an object");
+    return parsed;
+  } catch {
+    /* fall through: trailing prose, or a truncated object */
+  }
+  const end = body.lastIndexOf("}");
+  if (end > 0) {
+    try {
+      const parsed = JSON.parse(body.slice(0, end + 1));
+      if (parsed && typeof parsed === "object") return parsed;
+    } catch {
+      /* keep repairing */
+    }
+  }
+  const repaired = repairJson(body);
+  if (repaired) {
+    const parsed = JSON.parse(repaired);
+    if (parsed && typeof parsed === "object") return parsed;
+  }
+  throw new Error("invalid JSON");
 }
 
 // Kept exported for unit tests and future prompt variants.
