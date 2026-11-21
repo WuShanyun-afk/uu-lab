@@ -777,7 +777,7 @@ function renderHome(force = false) {
         ${homeRow("about", "doc", t("settings.about"), t("settings.aboutHint"))}
       </div>
     </section>
-    <p class="home-foot">${escapeHtml(t("settings.version", { v: "1.9.13" }))} · ${escapeHtml(t("home.localOnly"))}</p>`;
+    <p class="home-foot">${escapeHtml(t("settings.version", { v: "1.9.14" }))} · ${escapeHtml(t("home.localOnly"))}</p>`;
 }
 
 /* =========================================================
@@ -2669,6 +2669,9 @@ function stripLiveMarkup(raw) {
   text = text.replace(/\[\[?$/, "");
   text = text.replace(/```[\s\S]*?```/g, ""); // a finished drawing / code fence
   text = text.replace(/```[\s\S]*$/, ""); // a fence that is still being written
+  /* a bare <svg> (no fence) is still a picture: keep its source out of the
+     live bubble too */
+  text = text.replace(/<svg\b[^>]*\s(?:viewBox|xmlns|width|height)\s*=[\s\S]*$/i, "");
   return text.replace(/[ \t]+\n/g, "\n").trim();
 }
 
@@ -2780,8 +2783,16 @@ async function requestAssistant(userMessage, { proactive = false, manual = false
       messages,
       model,
       /* a drawing is a few hundred lines of markup: 720 tokens cut it in half,
-         which is how raw <svg> used to end up in a bubble */
-      maxTokens: afterBlock ? 260 : proactive ? 220 : state.settings.optimize?.drawings ? 2000 : 720,
+         which is how raw <svg> used to end up in a bubble. A model also draws
+         when the switch is off if the user asks it in words, so look at the
+         request as well. */
+      maxTokens: afterBlock
+        ? 260
+        : proactive
+          ? 220
+          : state.settings.optimize?.drawings || /(画|绘制|插画|svg|draw|illustrat)/i.test(String(userMessage?.text || ""))
+            ? 2600
+            : 720,
       temperature: afterBlock ? 0.82 : proactive ? 0.92 : 0.88,
       signal: controller.signal,
       onDelta: streamable

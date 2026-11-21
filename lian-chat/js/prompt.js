@@ -594,20 +594,14 @@ export function parseReply(raw, state, options = {}) {
   const quoteCatalog = Array.isArray(options.quoteCatalog) ? options.quoteCatalog : [];
   let text = String(raw || "").trim();
   // Pull drawings out first: the fence stripping below would eat the closing
-  // ``` of a drawing block and leave it unparseable.
-  let drawings = [];
-  let drawingBroken = false;
-  if (state.settings.optimize?.drawings) {
-    const drawn = extractDrawings(text, { limit: DRAWING_LIMITS.maxPerReply });
-    text = drawn.text;
-    drawings = drawn.drawings;
-    // a fence was there but no picture could be built (cut off / malformed)
-    drawingBroken = drawn.broken > 0 && !drawn.drawings.length;
-  } else {
-    /* drawings are off, so a fence is the user's own code request: keep the
-       code, drop the marker lines — no bubble should open with ```svg */
-    text = text.replace(/^[ \t]*```[ \t]*(?:svg|html)[ \t]*$/gim, "");
-  }
+  // ``` of a drawing block and leave it unparseable. This runs whether or not
+  // the drawing switch is on: a model that draws anyway must not paint its
+  // source code into the chat (that is exactly what happened on the phone).
+  const drawn = extractDrawings(text, { limit: DRAWING_LIMITS.maxPerReply });
+  text = drawn.text;
+  const drawings = drawn.drawings;
+  // a fence was there but no picture could be built (cut off / malformed)
+  const drawingBroken = drawn.broken > 0 && !drawn.drawings.length;
   text = text.replace(/^\s*```[a-z]*\s*/i, "").replace(/\s*```\s*$/i, "");
 
   let blockRequested = false;

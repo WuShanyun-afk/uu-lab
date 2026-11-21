@@ -34,6 +34,36 @@ test("a fenced html drawing is pulled out too", () => {
   assert.equal(text, "给你画个会飘的：");
 });
 
+test("a bare svg with no fence is a drawing too", () => {
+  /* the phone case: the model answered a "画SVG小猫" request with plain <svg>
+     markup, no ``` fence, and every blank line became a new bubble */
+  const out = extractDrawings(`画好了。\n\n${SVG}\n\n希望你会喜欢。`);
+  assert.equal(out.drawings.length, 1);
+  assert.ok(out.drawings[0].markup.startsWith("<svg"));
+  assert.ok(out.text.includes("画好了。"));
+  assert.ok(out.text.includes("希望你会喜欢。"));
+  assert.ok(!out.text.includes("<svg"));
+});
+
+test("a bare svg cut off before </svg> is stripped, not printed", () => {
+  const out = extractDrawings('在睡觉。\n<svg viewBox="0 0 320 320">\n<ellipse cx="160" cy="222"');
+  assert.equal(out.drawings.length, 0);
+  assert.equal(out.broken, 1);
+  assert.equal(out.text, "在睡觉。");
+});
+
+test("a passing mention of the tag is not a drawing", () => {
+  const out = extractDrawings("svg 里的 <svg> 标签就是画布。");
+  assert.equal(out.drawings.length, 0);
+  assert.ok(out.text.includes("<svg>"));
+});
+
+test("a fenced js block is still shown as code", () => {
+  const out = extractDrawings("```js\nconsole.log(1)\n```");
+  assert.equal(out.drawings.length, 0);
+  assert.ok(out.text.includes("console.log(1)"));
+});
+
 test("code that is not a drawing stays in the text", () => {
   const snippet = "```svg\n<svg>\n```";
   const plain = "```js\nconsole.log(1)\n```";
@@ -137,15 +167,18 @@ test("the prompt only offers drawings when the switch is on", () => {
   assert.ok(!prompt.includes("不主动发链接、图片、HTML 或代码"));
 });
 
-test("parseReply skips drawing fences unless enabled", () => {
+test("parseReply pulls drawings out whether or not the switch is on", () => {
   const raw = `看这个。\n\`\`\`svg\n${SVG}\n\`\`\``;
 
+  /* the switch only decides whether the prompt *offers* drawings; a model that
+     draws anyway must never paint its source into the chat */
   const off = defaultState();
   off.settings.apiKey = "test";
   off.settings.optimize.autoSticker = false;
   const parsedOff = parseReply(raw, off);
-  assert.equal(parsedOff.drawings.length, 0);
-  assert.ok(parsedOff.text.includes("<svg"));
+  assert.equal(parsedOff.drawings.length, 1);
+  assert.equal(parsedOff.text, "看这个。");
+  assert.ok(!parsedOff.text.includes("<svg"));
 
   const on = defaultState();
   on.settings.apiKey = "test";
@@ -171,12 +204,12 @@ test("a cut-off drawing leaves clean words and a flag, never raw markup", () => 
   assert.deepEqual(parsed.parts, ["在睡觉。拍糊了。"]);
 });
 
-test("with drawings off the markers go but the code the user asked for stays", () => {
+test("with drawings off, a complete picture is still drawn instead of printed", () => {
   const s = defaultState();
   s.settings.apiKey = "test";
   s.settings.optimize.autoSticker = false;
-  const parsed = parseReply(`给你代码：\n\`\`\`svg\n${SVG}\n\`\`\``, s);
-  assert.ok(!parsed.text.includes("```"));
-  assert.ok(parsed.text.includes("<svg"));
+  const parsed = parseReply(`给你画了：\n\`\`\`svg\n${SVG}\n\`\`\``, s);
+  assert.equal(parsed.drawings.length, 1);
+  assert.ok(!parsed.text.includes("<svg"));
   assert.equal(parsed.drawingBroken, false);
 });

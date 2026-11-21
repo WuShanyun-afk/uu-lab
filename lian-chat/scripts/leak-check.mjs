@@ -36,6 +36,8 @@ const REPLIES = {
   断: "在睡觉。拍糊了。\n\n```svg\n<svg viewBox=\"0 0 320 320\"><rect width=\"320\" height=\"320\" fill=\"#1c1c22\"/><circle cx=\"160\" cy=\"140\" r=\"60",
   空: "```svg\n<svg viewBox=\"0 0 320 320\"><path d=\"M100 130 L82",
   满: `在睡觉。这张给你。\n\n\`\`\`svg\n${SVG}\n\`\`\``,
+  /* the phone case: the model answered with bare <svg> and no fence at all */
+  裸: `画好了。\n\n${SVG}\n\n希望你会喜欢。`,
   码: `给你代码：\n\`\`\`svg\n${SVG}\n\`\`\``,
 };
 /* The report request asks for blocks + a scene id; this one is cut off. */
@@ -268,15 +270,27 @@ const art = await evaluate(`(() => {
 check("a complete drawing still renders", Boolean(art) && art.loaded && art.src.startsWith("data:image/svg+xml"), JSON.stringify(art).slice(0, 80));
 await capture("test-1.9.13-drawing.png");
 
-/* ---------- 4. drawings off: the code stays, the markers do not ---------- */
+/* ---------- 4. the phone case: a bare <svg>, drawings switch OFF ---------- */
 await boot(false);
+await say("画一张：裸");
+state = await lastBubbles();
+const bareArt = await evaluate(`(() => {
+  const node = document.querySelector(".msg-art.is-svg img");
+  return node ? { src: node.getAttribute("src") || "", loaded: node.naturalWidth > 0 } : null;
+})()`);
+check("a bare svg still becomes a picture with drawings off", Boolean(bareArt) && bareArt.loaded, JSON.stringify(bareArt).slice(0, 80));
+check("a bare svg leaves no source in the bubbles", !state.texts.join(" ").includes("<svg") && !state.texts.join(" ").includes("</svg>"), state.texts.join(" | ").slice(0, 90));
+check("the words around a bare svg are kept", state.texts.join(" ").includes("画好了") && state.texts.join(" ").includes("喜欢"), state.texts.join(" | ").slice(0, 90));
+await capture("test-1.9.14-bare.png");
+
+/* ---------- 5. a fenced svg with the switch off is a picture too ---------- */
 await say("给我代码：码");
 state = await lastBubbles();
-const code = state.texts.join(" ");
-check("with drawings off the svg text is still there", code.includes("<svg"), code.slice(0, 60));
-check("with drawings off the fence markers are gone", !code.includes("```"), code.slice(0, 60));
+const fencedArt = await evaluate(`document.querySelectorAll(".msg-art.is-svg").length`);
+check("a fenced svg also renders with drawings off", fencedArt >= 2, String(fencedArt));
+check("no fence markers reach a bubble", !state.texts.join(" ").includes("```") && !state.texts.join(" ").includes("<svg"), state.texts.join(" | ").slice(0, 90));
 
-/* ---------- 5. a report whose JSON never finished ---------- */
+/* ---------- 6. a report whose JSON never finished ---------- */
 await evaluate(`document.querySelector("#btnAttach").click()`);
 await sleep(200);
 await evaluate(`document.querySelector('[data-tray="report"]').click()`);

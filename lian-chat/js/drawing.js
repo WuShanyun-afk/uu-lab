@@ -45,6 +45,26 @@ function svgTail(markup) {
   return text.slice(0, last.index + last[0].length);
 }
 
+/* `<svg` + a real attribute: a picture, not a passing mention of the tag. */
+const LOOSE_SVG_START = /<svg\b[^>]*\s(?:viewBox|xmlns|width|height)\s*=/i;
+
+/**
+ * Find a bare (unfenced) svg in the text. `closed` is false when the reply was
+ * cut off before `</svg>`, in which case everything from the tag to the end
+ * belongs to the failed drawing.
+ */
+function looseSvgSpan(text) {
+  const source = String(text || "");
+  const match = LOOSE_SVG_START.exec(source);
+  if (!match) return null;
+  const start = match.index;
+  const rest = source.slice(start);
+  const close = /<\/svg\s*>/i.exec(rest);
+  if (!close) return { start, end: source.length, body: rest, closed: false };
+  const end = start + close.index + close[0].length;
+  return { start, end, body: source.slice(start, end), closed: true };
+}
+
 export function isSvgDrawing(body) {
   const text = svgTail(svgStart(body));
   if (!SVG_HINT.test(text)) return false;
@@ -135,12 +155,13 @@ function makeDrawing(type, body) {
 }
 
 /**
- * Pull drawing fences out of a model reply.
- * Anything that does not look like a drawing is left in the text untouched,
- * so "write me an SVG snippet" still shows the code instead of eating it —
- * except for an svg/html fence that we *tried* and failed to build (too big,
- * cut off, malformed): that source never belongs in a bubble, so it is removed
- * and counted in `broken`.
+ * Pull drawings out of a model reply.
+ *
+ * Two shapes arrive in practice: a ```` ```svg ```` fence, and — more often on
+ * small models — the bare `<svg …</svg>` with no fence at all. Both have to be
+ * taken out, because whatever is left in the text becomes chat bubbles and the
+ * raw markup is unreadable there. The fence is the only thing that ever reaches
+ * the text when a reply is *not* a drawing (a `js` fence stays as code).
  */
 export function extractDrawings(raw, { limit = DRAWING_LIMITS.maxPerReply } = {}) {
   const drawings = [];
@@ -159,6 +180,16 @@ export function extractDrawings(raw, { limit = DRAWING_LIMITS.maxPerReply } = {}
     broken += 1;
     return "\n";
   });
+  /* Bare svg: only trust it when the opening tag carries a real attribute, so a
+     passing mention of "<svg>" in prose is not mistaken for a picture. */
+  for (let guard = 0; guard < 4; guard += 1) {
+    const loose = looseSvgSpan(text);
+    if (!loose) break;
+    const made = drawings.length >= limit ? null : makeDrawing("svg", loose.body);
+    if (made) drawings.push(made);
+    else broken += 1;
+    text = `${text.slice(0, loose.start)}\n${text.slice(loose.end)}`;
+  }
   text = text.replace(/\n{3,}/g, "\n\n").trim();
   return { text, drawings, broken };
 }
