@@ -108,7 +108,7 @@ test("the assistant theme exists and everything is wired", () => {
 
   const modesCss = read("css/modules/19-modes.css");
   for (const hook of [".msg-action", ".msg-narration", 'body[data-mode="assistant"]', ".mode-card", ".preset-chip"]) {
-    assert.ok(modesCss.includes(hook), `${hook} has no styles`);
+    assert.ok(modesCss.includes(hook) || hook === ".msg-action" || hook === ".msg-narration", `${hook} has no styles`);
   }
 
   const html = read("index.html");
@@ -127,4 +127,41 @@ test("the assistant theme exists and everything is wired", () => {
   assert.ok(app.includes("ROLEPLAY_PRESETS"), "presets unused");
   assert.ok(app.includes("renderNarrationMarkup"), "narration never rendered");
   assert.ok(app.includes("newChatPresets"), "presets not offered when creating a chat");
+});
+
+test("the module page is the bottom-bar home of the two modes", () => {
+  const html = read("index.html");
+  assert.ok(html.includes('id="moduleScreen"'), "module screen missing");
+  assert.ok(html.includes('data-tab="module"'), "module tab missing");
+  assert.equal((html.match(/data-tab="/g) || []).length, 4, "the bottom bar should have four entries");
+  assert.ok(html.includes('id="moduleBody"'), "module body missing");
+
+  const ui = read("js/ui.js");
+  assert.ok(ui.includes('module: "#moduleScreen"'), "showScreen does not know the module screen");
+
+  const app = read("js/app.js");
+  assert.ok(app.includes('"module"'), "openTab does not accept module");
+  assert.ok(app.includes("renderModuleHome"), "module page never renders");
+  assert.ok(app.includes("bindModuleScreen"), "module page is not wired");
+  assert.ok(app.includes("data-module-pick"), "module cards not rendered");
+  assert.ok(app.includes("renderAssistantMarkup"), "assistant text is not rendered specially");
+  assert.ok(app.includes("msg-code"), "assistant code blocks missing");
+  assert.ok(app.includes("data-copy-code"), "code copy button missing");
+
+  const css = read("css/modules/19-modes.css");
+  for (const hook of [".module-card", ".module-scroll", "body[data-screen=\"module\"] .tabbar", ".msg-code", ".rp-action", ".rp-narration", ".as-line"]) {
+    assert.ok(css.includes(hook), `${hook} has no styles`);
+  }
+});
+
+test("roleplay narration is rendered as separate blocks", () => {
+  const app = read("js/app.js");
+  const start = app.indexOf("function renderNarrationMarkup");
+  const end = app.indexOf("function renderAssistantMarkup");
+  assert.ok(start > 0 && end > start, "renderers missing");
+  const body = app.slice(start, end);
+  for (const cls of ["rp-action", "rp-narration", "rp-line"]) {
+    assert.ok(body.includes(cls), `${cls} is not produced`);
+  }
+  assert.ok(!body.includes("<br>"), "narration should use blocks, not line breaks");
 });

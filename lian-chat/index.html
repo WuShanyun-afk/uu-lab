@@ -154,6 +154,26 @@
     </div>
   </section>
 
+  <!-- ============ 模块（AI 助理 / 角色扮演） ============ -->
+  <section class="screen module-screen" id="moduleScreen" hidden>
+    <header class="list-header">
+      <div class="list-brand">
+        <img src="assets/icons/icon.svg" alt="" class="brand-mark">
+        <span class="brand-name" data-i18n="module.title">模块</span>
+      </div>
+      <div class="list-header-actions">
+        <button class="icon-btn" id="btnModuleChat" type="button" aria-label="打开对话" data-i18n-aria="module.open">
+          <svg class="icon"><use href="#i-chat"></use></svg>
+        </button>
+      </div>
+    </header>
+    <div class="module-scroll">
+      <p class="module-lead" data-i18n="module.lead">这两个模块不是模拟真人聊天：没有头像、没有气泡和「在线」状态。</p>
+      <div id="moduleBody"></div>
+      <p class="chat-list-footnote" data-i18n="module.footnote">切换模块会改变 TA 的说话方式</p>
+    </div>
+  </section>
+
   <!-- ============ 聊天 ============ -->
   <section class="screen chat-screen" id="chatScreen" hidden>
     <header class="chat-header">
@@ -270,6 +290,10 @@
     <button type="button" class="tab-item" data-tab="contacts">
       <svg class="icon"><use href="#i-contacts"></use></svg>
       <span data-i18n="tab.contacts">通讯录</span>
+    </button>
+    <button type="button" class="tab-item" data-tab="module">
+      <svg class="icon"><use href="#i-sparkle"></use></svg>
+      <span data-i18n="tab.module">模块</span>
     </button>
     <button type="button" class="tab-item" data-tab="home">
       <svg class="icon"><use href="#i-home"></use></svg>

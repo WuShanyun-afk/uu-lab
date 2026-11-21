@@ -187,6 +187,7 @@ export function showScreen(name) {
     list: "#chatListScreen",
     contacts: "#contactsScreen",
     home: "#homeScreen",
+    module: "#moduleScreen",
     chat: "#chatScreen",
     settings: "#settingsScreen",
   };

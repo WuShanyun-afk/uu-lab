@@ -306,16 +306,17 @@ function openChatList() {  openTab("list");
 }
 
 function openTab(name) {
-  if (!state || !["list", "contacts", "home"].includes(name)) return;
+  if (!state || !["list", "contacts", "home", "module"].includes(name)) return;
   setComposerTray(false);
   syncActiveKey();
   syncActiveChat();
   persist();
   typingVisible = false;
   showScreen(name);
-  document.title = name === "home" ? `${t("tab.home")} · Lian` : name === "contacts" ? `${t("tab.contacts")} · Lian` : "Lian";
+  document.title = name === "home" ? `${t("tab.home")} · Lian` : name === "contacts" ? `${t("tab.contacts")} · Lian` : name === "module" ? `${t("module.title")} · Lian` : "Lian";
   if (name === "contacts") renderContacts();
   else if (name === "home") renderHome();
+  else if (name === "module") renderModuleHome();
   else renderChatList();
   startProactiveTimer();
 }
@@ -778,7 +779,7 @@ function renderHome(force = false) {
         ${homeRow("about", "doc", t("settings.about"), t("settings.aboutHint"))}
       </div>
     </section>
-    <p class="home-foot">${escapeHtml(t("settings.version", { v: "1.9.16" }))} · ${escapeHtml(t("home.localOnly"))}</p>`;
+    <p class="home-foot">${escapeHtml(t("settings.version", { v: "1.9.17" }))} · ${escapeHtml(t("home.localOnly"))}</p>`;
 }
 
 /* =========================================================
@@ -801,6 +802,7 @@ async function init() {
   bindGlobalEvents();
   bindMessageMenu();
   bindSearch();
+  bindModuleScreen();
   syncAppHeight();
 
   const params = new URLSearchParams(location.search);
@@ -1095,6 +1097,60 @@ function applyAppearance() {
   document.title = state.onboarded && s.aiName ? `${s.aiName} · Lian` : "Lian";
 }
 
+/* =========================================================
+   模块：AI 助理 / 角色扮演 的入口页
+   ========================================================= */
+
+const MODULE_CARDS = [
+  { id: "assistant", icon: "sparkle", nameKey: "module.assistantName", descKey: "module.assistantDesc" },
+  { id: "roleplay", icon: "heart", nameKey: "module.roleplayName", descKey: "module.roleplayDesc" },
+  { id: "companion", icon: "chat", nameKey: "module.companionName", descKey: "module.companionDesc" },
+];
+
+function renderModuleHome() {
+  const box = $("#moduleBody");
+  if (!box || !state) return;
+  const current = chatModeOf(state.settings);
+  box.innerHTML = MODULE_CARDS.map((card) => {
+    const on = card.id === current;
+    return `<button type="button" class="module-card${on ? " is-on" : ""}" data-module-pick="${card.id}" aria-pressed="${on}">
+      <span class="module-card-icon">${icon(card.icon)}</span>
+      <span class="module-card-copy">
+        <b>${escapeHtml(t(card.nameKey))}</b>
+        <small>${escapeHtml(t(card.descKey))}</small>
+      </span>
+      <span class="module-card-state">${escapeHtml(on ? t("module.current") : t("module.use"))}</span>
+    </button>`;
+  }).join("");
+}
+
+function openModuleChat() {
+  if (state.chats?.length) {
+    showScreen("chat");
+    renderHeader();
+    renderChat({ force: true });
+    return;
+  }
+  openTab("list");
+}
+
+function bindModuleScreen() {
+  $("#moduleBody")?.addEventListener("click", (event) => {
+    const card = event.target.closest("[data-module-pick]");
+    if (!card) return;
+    setChatMode(card.dataset.modulePick);
+    openModuleChat();
+  });
+  $("#btnModuleChat")?.addEventListener("click", () => openModuleChat());
+  /* assistant pages show code with a copy button */
+  $("#messageList")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-copy-code]");
+    if (!button) return;
+    const code = button.closest(".msg-code")?.querySelector("code")?.textContent || "";
+    if (code) copyText(code);
+  });
+}
+
 /* 切换聊天模式：companion / roleplay / assistant。
    进助理模式顺手换成「助理」主题，退出时换回原来的那套。 */
 function setChatMode(mode) {
@@ -1118,6 +1174,7 @@ function setChatMode(mode) {
   /* narration styling is baked into each bubble, so the list must be rebuilt */
   renderChat({ force: true });
   renderSettings(settingsCallbacks());
+  if (document.body.dataset.screen === "module") renderModuleHome();
   toast(t(`mode.toast.${next}`));
 }
 
@@ -1499,19 +1556,42 @@ function sameGroup(previous, message) {
 }
 
 function renderNarrationMarkup(text) {
-  return String(text || "")
-    .split("\n")
-    .map((line) => {
-      if (!line.trim()) return "";
-      return parseNarration(line)
-        .map((piece) => {
-          if (piece.type === "action") return `<em class="msg-action">${escapeHtml(piece.text)}</em>`;
-          if (piece.type === "narration") return `<span class="msg-narration">${escapeHtml(piece.text)}</span>`;
-          return renderRichText(piece.text);
-        })
-        .join(" ");
-    })
-    .join("<br>");
+  const blocks = [];
+  for (const line of String(text || "").split("\n")) {
+    if (!line.trim()) continue;
+    for (const piece of parseNarration(line)) {
+      if (piece.type === "action") blocks.push(`<p class="rp-action">${escapeHtml(piece.text)}</p>`);
+      else if (piece.type === "narration") blocks.push(`<p class="rp-narration">${escapeHtml(piece.text)}</p>`);
+      else blocks.push(`<p class="rp-line">${renderRichText(piece.text)}</p>`);
+    }
+  }
+  return blocks.join("");
+}
+
+/* 助理页面：正文按段落铺开，代码块单独成块并给一个复制按钮。 */
+function renderAssistantMarkup(text) {
+  const source = String(text || "");
+  const parts = [];
+  const pushText = (chunk) => {
+    for (const line of chunk.split("\n")) {
+      if (!line.trim()) continue;
+      /* inline `code` is common in assistant answers */
+      const html = renderRichText(line).replace(/`([^`\n]{1,80})`/g, '<code class="as-inline">$1</code>');
+      parts.push(`<p class="as-line">${html}</p>`);
+    }
+  };
+  const fence = /```([\w+#.-]*)\r?\n([\s\S]*?)```/g;
+  let index = 0;
+  let match = fence.exec(source);
+  while (match) {
+    if (match.index > index) pushText(source.slice(index, match.index));
+    const lang = (match[1] || "code").toLowerCase();
+    parts.push(`<div class="msg-code"><div class="msg-code-head"><span>${escapeHtml(lang)}</span><button type="button" class="msg-code-copy" data-copy-code>${escapeHtml(t("common.copy"))}</button></div><pre><code>${escapeHtml(String(match[2]).replace(/\s+$/, ""))}</code></pre></div>`);
+    index = match.index + match[0].length;
+    match = fence.exec(source);
+  }
+  if (index < source.length) pushText(source.slice(index));
+  return parts.join("") || renderRichText(source);
 }
 
 function messageMarkup(message, isNew, previous = null) {
@@ -1543,8 +1623,15 @@ function messageMarkup(message, isNew, previous = null) {
     if (/<svg\b/i.test(text)) text = stripSvgSource(text) || t("chat.drawingBroken");
     const emoji = isEmojiOnly(text);
     extraClass = emoji ? "is-emoji" : "";
-    /* roleplay: *动作* 与整行（旁白）有自己的样子 */
-    const body = !emoji && chatModeOf(s) === "roleplay" ? renderNarrationMarkup(text) : renderRichText(text);
+    /* roleplay: 旁白、动作、台词各占一行；assistant: 段落 + 代码块 */
+    const mode = chatModeOf(s);
+    const body = emoji
+      ? renderRichText(text)
+      : mode === "roleplay"
+        ? renderNarrationMarkup(text)
+        : mode === "assistant"
+          ? renderAssistantMarkup(text)
+          : renderRichText(text);
     content = `<div class="bubble ${extraClass}">${body}</div>`;
   }
   if ((message.kind === "image" || message.kind === "file") && String(message.text || "").trim()) {

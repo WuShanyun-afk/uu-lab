@@ -241,7 +241,7 @@ try {
     boot: document.querySelector("#boot").className,
     text: document.body.innerText.slice(0, 200),
   })`);
-  if (shell.screen && shell.tabs === 3) pass(`bottom tab bar has 3 entries (screen=${shell.screen})`);
+  if (shell.screen && shell.tabs === 4) pass(`bottom tab bar has 4 entries (screen=${shell.screen})`);
   else fail(`tab bar unexpected: ${JSON.stringify(shell)}`);
   if (/启动失败|is not defined/.test(shell.text)) fail(`boot error text: ${shell.text}`);
 
@@ -563,7 +563,7 @@ try {
   }
 
   const shot = await client.send("Page.captureScreenshot", { format: "png", fromSurface: true });
-  const outShot = path.join(ROOT, "docs", "test-1.9.16-boot.png");
+  const outShot = path.join(ROOT, "docs", "test-1.9.17-boot.png");
   fs.mkdirSync(path.dirname(outShot), { recursive: true });
   fs.writeFileSync(outShot, Buffer.from(shot.data, "base64"));
   console.log(`screenshot: ${outShot}`);

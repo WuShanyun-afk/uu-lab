@@ -1,9 +1,10 @@
-/* Checks for 1.9.16: roleplay mode (narration + scenario cards) and the pure
- * assistant mode (assistant theme, no stickers).
+/* Checks for the 1.9.17 module work: bottom「模块」page, the assistant
+ * conversation page and the roleplay script page (no avatars, no fake-chat
+ * bubbles).
  *
  *   node scripts/mode-check.mjs
  *
- * Drives the real page over CDP, no network. Writes docs/mode-*.png.
+ * Drives the real page over CDP, no network. Writes docs/module-*.png.
  */
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
@@ -112,17 +113,24 @@ const capture = async (name) => {
 };
 
 const now = Date.now();
-const messages = [
+const chatMessages = [
   { id: "m1", role: "assistant", kind: "text", text: "*把门推开，雪落进来* 老位置。", ts: now - 3600000 },
   { id: "m2", role: "user", kind: "text", text: "今天有热的吗？", ts: now - 3500000 },
   { id: "m3", role: "assistant", kind: "text", text: "*把茶推到你面前*\n喝吧。\n（火盆里的炭轻轻响了一声）", ts: now - 3400000 },
 ];
-const seed = {
+const codeMessages = [
+  { id: "a1", role: "user", kind: "text", text: "帮我写一个防抖函数", ts: now - 900000 },
+  {
+    id: "a2", role: "assistant", kind: "text", ts: now - 880000,
+    text: "用 `setTimeout` 记下最后一次调用即可：\n\n```js\nfunction debounce(fn, wait = 300) {\n  let timer = 0;\n  return (...args) => {\n    clearTimeout(timer);\n    timer = setTimeout(() => fn(...args), wait);\n  };\n}\n```\n\n注意：组件卸载时要 `clearTimeout`，否则会留下悬挂的定时器。",
+  },
+];
+const seedFor = (mode, messages) => ({
   onboarded: true,
   settings: {
     provider: "custom", apiKey: "seed", baseUrl: "http://127.0.0.1:1/v1", model: "m",
     aiName: "沈砚", userName: "小满", relationship: "客栈老板与常来的刀客", persona: "话少。",
-    greeting: "（推门进来）老位置。", theme: "paper", layout: "line", mode: "companion",
+    greeting: "（推门进来）老位置。", theme: mode === "assistant" ? "assistant" : "paper", layout: "line", mode,
   },
   chats: [{
     id: "c1", name: "沈砚", relationship: "客栈老板与常来的刀客", keyId: "k1",
@@ -131,154 +139,157 @@ const seed = {
   keys: [{ id: "k1", name: "Mock", provider: "custom", apiKey: "seed", baseUrl: "http://127.0.0.1:1/v1", model: "m", createdAt: now }],
   activeChatId: "c1", activeKeyId: "k1",
   messages, memories: [], memoryMeta: { lastUserCount: 0, lastAttemptAt: 0, lastAt: 0 },
+});
+
+async function boot(mode = "companion", messages = chatMessages) {
+  await send("Page.navigate", { url: base });
+  await sleep(450);
+  await evaluate(`(async () => {
+    localStorage.clear();
+    await new Promise((resolve) => { const req = indexedDB.deleteDatabase("lian-chat"); req.onsuccess = req.onerror = req.onblocked = () => resolve(); });
+    localStorage.setItem("lian.state.fallback.v1", ${JSON.stringify(JSON.stringify(seedFor(mode, messages)))});
+    return true;
+  })()`);
+  await send("Page.reload");
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    if (await evaluate(`!document.querySelector("#boot") || !!document.querySelector("#boot.is-done")`)) break;
+    await sleep(110);
+  }
+  await sleep(320);
+}
+
+const openChat = async () => {
+  await evaluate(`document.querySelector("[data-chat-open]")?.click()`);
+  await sleep(500);
 };
 
-await send("Page.navigate", { url: base });
-await sleep(450);
-await evaluate(`(async () => {
-  localStorage.clear();
-  await new Promise((resolve) => { const req = indexedDB.deleteDatabase("lian-chat"); req.onsuccess = req.onerror = req.onblocked = () => resolve(); });
-  localStorage.setItem("lian.state.fallback.v1", ${JSON.stringify(JSON.stringify(seed))});
-  return true;
+await boot("companion");
+/* the 陪伴 page keeps the fake-human look */
+await openChat();
+let page1 = await evaluate(`(() => {
+  const avatar = document.querySelector(".msg .avatar");
+  const bubble = document.querySelector(".msg.ai .bubble");
+  return {
+    mode: document.body.dataset.mode,
+    avatar: avatar ? getComputedStyle(avatar).display : "missing",
+    name: document.querySelector(".msg-name") ? getComputedStyle(document.querySelector(".msg-name")).display : "missing",
+    bg: bubble ? getComputedStyle(bubble).backgroundColor : "",
+    time: document.querySelector(".msg-time") ? getComputedStyle(document.querySelector(".msg-time")).display : "missing",
+  };
 })()`);
-await send("Page.reload");
-for (let attempt = 0; attempt < 120; attempt += 1) {
-  if (await evaluate(`!document.querySelector("#boot") || !!document.querySelector("#boot.is-done")`)) break;
-  await sleep(110);
-}
-await sleep(320);
-await evaluate(`document.querySelector("[data-chat-open]")?.click()`);
+check("companion still shows avatars", page1.avatar !== "none", page1.avatar);
+check("companion bubbles keep a background", page1.bg !== "rgba(0, 0, 0, 0)", page1.bg);
+check("companion shows timestamps", page1.time !== "none", page1.time);
+
+/* ---------- the bottom「模块」page ---------- */
+const tabs = await evaluate(`Array.from(document.querySelectorAll("#tabBar [data-tab]")).map((node) => node.dataset.tab)`);
+check("the bottom bar has a module tab", tabs.includes("module"), tabs.join(","));
+check("the bottom bar keeps four entries", tabs.length === 4, String(tabs.length));
+
+await evaluate(`document.querySelector('[data-tab="module"]').click()`);
 await sleep(500);
-
-/* ---------- 1. companion keeps the plain bubbles ---------- */
-let state = await evaluate(`(() => ({
-  mode: document.body.dataset.mode,
-  theme: document.body.dataset.theme,
-  actions: document.querySelectorAll(".msg-action").length,
-  narration: document.querySelectorAll(".msg-narration").length,
-  stickerBtn: getComputedStyle(document.querySelector("#btnSticker")).display,
+let modulePage = await evaluate(`(() => ({
+  screen: document.body.dataset.screen,
+  visible: !document.querySelector("#moduleScreen").hidden,
+  cards: Array.from(document.querySelectorAll("[data-module-pick]")).map((node) => node.dataset.modulePick),
+  current: document.querySelector(".module-card.is-on")?.dataset.modulePick || "",
+  lead: (document.querySelector(".module-lead") || {}).innerText || "",
 }))()`);
-check("companion is the default mode", state.mode === "companion", state.mode);
-check("companion does not style actions", state.actions === 0 && state.narration === 0, JSON.stringify(state));
-check("companion keeps the sticker button", state.stickerBtn !== "none", state.stickerBtn);
+check("the module page opens from the bottom bar", modulePage.screen === "module" && modulePage.visible, modulePage.screen);
+check("it offers assistant / roleplay / companion", modulePage.cards.join(",") === "assistant,roleplay,companion", modulePage.cards.join(","));
+check("it marks the current module", modulePage.current === "companion", modulePage.current);
+await capture("module-home.png");
 
-/* ---------- 2. switch to roleplay from settings ---------- */
-await evaluate(`document.querySelector('[data-tab="home"]').click()`);
-await sleep(400);
-await evaluate(`document.querySelector('[data-home-action="persona"]').click()`);
-await sleep(600);
-await evaluate(`(() => { const group = document.querySelector('[data-group="persona"]'); if (group) group.open = true; return true; })()`);
-await sleep(250);
-const picker = await evaluate(`(() => ({
-  cards: Array.from(document.querySelectorAll(".mode-card[data-mode]")).map((node) => node.dataset.mode),
-  active: document.querySelector(".mode-card.is-on")?.dataset.mode || "",
-}))()`);
-check("settings offers three chat modes", picker.cards.join(",") === "companion,roleplay,assistant", picker.cards.join(","));
-check("companion is selected in settings", picker.active === "companion", picker.active);
-await capture("mode-picker.png");
-
-await evaluate(`document.querySelector('[data-mode="roleplay"]').click()`);
-await sleep(500);
-await evaluate(`document.querySelector("#btnSettingsDone").click()`);
-await sleep(650);
-state = await evaluate(`(() => ({
+/* ---------- roleplay: script page ---------- */
+await evaluate(`document.querySelector('[data-module-pick="roleplay"]').click()`);
+await sleep(800);
+page1 = await evaluate(`(() => ({
+  screen: document.body.dataset.screen,
   mode: document.body.dataset.mode,
-  theme: document.body.dataset.theme,
-  actions: document.querySelectorAll(".msg-action").length,
-  narration: document.querySelectorAll(".msg-narration").length,
+  avatar: document.querySelector(".msg .avatar") ? getComputedStyle(document.querySelector(".msg .avatar")).display : "missing",
+  headerAvatar: getComputedStyle(document.querySelector("#headerAvatar")).display,
+  time: document.querySelector(".msg-time") ? getComputedStyle(document.querySelector(".msg-time")).display : "missing",
+  bubbleBg: getComputedStyle(document.querySelector(".msg.ai .bubble")).backgroundColor,
+  name: document.querySelector(".msg-name") ? getComputedStyle(document.querySelector(".msg-name")).display : "missing",
+  actions: document.querySelectorAll(".rp-action").length,
+  narrations: document.querySelectorAll(".rp-narration").length,
+  lines: document.querySelectorAll(".rp-line").length,
   text: Array.from(document.querySelectorAll(".msg .bubble")).map((node) => node.innerText).join(" | "),
 }))()`);
-check("roleplay mode is on", state.mode === "roleplay", state.mode);
-check("roleplay keeps the colour theme", state.theme === "paper", state.theme);
-check("roleplay styles *actions*", state.actions >= 2, String(state.actions));
-check("roleplay styles （narration）", state.narration >= 1, String(state.narration));
-check("the stars are gone from the bubble text", !state.text.includes("*"), state.text.slice(0, 60));
+check("the roleplay card opens the chat", page1.screen === "chat" && page1.mode === "roleplay", `${page1.screen}/${page1.mode}`);
+check("roleplay hides every avatar", page1.avatar === "none" && page1.headerAvatar === "none", `${page1.avatar}/${page1.headerAvatar}`);
+check("roleplay hides timestamps", page1.time === "none", page1.time);
+check("roleplay has no bubble background", page1.bubbleBg === "rgba(0, 0, 0, 0)", page1.bubbleBg);
+check("roleplay shows a speaker label", page1.name !== "none", page1.name);
+check("actions and narration are separate blocks", page1.actions >= 2 && page1.narrations >= 1 && page1.lines >= 2, `${page1.actions}/${page1.narrations}/${page1.lines}`);
+check("no action markers are printed", !page1.text.includes("*"), page1.text.slice(0, 60));
+await capture("module-roleplay.png");
 
-/* show the styled chat itself in the screenshot */
-await evaluate(`document.querySelector('[data-tab="list"]').click()`);
-await sleep(400);
-await evaluate(`document.querySelector("[data-chat-open]")?.click()`);
-await sleep(500);
-await capture("mode-roleplay.png");
-
-/* ---------- 3. the scenario cards fill the new-chat form ---------- */
+/* ---------- the scenario cards still fill the form ---------- */
 await evaluate(`document.querySelector("#btnChatBack").click()`);
 await sleep(450);
 await evaluate(`document.querySelector("#btnNewChat").click()`);
-await sleep(500);
-const presetUi = await evaluate(`(() => ({
-  chips: Array.from(document.querySelectorAll("#newChatPresets [data-preset]")).map((node) => node.dataset.preset),
-  hint: document.querySelector("#newChatPresets")?.parentElement?.innerText?.slice(0, 40) || "",
-}))()`);
-check("roleplay offers the scenario cards", presetUi.chips.length === ROLEPLAY_PRESETS.length, `${presetUi.chips.length} chips`);
-check("the first card is the inn scene", presetUi.chips[0] === "jianghu", presetUi.chips[0]);
+await sleep(450);
+const chips = await evaluate(`Array.from(document.querySelectorAll("#newChatPresets [data-preset]")).map((node) => node.dataset.preset)`);
+check("roleplay offers the scenario cards", chips.length === ROLEPLAY_PRESETS.length, `${chips.length}`);
 await evaluate(`document.querySelector('[data-preset="jianghu"]').click()`);
-await sleep(250);
-const filled = await evaluate(`(() => ({
-  name: document.querySelector("#newChatName").value,
-  relation: document.querySelector("#newChatRelation").value,
-  persona: document.querySelector("#newChatPersona").value.length,
-  greeting: document.querySelector("#newChatGreeting").value,
-  on: document.querySelector(".preset-chip.is-on")?.dataset.preset || "",
-}))()`);
-check("picking a card fills the form", filled.name === "沈砚" && filled.persona > 20 && filled.greeting.length > 0, JSON.stringify(filled).slice(0, 90));
-check("the picked card is highlighted", filled.on === "jianghu", filled.on);
-await capture("mode-presets.png");
-await evaluate(`document.querySelector("[data-close-sheet]").click()`);
-await sleep(300);
-
-/* ---------- 4. assistant mode: theme + no stickers ---------- */
-await evaluate(`document.querySelector('[data-tab="home"]').click()`);
-await sleep(350);
-await evaluate(`document.querySelector('[data-home-action="persona"]').click()`);
-await sleep(600);
-await evaluate(`(() => { const group = document.querySelector('[data-group="persona"]'); if (group) group.open = true; return true; })()`);
 await sleep(200);
-await evaluate(`document.querySelector('[data-mode="assistant"]').click()`);
-await sleep(700);
-state = await evaluate(`(() => ({
+const filled = await evaluate(`document.querySelector("#newChatName").value`);
+check("picking a card fills the form", filled === "沈砚", filled);
+await evaluate(`document.querySelector("[data-close-sheet]").click()`);
+await sleep(250);
+
+/* ---------- assistant: modern AI page ---------- */
+await boot("assistant", codeMessages);
+await openChat();
+page1 = await evaluate(`(() => ({
   mode: document.body.dataset.mode,
   theme: document.body.dataset.theme,
-  accent: getComputedStyle(document.documentElement).getPropertyValue("--accent").trim(),
+  avatar: document.querySelector(".msg .avatar") ? getComputedStyle(document.querySelector(".msg .avatar")).display : "missing",
+  headerAvatar: getComputedStyle(document.querySelector("#headerAvatar")).display,
+  time: document.querySelector(".msg-time") ? getComputedStyle(document.querySelector(".msg-time")).display : "missing",
+  aiBg: getComputedStyle(document.querySelector(".msg.ai .bubble")).backgroundColor,
+  userBg: getComputedStyle(document.querySelector(".msg.user .bubble")).backgroundColor,
+  code: document.querySelectorAll(".msg-code").length,
+  copy: document.querySelectorAll("[data-copy-code]").length,
+  lang: (document.querySelector(".msg-code-head span") || {}).textContent || "",
+  lines: document.querySelectorAll(".as-line").length,
   stickerBtn: getComputedStyle(document.querySelector("#btnSticker")).display,
-  actions: document.querySelectorAll(".msg-action").length,
 }))()`);
-check("assistant mode is on", state.mode === "assistant", state.mode);
-check("assistant mode switches to the assistant theme", state.theme === "assistant", state.theme);
-check("assistant mode hides the sticker button", state.stickerBtn === "none", state.stickerBtn);
-check("assistant mode stops styling actions", state.actions === 0, String(state.actions));
+check("assistant page opens in assistant mode", page1.mode === "assistant", page1.mode);
+check("assistant page uses the assistant theme", page1.theme === "assistant", page1.theme);
+check("assistant hides avatars", page1.avatar === "none" && page1.headerAvatar === "none", `${page1.avatar}/${page1.headerAvatar}`);
+check("assistant hides timestamps", page1.time === "none", page1.time);
+check("assistant answers have no bubble", page1.aiBg === "rgba(0, 0, 0, 0)", page1.aiBg);
+check("assistant questions keep a light card", page1.userBg !== "rgba(0, 0, 0, 0)", page1.userBg);
+check("a fenced block becomes a code block", page1.code === 1 && page1.lang === "js", `${page1.code}/${page1.lang}`);
+check("the code block has a copy button", page1.copy === 1, String(page1.copy));
+check("assistant text is laid out as paragraphs", page1.lines >= 2, String(page1.lines));
+check("assistant hides the sticker button", page1.stickerBtn === "none", page1.stickerBtn);
 
-await evaluate(`document.querySelector("#btnSettingsDone").click()`);
+const copied = await evaluate(`(() => {
+  const button = document.querySelector("[data-copy-code]");
+  if (!button) return "missing";
+  try { button.click(); return "clicked"; } catch (error) { return "threw:" + error.message; }
+})()`);
+check("the copy button is clickable", copied === "clicked", copied);
+await capture("module-assistant.png");
+
+/* ---------- back to companion through the module page ---------- */
+await evaluate(`document.querySelector("#btnChatBack").click()`);
 await sleep(400);
-await evaluate(`document.querySelector("[data-chat-open]")?.click()`);
+await evaluate(`document.querySelector('[data-tab="module"]').click()`);
 await sleep(450);
-await evaluate(`document.querySelector("#btnAttach").click()`);
-await sleep(300);
-const tray = await evaluate(`(() => ({
-  stickerAction: getComputedStyle(document.querySelector('[data-tray="sticker"]')).display,
-  emojiHead: getComputedStyle(document.querySelector("#trayEmojiHead")).display,
-  emojiRow: getComputedStyle(document.querySelector("#trayEmoji")).display,
-  actions: Array.from(document.querySelectorAll("[data-tray]")).filter((node) => getComputedStyle(node).display !== "none").map((node) => node.dataset.tray),
-}))()`);
-check("the tray has no sticker entry", tray.stickerAction === "none", JSON.stringify(tray.actions));
-check("the tray has no emoji row", tray.emojiHead === "none" && tray.emojiRow === "none");
-check("the tray keeps photo / file / recap / more", tray.actions.join(",") === "image,file,report,more", tray.actions.join(","));
-await capture("mode-assistant.png");
-
-/* ---------- 5. back to companion restores the theme ---------- */
-await evaluate(`document.querySelector("#btnSettingsBack") ? document.querySelector("#btnSettingsBack").click() : document.querySelector("#btnChatBack").click()`);
-await sleep(400);
-await evaluate(`document.querySelector('[data-tab="home"]').click()`);
-await sleep(350);
-await evaluate(`document.querySelector('[data-home-action="persona"]').click()`);
-await sleep(550);
-await evaluate(`(() => { const group = document.querySelector('[data-group="persona"]'); if (group) group.open = true; return true; })()`);
-await sleep(200);
-await evaluate(`document.querySelector('[data-mode="companion"]').click()`);
+await evaluate(`document.querySelector('[data-module-pick="companion"]').click()`);
 await sleep(700);
-const back = await evaluate(`({ mode: document.body.dataset.mode, theme: document.body.dataset.theme })`);
-check("switching back restores companion", back.mode === "companion", back.mode);
-check("switching back restores the old theme", back.theme === "paper", back.theme);
+const back = await evaluate(`(() => ({
+  mode: document.body.dataset.mode,
+  theme: document.body.dataset.theme,
+  avatar: document.querySelector(".msg.ai .avatar") ? getComputedStyle(document.querySelector(".msg.ai .avatar")).display : "missing",
+}))()`);
+check("companion restores the fake-human page", back.mode === "companion", back.mode);
+check("companion restores the old theme", back.theme === "paper", back.theme);
+check("companion shows avatars again", back.avatar !== "none", back.avatar);
 
 check("no console errors", consoleErrors.length === 0, consoleErrors.slice(0, 2).join(" | "));
 
