@@ -563,7 +563,7 @@ try {
   }
 
   const shot = await client.send("Page.captureScreenshot", { format: "png", fromSurface: true });
-  const outShot = path.join(ROOT, "docs", "test-1.9.24-boot.png");
+  const outShot = path.join(ROOT, "docs", "test-1.9.25-boot.png");
   fs.mkdirSync(path.dirname(outShot), { recursive: true });
   fs.writeFileSync(outShot, Buffer.from(shot.data, "base64"));
   console.log(`screenshot: ${outShot}`);

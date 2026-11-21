@@ -224,6 +224,8 @@ check("companion shows timestamps", page1.time !== "none", page1.time);
 const tabs = await evaluate(`Array.from(document.querySelectorAll("#tabBar [data-tab]")).map((node) => node.dataset.tab)`);
 check("the bottom bar has a module tab", tabs.includes("module"), tabs.join(","));
 check("the bottom bar keeps four entries", tabs.length === 4, String(tabs.length));
+const moduleLabel = await evaluate(`document.querySelector('[data-tab="module"] span')?.textContent || ""`);
+check("the module tab label is localised", moduleLabel === "模块" || moduleLabel === "Modules", moduleLabel);
 
 await openModuleTab();
 let modulePage = await evaluate(`(() => ({

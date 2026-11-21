@@ -28,6 +28,12 @@ body[data-screen="module"] .tabbar {
   font-size: var(--fs-xs);
   line-height: 1.7;
 }
+.module-error {
+  margin: 24px 4px;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  line-height: 1.7;
+}
 .module-card {
   display: flex;
   align-items: center;

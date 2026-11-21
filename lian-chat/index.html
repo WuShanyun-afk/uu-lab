@@ -337,6 +337,56 @@
   <input type="file" id="stickerInput" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
   <input type="file" id="importInput" accept="application/json,.json" hidden>
 
-  <script type="module" src="js/app.js"></script>
+  <script>
+    /* 资源版本自检：新 HTML 配到旧 JS（Service Worker / HTTP 缓存混用）时，
+       自动清掉旧的 Service Worker 与缓存并重载一次；仍然不一致就提示。
+       不再用固定延时，否则冷启动慢的机器会误判。 */
+    window.__LIAN_HTML_BUILD__ = "1.9.25";
+    (() => {
+      const started = Date.now();
+      const repair = async () => {
+        let repaired = false;
+        try { repaired = sessionStorage.getItem("lian.build.mismatch") === "1"; } catch (error) { /* ignore */ }
+        if (repaired) {
+          const bar = document.createElement("div");
+          bar.setAttribute("role", "alert");
+          bar.style.cssText = "position:fixed;left:12px;right:12px;bottom:76px;z-index:9999;padding:10px 12px;border:1px solid #d9c48a;border-radius:12px;background:#fffbe8;color:#5a4a1f;font:12px/1.5 system-ui,sans-serif;box-shadow:0 8px 24px rgba(30,25,10,.16)";
+          bar.textContent = "界面资源版本不一致，请彻底关闭应用后重新打开。";
+          document.body.append(bar);
+          return;
+        }
+        try { sessionStorage.setItem("lian.build.mismatch", "1"); } catch (error) { /* ignore */ }
+        try {
+          if (navigator.serviceWorker) {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(registrations.map((registration) => registration.unregister()));
+          }
+          if (window.caches) {
+            const keys = await caches.keys();
+            await Promise.all(keys.map((key) => caches.delete(key)));
+          }
+        } catch (error) { /* ignore */ }
+        location.replace(`${location.pathname}?v=${Date.now()}`);
+      };
+      const tick = () => {
+        if (window.__LIAN_APP_BUILD__) {
+          clearInterval(timer);
+          if (window.__LIAN_APP_BUILD__ === window.__LIAN_HTML_BUILD__) {
+            try { sessionStorage.removeItem("lian.build.mismatch"); } catch (error) { /* ignore */ }
+          } else {
+            repair();
+          }
+          return;
+        }
+        if (Date.now() - started > 7000) {
+          clearInterval(timer);
+          repair();
+        }
+      };
+      const timer = setInterval(tick, 200);
+      tick();
+    })();
+  </script>
+  <script type="module" src="js/app.js?v=1.9.25"></script>
 </body>
 </html>

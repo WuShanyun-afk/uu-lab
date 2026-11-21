@@ -2,7 +2,7 @@
 
 一个 **纯前端** 的 LINE 风格手机聊天应用。没有账号、没有后端、没有模型名；填入自己的 API Key 就能用。聊天、记忆、头像、表情和密钥都只留在当前设备。
 
-> 当前版本：**1.9.24**  
+> 当前版本：**1.9.25**  
 > 形态：PWA / 静态网页 / Android APK  
 > 默认接口：MiMo（小米）OpenAI 兼容接口  
 > 重来：长按「重新生成」只重做那一条，后面的消息保留（画面消息是「重画一张」）
@@ -24,6 +24,23 @@
 <img src="docs/preview-snow.png" width="260" alt="雪站沉浸主题">
 <img src="docs/preview-studio.png" width="260" alt="AI 表情工坊">
 <img src="docs/preview-drawing.png" width="260" alt="TA 现场画的画面">
+
+---
+
+## 1.9.25 修「模块打不开」：新 HTML 配旧 JS 的自愈（2026-11-21）
+
+屋主截图里，底部出现了 `tab.module` 原文、「模块」点了没反应。根因不是模块页本身，而是**新 HTML 配上了旧 JS**：`index.html` 每次导航都走网络，`js/*.js` 却被旧 Service Worker / HTTP 缓存按「缓存优先」返回；旧 JS 里还没有模块路由和 `tab.module` 这个词，于是标签显示 key、点击没有反应。
+
+这一版从四个层面修：
+
+1. **资源版本自检**：`index.html` 里写 `window.__LIAN_HTML_BUILD__`，`app.js` 写 `window.__LIAN_APP_BUILD__`；两者不一致时，清掉旧 Service Worker 与 Cache Storage，带 `?v=` 重载一次。重载后仍不一致才显示提示，不会死循环。
+2. **入口带版本**：`js/app.js?v=1.9.25`，新 HTML 永远不会命中旧 JS 的缓存键。
+3. **Service Worker 改网络优先**：`/js/`、`/css/` 在线时先取网络，失败再回落到缓存（`ignoreSearch`，离线仍可打开）；HTML 本来就是网络优先。
+4. **兜底**：缺翻译时保留 HTML 里的中文，绝不把 `tab.module` 这种 key 印出来；模块页渲染失败会显示一句「模块加载失败」，不再静默空白。
+
+如果手机里已经装了旧版本：装 1.9.25，**第一次打开会自动清一次缓存并重载**；如果还看到「界面资源版本不一致」，彻底关掉应用再开一次即可。
+
+验证：单测 **166 / 166**（新增构建号一致性、缺词兜底、SW 网络优先）、thread **67 / 67**、mode **62 / 62**、audit 262、boot 14、leak 19、tray 21、drawing 14、regen 10、stream 8、sticker 20、ux 14。
 
 ---
 

@@ -79,6 +79,9 @@ import {
   uid,
 } from "./utils.js";
 
+/* 与 index.html 的 __LIAN_HTML_BUILD__ 对齐；不一致时由页内脚本清缓存重载。 */
+window.__LIAN_APP_BUILD__ = "1.9.25";
+
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
@@ -560,8 +563,15 @@ function openTab(name) {
   document.title = name === "home" ? `${t("tab.home")} · Lian` : name === "contacts" ? `${t("tab.contacts")} · Lian` : name === "module" ? `${t("module.title")} · Lian` : "Lian";
   if (name === "contacts") renderContacts();
   else if (name === "home") renderHome();
-  else if (name === "module") renderModuleHome();
-  else renderChatList();
+  else if (name === "module") {
+    try {
+      renderModuleHome();
+    } catch (error) {
+      console.error("module screen failed", error);
+      const box = $("#moduleBody");
+      if (box) box.innerHTML = `<p class="module-error">模块加载失败，请彻底关闭应用后重新打开。</p>`;
+    }
+  } else renderChatList();
   startProactiveTimer();
 }
 
@@ -1559,13 +1569,16 @@ function applyStaticI18n() {
   $$("[data-i18n]").forEach((el) => {
     const key = el.dataset.i18n;
     const value = t(key);
-    if (value) el.textContent = value;
+    /* 缺词时保留 HTML 里的中文，绝不把 key 直接印到界面上。 */
+    if (value && value !== key) el.textContent = value;
   });
   $$("[data-i18n-ph]").forEach((el) => {
-    el.placeholder = t(el.dataset.i18nPh);
+    const value = t(el.dataset.i18nPh);
+    if (value && value !== el.dataset.i18nPh) el.placeholder = value;
   });
   $$("[data-i18n-aria]").forEach((el) => {
-    el.setAttribute("aria-label", t(el.dataset.i18nAria));
+    const value = t(el.dataset.i18nAria);
+    if (value && value !== el.dataset.i18nAria) el.setAttribute("aria-label", value);
   });
   const input = $("#messageInput");
   if (input) {

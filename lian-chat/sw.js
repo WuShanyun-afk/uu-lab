@@ -1,6 +1,6 @@
 /* Lian service worker — cache the shell so the app opens instantly.
    API calls are never cached. */
-const VERSION = "lian-v1.9.24-1";
+const VERSION = "lian-v1.9.25-1";
 const SANDBOX_MARK = "/__sandbox__/asset/";
 const ASSETS = [
   "./",
@@ -212,6 +212,23 @@ self.addEventListener("fetch", (event) => {
           return response;
         })
         .catch(() => caches.match("index.html").then((hit) => hit || caches.match("./"))),
+    );
+    return;
+  }
+
+  /* 脚本和样式走网络优先：新 HTML 绝不能配上旧 JS（曾出现「模块」标签
+     显示成 tab.module、点进去没反应）。离线时再回落到缓存。 */
+  if (url.pathname.includes("/js/") || url.pathname.includes("/css/")) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(VERSION).then((cache) => cache.put(request, copy)).catch(() => {});
+          }
+          return response;
+        })
+        .catch(() => caches.match(request, { ignoreSearch: true }).then((hit) => hit || new Response("", { status: 503 }))),
     );
     return;
   }
