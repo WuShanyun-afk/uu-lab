@@ -1,6 +1,6 @@
 /* Lian service worker — cache the shell so the app opens instantly.
    API calls are never cached. */
-const VERSION = "lian-v1.9.15-1";
+const VERSION = "lian-v1.9.16-1";
 const SANDBOX_MARK = "/__sandbox__/asset/";
 const ASSETS = [
   "./",
@@ -24,6 +24,7 @@ const ASSETS = [
   "css/modules/16-layouts.css",
   "css/modules/17-screens.css",
   "css/modules/18-composer.css",
+  "css/modules/19-modes.css",
   "js/app.js",
   "js/api.js",
   "js/config.js",
@@ -32,6 +33,7 @@ const ASSETS = [
   "js/insights.js",
   "js/memory.js",
   "js/palette.js",
+  "js/roleplay.js",
   "js/prompt.js",
   "js/report.js",
   "js/search.js",

@@ -148,6 +148,17 @@ export const THEMES = [
     bubble: { bg: "#EEECE7", ink: "#4A453D" },
     swatch: "radial-gradient(circle at 34% 30%,#fbf9f4 0 24%,transparent 25%),linear-gradient(145deg,#f2f0ea,#ded9d0)",
   },
+  /* ---- 助理：给「纯 AI 助理」模式用的冷白 + 蓝 ---- */
+  {
+    id: "assistant",
+    label: "助理",
+    labelEn: "Assistant",
+    accent: "#2F6BFF",
+    bg: "#F2F5FA",
+    statusBar: "#F7F9FC",
+    bubble: { bg: "#DCE7FF", ink: "#12325F" },
+    swatch: "linear-gradient(150deg,#f7f9fc 0 52%,#2f6bff 53%)",
+  },
 ];
 
 /* Chat page layouts — each one rewrites the header, the bubble anatomy and the
@@ -357,6 +368,11 @@ export function defaultState() {
       userAvatar: "",
       relationship: "",
       persona: "",
+      /* companion：原来的恋人/朋友聊天；roleplay：剧本扮演，允许 *动作* 与（旁白）；
+         assistant：纯 AI 助理，没有亲昵称呼，允许列表与代码块。 */
+      mode: "companion",
+      /* 进助理模式前的那套配色，退出助理模式时换回来 */
+      modeTheme: "paper",
       greeting: DEFAULT_GREETING,
       theme: "line",
       accent: THEMES[0].accent,

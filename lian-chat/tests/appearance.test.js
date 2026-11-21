@@ -11,8 +11,9 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (file) => fs.readFileSync(path.join(ROOT, file), "utf8");
 const hex = /^#[0-9a-f]{6}$/i;
 
-test("themes: 15 skins, unique ids, valid accent/bg", () => {
-  assert.equal(THEMES.length, 15);
+test("themes: 16 skins, unique ids, valid accent/bg", () => {
+  assert.equal(THEMES.length, 16);
+  assert.ok(THEMES.some((theme) => theme.id === "assistant"), "the assistant skin is required by assistant mode");
   const ids = new Set(THEMES.map((theme) => theme.id));
   assert.equal(ids.size, THEMES.length);
   for (const theme of THEMES) {

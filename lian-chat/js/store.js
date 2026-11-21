@@ -241,6 +241,13 @@ export function normaliseState(raw) {
   if (!merged.settings.notifications.enabled) merged.settings.notifications.background = false;
   merged.settings.optimize.quotes = merged.settings.optimize.quotes !== false;
   merged.settings.optimize.drawings = merged.settings.optimize.drawings === true;
+  merged.settings.mode = ["companion", "roleplay", "assistant"].includes(merged.settings.mode)
+    ? merged.settings.mode
+    : "companion";
+  merged.settings.modeTheme =
+    typeof merged.settings.modeTheme === "string" && merged.settings.modeTheme
+      ? merged.settings.modeTheme.slice(0, 30)
+      : "paper";
   merged.settings.layout = ["line", "imessage", "letter", "bubble", "plain", "journal", "timeline", "comic"].includes(merged.settings.layout)
     ? merged.settings.layout
     : "line";

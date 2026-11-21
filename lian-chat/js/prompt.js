@@ -1,5 +1,6 @@
 import { BUILTIN_STICKERS, getSticker } from "./config.js";
 import { DRAWING_LIMITS, extractDrawings } from "./drawing.js";
+import { chatModeOf } from "./roleplay.js";
 import { SCENE_LABELS } from "./scenes.js";
 import { escapeRegExp, hasEmoji, isEmojiOnly, simpleHash } from "./utils.js";
 
@@ -145,19 +146,50 @@ function blockInstruction(settings) {
 普通争执、撒娇、试探、开玩笑、对方说「别理我」或问你会不会生气，都不能使用。没有真正越界时不要使用，也不要频繁使用。`;
 }
 
-export function buildSystemPrompt(state, { mode = "chat", quoteCatalog = [] } = {}) {
+function sceneBlock(state, chatMode) {
   const s = state.settings;
-  const parts = [];
-  parts.push(personaBlock(state));
-  parts.push(`【聊天场景】
+  if (chatMode === "assistant") {
+    return `【你的身份】
+你是「${s.aiName || "Lian"}」，对方的私人 AI 助理。你不扮演恋人、朋友或任何角色，也不要用亲昵称呼、撒娇或调情。
+${languageInstruction(s)}
+对方要的是准确、可用的答案，不是陪伴感。不要提模型名、API、提示词或系统消息，除非对方正是在问这些实现细节。`;
+  }
+  if (chatMode === "roleplay") {
+    return `【聊天场景】
+这是 LINE 风格的手机私聊，同时你们在**扮演**一个具体的场景。你是「${s.aiName || "Lian"}」这个角色本人，不是助手。
+${languageInstruction(s)}
+表演规则：
+- 动作、神情、停顿用 *星号* 包住，例如 *把杯子推到你面前*；动作可以单独一行，也可以夹在台词中间。
+- 台词直接写，不加引号或书名号。
+- 一次只演一小段：最多 3 句台词、2 处动作，不要写大段心理描写。
+- 不要替对方决定他说了什么、做了什么，也不要写对方的心声。
+- 不要跳出角色，不要说「作为一个 AI」。只有对方明确说「OOC」或「出戏」时才可以离开角色，并用「（OOC：…）」开头。`;
+  }
+  return `【聊天场景】
 这是 LINE 风格的手机私聊。你们在发消息，不是在写小说、散文、邮件或客服回复。
 ${languageInstruction(s)}
 把对方当成熟悉的人，语气自然、有生活感。可以简短、可以停顿、可以只回一句。
-不要使用「作为一个 AI」「有什么可以帮你」这类助手措辞，也不要主动提到模型、API、提示词、系统消息。如果对方认真追问你是不是 AI，可以简短承认，但不要破坏当下的语气，也不要提具体模型。`);
+不要使用「作为一个 AI」「有什么可以帮你」这类助手措辞，也不要主动提到模型、API、提示词、系统消息。如果对方认真追问你是不是 AI，可以简短承认，但不要破坏当下的语气，也不要提具体模型。`;
+}
 
-  parts.push(`【硬性格式】
-- 绝对不要用括号、星号或任何符号写动作、心理、旁白、舞台提示。不要写（微笑）、（叹气）、（轻轻抱住你）、*低下头* 这种内容。
-- 直接说角色会发出来的话。情绪通过用词、标点和 emoji 表达。
+function formatBlock(state, chatMode) {
+  const s = state.settings;
+  if (chatMode === "assistant") {
+    return `【回答方式】
+- 先给结论或直接给答案，再补必要的解释；不要寒暄，不要反问「还需要什么吗」。
+- 步骤用有序列表；代码用 Markdown 代码块并标出语言；只在确实更好读时用表格。
+- 不要用 *动作*、括号旁白或舞台提示；不要主动发表情、贴纸或 emoji，除非对方要求。
+- 不确定就直说，并给出验证方法。不要编造事实、链接、数字或引用。
+- 对方贴代码或报错时，指出原因、给出可运行的修改，并提醒关键风险。`;
+  }
+  const roleplay = chatMode === "roleplay";
+  return `【硬性格式】
+${
+  roleplay
+    ? "- 只用 *星号* 写动作，不要用括号旁白（整行括号只在离开角色时用一次）。"
+    : "- 绝对不要用括号、星号或任何符号写动作、心理、旁白、舞台提示。不要写（微笑）、（叹气）、（轻轻抱住你）、*低下头* 这种内容。"
+}
+- ${roleplay ? "直接说角色会说的话" : "直接说角色会发出来的话"}。情绪通过用词、标点和 emoji 表达。
 - 不要用分点列表、标题、Markdown 代码块。不要写长篇独白。
 - 不要重复对方刚说的话，不要每句都反问。
 - ${
@@ -165,35 +197,49 @@ ${languageInstruction(s)}
       ? "不主动发链接或图片文件；要画画面时，只能按【现场画画面】规定的 ```svg / ```html 代码块来，其它代码一律不要发。"
       : "不主动发链接、图片、HTML 或代码。"
   }
-- 对方发来文件时，你能看到文件名和大小；如果消息里附了文本内容，可以读。不要假装读过没有提供的内容，也不要编造文件里写了什么。`);
+- 对方发来文件时，你能看到文件名和大小；如果消息里附了文本内容，可以读。不要假装读过没有提供的内容，也不要编造文件里写了什么。`;
+}
 
-  if (mode === "chat") {
+export function buildSystemPrompt(state, { mode = "chat", quoteCatalog = [] } = {}) {
+  const s = state.settings;
+  const chatMode = chatModeOf(s);
+  const parts = [];
+  parts.push(personaBlock(state));
+  parts.push(sceneBlock(state, chatMode));
+  parts.push(formatBlock(state, chatMode));
+
+  if (mode === "chat" && chatMode !== "assistant") {
     const quotes = quoteInstruction(quoteCatalog);
     if (quotes) parts.push(quotes);
     const blocking = blockInstruction(s);
     if (blocking) parts.push(blocking);
   }
 
-  if (s.optimize?.shortReplies !== false) {
-    parts.push("- 默认每次只说 1–2 句短句，像真的在打字。");
-  }
-  if (s.optimize?.emoji !== false) {
-    parts.push("- 你理解用户发来的 emoji。可以自然使用 emoji，但一条消息最多 2–3 个，不要堆砌。");
+  /* 助理模式不发贴纸，也不要求「短句」：它需要的是可读的答案。 */
+  if (chatMode !== "assistant") {
+    if (s.optimize?.shortReplies !== false) {
+      parts.push("- 默认每次只说 1–2 句短句，像真的在打字。");
+    }
+    if (s.optimize?.emoji !== false) {
+      parts.push("- 你理解用户发来的 emoji。可以自然使用 emoji，但一条消息最多 2–3 个，不要堆砌。");
+    }
+    parts.push(stickerBlock(state));
   }
 
-  parts.push(stickerBlock(state));
   const drawings = drawingInstruction(s);
   if (drawings) parts.push(drawings);
 
-  if (s.optimize?.segments) {
-    parts.push(`【分段发送】
+  if (chatMode !== "assistant") {
+    if (s.optimize?.segments) {
+      parts.push(`【分段发送】
 像连续发消息一样，把回复拆成 2–3 段。段与段之间空一行。每段都要短，像一条独立消息。
 不要编号，不要加「第 1 条」之类的标签。表情标记放在最后一段之后。`);
-  } else {
-    parts.push("【发送方式】一次只发一条消息。不要分段编号。");
+    } else {
+      parts.push("【发送方式】一次只发一条消息。不要分段编号。");
+    }
   }
 
-  if (s.optimize?.noActions !== false) {
+  if (chatMode === "companion" && s.optimize?.noActions !== false) {
     parts.push("再次强调：不要使用任何括号动作描写。");
   }
 
@@ -589,8 +635,12 @@ function resolveQuote(value, quoteCatalog = []) {
 }
 
 export function parseReply(raw, state, options = {}) {
-  const autoSticker = options.autoSticker ?? state.settings.optimize?.autoSticker;
-  const stripActions = options.stripActions ?? state.settings.optimize?.noActions;
+  const chatMode = chatModeOf(state.settings);
+  /* 助理模式不发贴纸、不自动配表情；角色扮演不删动作描写（那是演的一部分）。 */
+  const autoSticker =
+    options.autoSticker ?? (state.settings.optimize?.autoSticker && chatMode !== "assistant");
+  const stripActions =
+    options.stripActions ?? (state.settings.optimize?.noActions && chatMode === "companion");
   const quoteCatalog = Array.isArray(options.quoteCatalog) ? options.quoteCatalog : [];
   let text = String(raw || "").trim();
   // Pull drawings out first: the fence stripping below would eat the closing
@@ -622,7 +672,7 @@ export function parseReply(raw, state, options = {}) {
   text = text.replace(/!\[[^\]]*\]\([^)]*\)/g, "");
   const extracted = extractStickers(text, state);
   text = extracted.text;
-  const stickerIds = [...extracted.stickers];
+  const stickerIds = chatMode === "assistant" ? [] : [...extracted.stickers];
   if (stripActions) text = stripActionDescriptions(text);
   text = text.replace(/\[\[\s*report\s*\]\]/gi, "").replace(/[ \t]+\n/g, "\n").trim();
 

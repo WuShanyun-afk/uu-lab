@@ -270,15 +270,48 @@ body[data-theme="neo"] {
   --head-bot: rgba(238, 236, 231, 0.86);
 }
 
+
+/* ---- 9. 助理（冷白 + 蓝，配「纯 AI 助理」模式） ---- */
+body[data-theme="assistant"] {
+  --page: #f2f5fa;
+  --paper-100: #ffffff;
+  --paper-150: #fafbfd;
+  --paper-200: #f4f7fb;
+  --paper-300: #e9eff7;
+  --paper-400: #dbe4f0;
+  --surface: #ffffff;
+  --surface-2: #f5f8fc;
+  --surface-3: #ebf1f9;
+  --text: #101b2d;
+  --text-2: #3b4a61;
+  --muted: #6b7b93;
+  --line: #e0e8f3;
+  --line-strong: #cbd8ea;
+  --line-paper: rgba(20, 45, 90, 0.09);
+  --ink-900: #101b2d;
+  --ink-700: #3b4a61;
+  --ink-500: #6b7b93;
+  --ink-400: #8797ae;
+  --ai-bubble: #ffffff;
+  --bubble-peer: #ffffff;
+  --bubble-peer-ink: #101b2d;
+  --chat-top: #f7f9fc;
+  --chat-bot: #e8eefa;
+  --bubble-rim: rgba(20, 45, 90, 0.08);
+  --bubble-shadow: 0 1px 2px rgba(16, 35, 70, 0.05), 0 18px 30px -26px rgba(16, 35, 70, 0.5);
+  --head-top: rgba(255, 255, 255, 0.95);
+  --head-bot: rgba(247, 249, 252, 0.86);
+}
+
 /* =========================================================
    共享层：只在上面这八套下生效
    ========================================================= */
-body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="neo"]) {
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="assistant"], [data-theme="neo"], [data-theme="assistant"]) {
   background: var(--page);
 }
 
 /* 头像占位块：默认的近黑方块在浅色皮肤里像一块补丁，改成 accent 淡底 */
-body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="neo"]) .avatar {
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="neo"], [data-theme="assistant"]) .avatar {
   background: color-mix(in srgb, var(--accent) 14%, var(--paper-100));
   color: color-mix(in srgb, var(--accent) 58%, #191919);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent);
@@ -289,45 +322,45 @@ body[data-theme="mono"] .avatar {
   box-shadow: inset 0 0 0 1px rgba(20, 20, 25, 0.1);
 }
 
-body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="neo"]) .chat-list-screen,
-body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="neo"]) .contacts-screen,
-body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="neo"]) .home-screen,
-body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="neo"]) .settings-screen {
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="assistant"], [data-theme="neo"], [data-theme="assistant"]) .chat-list-screen,
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="assistant"], [data-theme="neo"], [data-theme="assistant"]) .contacts-screen,
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="assistant"], [data-theme="neo"], [data-theme="assistant"]) .home-screen,
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="assistant"], [data-theme="neo"], [data-theme="assistant"]) .settings-screen {
   background: var(--paper-200);
 }
 
-body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="neo"]) .chat-screen {
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="assistant"], [data-theme="neo"], [data-theme="assistant"]) .chat-screen {
   background:
     radial-gradient(120% 60% at 50% -14%, #ffffff 0%, rgba(255, 255, 255, 0) 58%),
     linear-gradient(180deg, var(--chat-top) 0%, var(--chat-mid, var(--chat-bot)) 58%, var(--chat-bot) 100%);
 }
 
-body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="neo"]) .chat-header {
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="assistant"], [data-theme="neo"], [data-theme="assistant"]) .chat-header {
   background: linear-gradient(180deg, var(--head-top), var(--head-bot));
   border-bottom-color: var(--line-paper);
 }
 
-body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="neo"]) .msg.ai .bubble {
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="assistant"], [data-theme="neo"], [data-theme="assistant"]) .msg.ai .bubble {
   border: 1px solid var(--bubble-rim);
   box-shadow: var(--bubble-shadow);
 }
 
-body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="neo"]) .date-sep span {
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="assistant"], [data-theme="neo"], [data-theme="assistant"]) .date-sep span {
   background: color-mix(in srgb, var(--paper-100) 78%, transparent);
   border: 1px solid var(--line-paper);
   color: var(--ink-400);
 }
 
-body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="neo"]) .settings-group,
-body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="neo"]) .home-quick,
-body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="neo"]) .home-menu {
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="assistant"], [data-theme="neo"], [data-theme="assistant"]) .settings-group,
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="assistant"], [data-theme="neo"], [data-theme="assistant"]) .home-quick,
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="assistant"], [data-theme="neo"], [data-theme="assistant"]) .home-menu {
   border-color: var(--line-paper);
   background: var(--paper-100);
 }
 
-body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="neo"]) .sheet,
-body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="neo"]) .modal,
-body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="neo"]) .confirm-modal {
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="assistant"], [data-theme="neo"], [data-theme="assistant"]) .sheet,
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="assistant"], [data-theme="neo"], [data-theme="assistant"]) .modal,
+body:is([data-theme="mint"], [data-theme="berry"], [data-theme="butter"], [data-theme="lilac"], [data-theme="sky"], [data-theme="dawn"], [data-theme="mono"], [data-theme="assistant"], [data-theme="neo"], [data-theme="assistant"]) .confirm-modal {
   background: var(--paper-100);
 }
 

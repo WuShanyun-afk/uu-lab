@@ -117,6 +117,7 @@ export function renderSettings({
   state,
   onChange,
   onAppearance,
+  onMode,
   onUiLanguage,
   onPickAvatar,
   onPickBackground,
@@ -134,7 +135,7 @@ export function renderSettings({
   onRestartSetup,
 }) {
   const deps = {
-    state, onChange, onAppearance, onUiLanguage, onPickAvatar, onPickBackground, onRemoveBackground,
+    state, onChange, onAppearance, onMode, onUiLanguage, onPickAvatar, onPickBackground, onRemoveBackground,
     onOpenContext, onOrganizeMemory, onUnblock,
     onExport, onImport, onShare, onClearChat, onClearAll, onOpenReport, onProactiveNow, onRestartSetup,
   };
@@ -181,6 +182,18 @@ export function renderSettings({
       : `${Math.floor(blockedRemaining / 60)}:${String(blockedRemaining % 60).padStart(2, "0")}`;
 
   const personaBody = `
+    <p class="field-label">${escapeHtml(t("settings.mode"))}</p>
+    <div class="mode-picker" id="modePicker">
+      ${["companion", "roleplay", "assistant"]
+        .map((id) => {
+          const on = (["companion", "roleplay", "assistant"].includes(s.mode) ? s.mode : "companion") === id;
+          return `<button type="button" class="mode-card${on ? " is-on" : ""}" data-mode="${id}" aria-pressed="${on}">
+            <b>${escapeHtml(t(`settings.mode.${id}`))}</b>
+            <small>${escapeHtml(t(`settings.modeHint.${id}`))}</small>
+          </button>`;
+        })
+        .join("")}
+    </div>
     <div class="two-col avatar-cards">
       <div class="avatar-card">
         ${avatarMarkup({ src: s.aiAvatar, role: "ai", name: s.aiName, size: 50 })}
@@ -595,7 +608,7 @@ ${switchRow(t("settings.optDrawings"), t("settings.optDrawingsHint"), Boolean(op
       <div class="danger-row-copy"><b>${escapeHtml(t("settings.clearAll"))}</b><small>${escapeHtml(t("settings.clearAllHint"))}</small></div>
       <button type="button" class="btn btn-danger" id="clearAll">${escapeHtml(t("common.delete"))}</button>
     </div>
-    <p class="token-line">${escapeHtml(t("settings.version", { v: "1.9.15" }))}</p>`;
+    <p class="token-line">${escapeHtml(t("settings.version", { v: "1.9.16" }))}</p>`;
 
   const aboutBody = `
     <div class="about-box">
@@ -881,6 +894,11 @@ ${switchRow(t("settings.optDrawings"), t("settings.optDrawingsHint"), Boolean(op
       onChange();
       onAppearance();
       rerender();
+    });
+  });
+  root.querySelectorAll("[data-mode]").forEach((el) => {
+    el.addEventListener("click", () => {
+      if (deps.onMode) deps.onMode(el.dataset.mode);
     });
   });
   root.querySelector("#uiLang")?.addEventListener("change", (event) => {

@@ -1,0 +1,111 @@
+/* =========================================================
+   19 · modes — 角色扮演 / 纯 AI 助理
+   ---------------------------------------------------------
+   角色扮演：*动作* 用灰斜体，整行（旁白）更淡，台词保持正常。
+   助理：不出现贴纸与快捷表情，工具盘只剩图片 / 文件 / 日常 / 更多。
+   两端都只读 body[data-mode]，主题色仍然来自 15-themes.css。
+   ========================================================= */
+
+/* ---- 1. 角色扮演的旁白与动作 ---- */
+.msg-action {
+  color: var(--text-3, var(--text-2));
+  font-style: italic;
+  letter-spacing: 0.01em;
+}
+.msg-narration {
+  color: var(--ink-500, var(--text-3));
+  font-size: var(--fs-xs);
+  letter-spacing: 0.02em;
+}
+body[data-mode="roleplay"] .msg .bubble .msg-action {
+  opacity: 0.9;
+}
+
+/* ---- 2. 纯 AI 助理 ---- */
+body[data-mode="assistant"] #btnSticker,
+body[data-mode="assistant"] [data-tray="sticker"],
+body[data-mode="assistant"] .tray-emoji-head,
+body[data-mode="assistant"] .tray-emoji {
+  display: none !important;
+}
+body[data-mode="assistant"] .msg .bubble {
+  line-height: 1.6;
+}
+body[data-mode="assistant"] .composer-tray .tray-actions {
+  justify-content: space-between;
+}
+
+/* ---- 3. 设置里的模式选择 ---- */
+.mode-picker {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+  margin: 8px 0 16px;
+}
+.mode-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  text-align: left;
+  transition: border-color var(--t-fast), background var(--t-fast), transform var(--t-fast);
+}
+.mode-card b {
+  font-size: var(--fs-sm);
+  color: var(--text);
+}
+.mode-card small {
+  font-size: var(--fs-2xs);
+  line-height: 1.45;
+  color: var(--muted);
+}
+.mode-card.is-on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+}
+.mode-card.is-on b {
+  color: var(--accent-strong, var(--accent));
+}
+.mode-card:active {
+  transform: scale(0.985);
+}
+
+/* ---- 4. 新建聊天里的剧本卡 ---- */
+.preset-chips {
+  display: flex;
+  gap: 6px;
+  margin: 4px 0 2px;
+  padding-bottom: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.preset-chips::-webkit-scrollbar {
+  display: none;
+}
+.preset-chip {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 7px 11px 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  font-size: var(--fs-sm);
+  color: var(--text);
+}
+.preset-chip small {
+  font-size: var(--fs-2xs);
+  color: var(--muted);
+}
+.preset-chip.is-on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface));
+}
+.preset-chip.is-on small {
+  color: var(--accent-strong, var(--accent));
+}

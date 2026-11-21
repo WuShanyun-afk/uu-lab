@@ -28,6 +28,7 @@ import {
 } from "./prompt.js";
 import { buildMemoryMessages, mergeMemories, parseMemoryReply } from "./memory.js";
 import { adoptStoredDrawings, buildHtmlDocument, buildSvgDataUri, drawingLabel, stripSvgSource } from "./drawing.js";
+import { ROLEPLAY_PRESETS, chatModeOf, parseNarration } from "./roleplay.js";
 import { accentStrong, mineBubble, relativeLuminance } from "./palette.js";
 import { buildReportFromRaw, reportBlocksHtml, salvageReport, sanitizeReportHtml } from "./report.js";
 import { chatHaystack, matchMessageIndexes, matchSnippet, normaliseQuery, splitByMatches } from "./search.js";
@@ -777,7 +778,7 @@ function renderHome(force = false) {
         ${homeRow("about", "doc", t("settings.about"), t("settings.aboutHint"))}
       </div>
     </section>
-    <p class="home-foot">${escapeHtml(t("settings.version", { v: "1.9.15" }))} · ${escapeHtml(t("home.localOnly"))}</p>`;
+    <p class="home-foot">${escapeHtml(t("settings.version", { v: "1.9.16" }))} · ${escapeHtml(t("home.localOnly"))}</p>`;
 }
 
 /* =========================================================
@@ -1079,6 +1080,7 @@ function applyAppearance() {
   document.body.dataset.font = s.font || "sans";
   document.body.dataset.theme = s.theme || "line";
   document.body.dataset.layout = s.layout || "line";
+  document.body.dataset.mode = chatModeOf(s);
   syncChatCrest();
   const background = s.chatBg || (immersive ? new URL(theme.defaultBg, document.baseURI).href : "");
   if (background) {
@@ -1091,6 +1093,32 @@ function applyAppearance() {
   syncThemeColor();
   bindThemeColor();
   document.title = state.onboarded && s.aiName ? `${s.aiName} · Lian` : "Lian";
+}
+
+/* 切换聊天模式：companion / roleplay / assistant。
+   进助理模式顺手换成「助理」主题，退出时换回原来的那套。 */
+function setChatMode(mode) {
+  if (!state) return;
+  const next = ["companion", "roleplay", "assistant"].includes(mode) ? mode : "companion";
+  const previous = chatModeOf(state.settings);
+  if (next === previous) return;
+  if (next === "assistant" && state.settings.theme !== "assistant") {
+    state.settings.modeTheme = state.settings.theme;
+    state.settings.theme = "assistant";
+    state.settings.accent = "#2F6BFF";
+  } else if (previous === "assistant" && state.settings.theme === "assistant") {
+    const back = THEMES.find((theme) => theme.id === state.settings.modeTheme) || THEMES[0];
+    state.settings.theme = back.id;
+    state.settings.accent = back.accent;
+  }
+  state.settings.mode = next;
+  persist();
+  applyAppearance();
+  renderHeader();
+  /* narration styling is baked into each bubble, so the list must be rebuilt */
+  renderChat({ force: true });
+  renderSettings(settingsCallbacks());
+  toast(t(`mode.toast.${next}`));
 }
 
 /* The letter layout opens with a small "the two of you" crest above the sheet.
@@ -1470,6 +1498,22 @@ function sameGroup(previous, message) {
   return gap > 0 && gap <= GROUP_WINDOW;
 }
 
+function renderNarrationMarkup(text) {
+  return String(text || "")
+    .split("\n")
+    .map((line) => {
+      if (!line.trim()) return "";
+      return parseNarration(line)
+        .map((piece) => {
+          if (piece.type === "action") return `<em class="msg-action">${escapeHtml(piece.text)}</em>`;
+          if (piece.type === "narration") return `<span class="msg-narration">${escapeHtml(piece.text)}</span>`;
+          return renderRichText(piece.text);
+        })
+        .join(" ");
+    })
+    .join("<br>");
+}
+
 function messageMarkup(message, isNew, previous = null) {
   const s = state.settings;
   const role = message.role === "user" ? "user" : "assistant";
@@ -1499,7 +1543,9 @@ function messageMarkup(message, isNew, previous = null) {
     if (/<svg\b/i.test(text)) text = stripSvgSource(text) || t("chat.drawingBroken");
     const emoji = isEmojiOnly(text);
     extraClass = emoji ? "is-emoji" : "";
-    content = `<div class="bubble ${extraClass}">${renderRichText(text)}</div>`;
+    /* roleplay: *动作* 与整行（旁白）有自己的样子 */
+    const body = !emoji && chatModeOf(s) === "roleplay" ? renderNarrationMarkup(text) : renderRichText(text);
+    content = `<div class="bubble ${extraClass}">${body}</div>`;
   }
   if ((message.kind === "image" || message.kind === "file") && String(message.text || "").trim()) {
     content += `<div class="bubble">${renderRichText(String(message.text).trim())}</div>`;
@@ -3128,6 +3174,7 @@ function settingsCallbacks() {
       applyAppearance();
       renderHeader();
     },
+    onMode: (mode) => setChatMode(mode),
     onUiLanguage: () => {
       applyStaticI18n();
       applyAppearance();
@@ -3233,6 +3280,15 @@ function openNewChatSheet() {
       <button type="button" class="sheet-close" data-close-sheet aria-label="${escapeHtml(t("common.close"))}">${icon("close")}</button>
     </div>
     <form class="new-chat-form" id="newChatForm">
+      ${
+        chatModeOf(state.settings) === "roleplay"
+          ? `<p class="field-label">${escapeHtml(t("newChat.presets"))}</p>
+      <div class="preset-chips" id="newChatPresets">
+        ${ROLEPLAY_PRESETS.map((preset) => `<button type="button" class="preset-chip" data-preset="${escapeHtml(preset.id)}">${escapeHtml(state.settings.uiLang === "en" ? preset.titleEn : preset.title)}<small>${escapeHtml(state.settings.uiLang === "en" ? preset.tagEn : preset.tag)}</small></button>`).join("")}
+      </div>
+      <p class="field-hint" style="margin:6px 0 12px">${escapeHtml(t("newChat.presetsHint"))}</p>`
+          : ""
+      }
       <label class="field-label" for="newChatName">${escapeHtml(t("chatList.name"))}</label>
       <input class="input" id="newChatName" maxlength="80" autocomplete="off" placeholder="${escapeHtml(t("chatList.namePh"))}" required>
       <label class="field-label" for="newChatRelation">${escapeHtml(t("settings.relationship"))}</label>
@@ -3250,6 +3306,21 @@ function openNewChatSheet() {
       </div>
     </form>`, {
     onMount: (sheet) => {
+      sheet.querySelector("#newChatPresets")?.addEventListener("click", (event) => {
+        const chip = event.target.closest("[data-preset]");
+        if (!chip) return;
+        const preset = ROLEPLAY_PRESETS.find((item) => item.id === chip.dataset.preset);
+        if (!preset) return;
+        const fill = (id, value) => {
+          const input = sheet.querySelector(id);
+          if (input) input.value = value;
+        };
+        fill("#newChatName", preset.name);
+        fill("#newChatRelation", preset.relationship);
+        fill("#newChatPersona", preset.persona);
+        fill("#newChatGreeting", preset.greeting);
+        sheet.querySelectorAll("[data-preset]").forEach((node) => node.classList.toggle("is-on", node === chip));
+      });
       sheet.querySelector("[data-new-chat-settings]")?.addEventListener("click", () => {
         closeSheet();
         openSettings("connection", "list");
