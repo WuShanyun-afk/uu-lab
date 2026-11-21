@@ -382,7 +382,7 @@ const fresh = await evaluate(`(() => ({
   count: document.querySelectorAll(".msg").length,
 }))()`);
 check("opening an empty module creates its own thread", fresh.mode === "assistant", fresh.mode);
-check("the assistant thread opens with a neutral hello", fresh.text.includes("在。要处理什么？"), fresh.text.slice(0, 40));
+check("the assistant thread opens with a neutral hello", fresh.text.includes("你好，需要什么帮助吗？"), fresh.text.slice(0, 40));
 check("it holds only that hello", fresh.count === 1, String(fresh.count));
 check("it did not copy the companion history", !fresh.text.includes("今天有热的吗"), fresh.text.slice(0, 60));
 
@@ -398,7 +398,7 @@ const restored = await evaluate(`(() => ({
   mode: document.body.dataset.mode,
   text: document.querySelector("#messageList")?.innerText || "",
 }))()`);
-check("its messages survive the reload too", restored.mode === "assistant" && restored.text.includes("在。要处理什么？"), restored.text.slice(0, 40));
+check("its messages survive the reload too", restored.mode === "assistant" && restored.text.includes("你好，需要什么帮助吗？"), restored.text.slice(0, 40));
 
 /* 切回陪伴，历史还在 */
 await openModuleTab();

@@ -643,6 +643,8 @@ function chatPreview(chat) {
   if (last.kind === "file") return last.file?.name || last.text || t("chat.fileSent");
   if (last.kind === "report") return last.report?.title || t("chat.report");
   if (last.kind === "drawing") return last.text || t("chat.drawingSent");
+  /* 助理页的招呼统一成一句，旧会话在列表里也不显示旧文案。 */
+  if (last.greeting && modeOfChat(chat) === "assistant") return t("module.assistantHello");
   return previewSafe(last.text).slice(0, 60) || t("chat.noMessages");
 }
 
@@ -1446,32 +1448,8 @@ function bindModuleScreen() {
     openModuleChat();
   });
   $("#btnModuleChat")?.addEventListener("click", () => openModuleChat());
-  /* 助理页的交互：代码复制、快捷提问、答案复制 / 重新生成；剧本页的「挑剧本」 */
+  /* 消息列表里只剩代码复制和剧本页的「挑剧本」；助理页的复制 / 重新生成走长按菜单。 */
   $("#messageList")?.addEventListener("click", (event) => {
-    const prompt = event.target.closest("[data-as-prompt]");
-    if (prompt) {
-      const input = $("#messageInput");
-      if (!input) return;
-      input.value = t(prompt.dataset.asPrompt);
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-      autoResizeInput(input);
-      input.focus();
-      const end = input.value.length;
-      try { input.setSelectionRange(end, end); } catch { /* ignore */ }
-      return;
-    }
-    const copy = event.target.closest("[data-as-copy]");
-    if (copy) {
-      const message = (state?.messages || []).find((item) => item.id === copy.dataset.asCopy);
-      if (message) copyText(messagePlainText(message));
-      return;
-    }
-    const regen = event.target.closest("[data-as-regen]");
-    if (regen) {
-      const message = (state?.messages || []).find((item) => item.id === regen.dataset.asRegen);
-      if (message) regenerateFrom(message);
-      return;
-    }
     const button = event.target.closest("[data-copy-code]");
     if (button) {
       const code = button.closest(".msg-code")?.querySelector("code")?.textContent || "";
@@ -1608,15 +1586,13 @@ function renderHeader() {
     mark.dataset.provider = provider;
     mark.textContent = assistant ? providerMonogram(provider) : "";
   }
+  /* 助理页页头只留徽记 + 服务商名：不挂「AI 助理」小标、不挂模型副标题。 */
   const badge = $("#peerBadge");
-  if (badge) {
-    badge.textContent = t("assistant.label");
-    badge.hidden = !assistant;
-  }
+  if (badge) badge.hidden = true;
   const sub = $("#peerSub");
   if (sub) {
-    sub.textContent = assistant ? assistantSubline() : "";
-    sub.hidden = !assistant;
+    sub.textContent = "";
+    sub.hidden = true;
   }
   syncAssistantTools();
   updatePeerStatus();
@@ -2065,20 +2041,6 @@ function renderAssistantMarkup(text) {
   return parts.join("") || assistantInline(source);
 }
 
-function assistantMetaMarkup(message, role) {
-  /* 助理页不出现人设名：AI 那一侧直接写服务商，和页头、会话列表保持一致。 */
-  const label = role === "user" ? t("assistant.metaUser") : providerShort(providerIdOf());
-  const dot = role === "user" ? "" : '<span class="as-dot" aria-hidden="true"></span>';
-  return `<div class="as-meta ${role === "user" ? "is-user" : "is-ai"}">${dot}<span class="as-who">${escapeHtml(label)}</span><time>${escapeHtml(timeLabel(message.ts))}</time></div>`;
-}
-
-function assistantActionsMarkup(message) {
-  return `<div class="as-actions">
-    <button type="button" class="as-action" data-as-copy="${escapeHtml(message.id)}">${icon("doc")}<span>${escapeHtml(t("chat.copy"))}</span></button>
-    <button type="button" class="as-action" data-as-regen="${escapeHtml(message.id)}">${icon("sparkle")}<span>${escapeHtml(t("chat.regenerate"))}</span></button>
-  </div>`;
-}
-
 /** 深度思考的折叠面板：默认收起，不挡住答案。 */
 function assistantReasoningMarkup(message) {
   const text = String(message.reasoning || "").trim().slice(0, 12000);
@@ -2106,70 +2068,6 @@ function assistantSourcesMarkup(message) {
       })
       .join("")}
   </div>`;
-}
-
-function assistantWelcomeMarkup() {
-  const prompts = ["code", "write", "error", "notes"];
-  const provider = providerIdOf();
-  return `<div class="as-welcome" id="asWelcome">
-    <div class="as-welcome-head">
-      <span class="as-orb" data-provider="${escapeHtml(provider)}" aria-hidden="true">${escapeHtml(providerMonogram(provider))}</span>
-      <div class="as-welcome-copy">
-        <b>${escapeHtml(t("assistant.welcomeTitle"))}</b>
-        <small>${escapeHtml(t("assistant.welcomeSub"))}</small>
-        <small class="as-welcome-meta">${escapeHtml(assistantWelcomeMeta())}</small>
-      </div>
-    </div>
-    <div class="as-prompts">
-      ${prompts
-        .map(
-          (id) => `<button type="button" class="as-prompt" data-as-prompt="assistant.prompt.${id}Fill">
-            <span>${escapeHtml(t(`assistant.prompt.${id}`))}</span><i aria-hidden="true">→</i>
-          </button>`,
-        )
-        .join("")}
-    </div>
-  </div>`;
-}
-
-/** 欢迎卡第二行：告诉用户这张卡后面接着哪家服务、哪些能力可用。 */
-function assistantWelcomeMeta() {
-  const s = state.settings;
-  const provider = providerIdOf(s);
-  const model = String(s.model || "").trim();
-  const head = model ? t("assistant.welcomeMeta", { provider: providerShort(provider), model }) : providerShort(provider);
-  const caps = assistantCapabilities(s);
-  return caps.web || caps.thinking ? `${head} · ${t("assistant.capReady")}` : head;
-}
-
-function syncAssistantWelcome() {
-  const list = $("#messageList");
-  if (!list || !state) return;
-  const show = chatModeOf(state.settings) === "assistant"
-    && (state.messages || []).length > 0
-    && !(state.messages || []).some((message) => message.role === "user");
-  const existing = list.querySelector("#asWelcome");
-  if (!show) {
-    existing?.remove();
-    return;
-  }
-  if (existing) {
-    const provider = providerIdOf();
-    const orb = existing.querySelector(".as-orb");
-    if (orb) {
-      orb.dataset.provider = provider;
-      orb.textContent = providerMonogram(provider);
-    }
-    const meta = existing.querySelector(".as-welcome-meta");
-    if (meta) meta.textContent = assistantWelcomeMeta();
-    return;
-  }
-  const holder = document.createElement("div");
-  holder.innerHTML = assistantWelcomeMarkup();
-  const node = holder.firstElementChild;
-  const live = list.querySelector(".is-live");
-  if (live) live.before(node);
-  else list.append(node);
 }
 
 function syncAssistantThinking() {
@@ -2217,28 +2115,24 @@ function syncAssistantTools() {
   });
 }
 
-/** 助理页专属的装饰：欢迎卡、等待指示、输入栏开关、页头会话条数。 */
+/** 助理页只留两个能力开关和等待提示，其余装饰全部收掉。 */
 function syncAssistantExtras() {
   if (!state) return;
-  syncAssistantWelcome();
   syncAssistantThinking();
   syncAssistantTools();
-  const sub = $("#peerSub");
-  if (sub && chatModeOf(state.settings) === "assistant") {
-    sub.textContent = assistantSubline();
+  /* 招呼只在空会话里出现：第一句提问之后，即使列表是增量追加，
+     也要把已经渲染的招呼节点摘掉。 */
+  if (chatModeOf(state.settings) === "assistant" && (state.messages || []).some((item) => item.role === "user")) {
+    $("#messageList")?.querySelectorAll(".as-hello").forEach((node) => node.remove());
   }
-}
-
-/** 页头第二行：模型 + 会话条数，服务商身份具体到型号。 */
-function assistantSubline() {
-  const count = t("assistant.sessionSub", { n: (state.messages || []).length });
-  const model = String(state.settings.model || "").trim();
-  return model ? `${model} · ${count}` : count;
 }
 
 function messageMarkup(message, isNew, previous = null) {
   const s = state.settings;
   const mode = chatModeOf(s);
+  /* 助理页的招呼只在真正空着时出现；一旦有过提问，它就从列表里退场。 */
+  if (mode === "assistant" && message.greeting
+    && (state.messages || []).some((item) => item.role === "user")) return "";
   const role = message.role === "user" ? "user" : "assistant";
   const side = role === "user" ? "user" : "ai";
   const avatar = messageAvatar(message);
@@ -2262,33 +2156,35 @@ function messageMarkup(message, isNew, previous = null) {
     content = drawingMarkup(message);
   } else {
     let text = String(message.text || "");
-    /* roleplay: 旁白、动作、台词各占一行；assistant: 段落 + 代码块 */
-    /* a stray svg block must never be printed as text, whatever the source.
-       助理页例外：那里代码就是内容，问「这段 svg 哪错了」时必须看得见源码。 */
-    if (mode !== "assistant" && /<svg\b/i.test(text)) text = stripSvgSource(text) || t("chat.drawingBroken");
-    const emoji = isEmojiOnly(text);
-    extraClass = emoji ? "is-emoji" : "";
-    const body = emoji
-      ? renderRichText(text)
-      : mode === "roleplay"
-        ? renderNarrationMarkup(text)
-        : mode === "assistant"
-          ? renderAssistantMarkup(text)
-          : renderRichText(text);
-    content = `<div class="bubble ${extraClass}">${body}</div>`;
+    if (mode === "assistant" && message.greeting) {
+      /* 助理页不摆欢迎卡：打开就是一句「你好，需要什么帮助吗？」 */
+      content = `<div class="as-hello">${escapeHtml(t("module.assistantHello"))}</div>`;
+    } else {
+      /* roleplay: 旁白、动作、台词各占一行；assistant: 段落 + 代码块 */
+      /* a stray svg block must never be printed as text, whatever the source.
+         助理页例外：那里代码就是内容，问「这段 svg 哪错了」时必须看得见源码。 */
+      if (mode !== "assistant" && /<svg\b/i.test(text)) text = stripSvgSource(text) || t("chat.drawingBroken");
+      const emoji = isEmojiOnly(text);
+      extraClass = emoji ? "is-emoji" : "";
+      const body = emoji
+        ? renderRichText(text)
+        : mode === "roleplay"
+          ? renderNarrationMarkup(text)
+          : mode === "assistant"
+            ? renderAssistantMarkup(text)
+            : renderRichText(text);
+      content = `<div class="bubble ${extraClass}">${body}</div>`;
+    }
   }
   if ((message.kind === "image" || message.kind === "file") && String(message.text || "").trim()) {
     content += `<div class="bubble">${renderRichText(String(message.text).trim())}</div>`;
   }
-  /* 助理页：每题上方一行「AI 助理 · 时间」，回答下方给复制 / 重新生成。
+  /* 助理页只留思考过程和来源；时间、小标、复制 / 重新生成都收进长按菜单。
      流式预览只是临时气泡，不挂这些。 */
-  if (mode === "assistant" && message.kind !== "report" && message.id !== "live_preview") {
+  if (mode === "assistant" && message.kind !== "report" && message.id !== "live_preview" && !message.greeting) {
     const reasoning = message.kind === "text" ? assistantReasoningMarkup(message) : "";
     const sources = message.kind === "text" ? assistantSourcesMarkup(message) : "";
-    content = `${assistantMetaMarkup(message, role)}${reasoning}${content}${sources}`;
-    if (role === "assistant" && message.kind === "text" && !message.greeting && String(message.text || "").trim()) {
-      content += assistantActionsMarkup(message);
-    }
+    content = `${reasoning}${content}${sources}`;
   }
 
   const time = message.kind === "sticker" || message.kind === "report" ? "" : `<span class="msg-time">${escapeHtml(timeLabel(message.ts))}</span>`;
@@ -2334,9 +2230,11 @@ function rangeSignature(messages, from, to) {
 
 function chatEmptyMarkup() {
   const mode = chatModeOf(state.settings);
-  const hint = mode === "assistant"
-    ? t("chat.emptyAssistant")
-    : mode === "roleplay" ? t("chat.emptyRoleplay") : t("chat.emptyHint");
+  /* 助理页空着时不摆图标和按钮，只有一句招呼。 */
+  if (mode === "assistant") {
+    return `<div class="as-hello">${escapeHtml(t("module.assistantHello"))}</div>`;
+  }
+  const hint = mode === "roleplay" ? t("chat.emptyRoleplay") : t("chat.emptyHint");
   /* 剧本页空着的时候，第一步不是打字，是挑一张剧本。 */
   const action = mode === "roleplay"
     ? `<button type="button" class="btn btn-ghost btn-small empty-action" data-open-scenes>${escapeHtml(t("chat.pickScene"))}</button>`
@@ -3276,7 +3174,7 @@ function bindMessageMenu() {
     (event) => {
       if (event.pointerType === "mouse" && event.button !== 0) return;
       /* 助理页的答案操作条 / 快捷提问 / 思考面板 / 来源是普通控件，不要顺手把长按菜单叫出来 */
-      if (event.target.closest(".as-actions, .as-prompts, .as-think, .as-sources")) return;
+      if (event.target.closest(".as-think, .as-sources")) return;
       const holder = event.target.closest(".msg[data-message]");
       if (!holder || holder.classList.contains("is-live")) return;
       cancel();

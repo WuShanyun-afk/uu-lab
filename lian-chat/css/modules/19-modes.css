@@ -111,8 +111,11 @@ body[data-mode="assistant"] .tray-emoji {
 }
 body[data-mode="assistant"] .msg {
   gap: 0;
-  padding: 10px 0;
+  padding: 16px 0;
   align-items: stretch;
+}
+body[data-mode="assistant"] .msg.user + .msg.ai {
+  padding-top: 24px;
 }
 body[data-mode="assistant"] .msg .msg-body,
 body[data-mode="assistant"] .msg-stack {
@@ -388,11 +391,11 @@ body[data-mode="roleplay"] .msg-reply {
 }
 
 /* =========================================================
-   7 · 助理页 1.9.20：从「一张白纸」到 AI 工作台
+   7 · 助理页 1.9.23：极简对话
    ---------------------------------------------------------
-   页头：渐变 AI 徽记 + 「AI 助理」小标 + 独立会话条数
-   内容：AI / 你的小标与时间、欢迎卡与快捷提问、思考指示、流式光标
-   代码：语言 chip + 行数 + 复制；正文认出标题 / 列表 / 引用 / 表格 / 粗斜体
+   页头：只有徽记 + 服务商名，没有小标 / 副标题
+   内容：打开一句「你好，需要什么帮助吗？」，不摆欢迎卡和快捷提问
+   消息：没有时间小标、没有复制 / 重新生成按钮，动作收进长按菜单
    ========================================================= */
 
 /* ---- 7.1 页头 ---- */
@@ -412,15 +415,11 @@ body[data-mode="roleplay"] .msg-reply {
   min-width: 0;
 }
 body[data-mode="assistant"] .chat-header {
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, #2f6bff 6%, var(--surface)) 0%,
-    color-mix(in srgb, var(--surface) 94%, transparent) 100%
-  );
-  border-bottom-color: color-mix(in srgb, #2f6bff 14%, var(--line));
+  background: var(--surface);
+  border-bottom-color: color-mix(in srgb, var(--line) 78%, transparent);
 }
 body[data-mode="assistant"] .peer {
-  gap: 11px;
+  gap: 10px;
 }
 body[data-mode="assistant"] .peer-mark {
   position: relative;
@@ -449,26 +448,22 @@ body[data-mode="assistant"] .peer-mark {
 }
 
 /* 一枚徽记 = 深墨砖 + 细渐变环 + 服务商首字母；换 Key 时颜色和字母一起换。 */
-.peer-mark[data-provider="mimo"],
-.as-orb[data-provider="mimo"] {
+.peer-mark[data-provider="mimo"] {
   --mark-a: rgba(128, 160, 255, 0.66);
   --mark-b: rgba(200, 168, 255, 0.46);
   --mark-glow: rgba(126, 158, 255, 0.22);
 }
-.peer-mark[data-provider="openai"],
-.as-orb[data-provider="openai"] {
+.peer-mark[data-provider="openai"] {
   --mark-a: rgba(122, 226, 196, 0.55);
   --mark-b: rgba(150, 205, 255, 0.34);
   --mark-glow: rgba(122, 226, 196, 0.16);
 }
-.peer-mark[data-provider="deepseek"],
-.as-orb[data-provider="deepseek"] {
+.peer-mark[data-provider="deepseek"] {
   --mark-a: rgba(92, 148, 255, 0.7);
   --mark-b: rgba(96, 214, 255, 0.4);
   --mark-glow: rgba(92, 148, 255, 0.24);
 }
-.peer-mark[data-provider="custom"],
-.as-orb[data-provider="custom"] {
+.peer-mark[data-provider="custom"] {
   --mark-a: rgba(196, 204, 220, 0.42);
   --mark-b: rgba(140, 150, 170, 0.26);
   --mark-glow: rgba(190, 198, 214, 0.12);
@@ -480,195 +475,23 @@ body[data-mode="assistant"] .peer-mark {
 body[data-mode="assistant"] .peer-title {
   max-width: 100%;
 }
-body[data-mode="assistant"] .peer-badge {
-  display: inline-flex;
-  align-items: center;
-  flex: none;
-  padding: 1px 6px;
-  border: 1px solid color-mix(in srgb, #2f6bff 26%, transparent);
-  border-radius: 6px;
-  background: color-mix(in srgb, #2f6bff 9%, transparent);
-  color: #2f6bff;
-  font-size: 10px;
-  font-weight: 650;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-}
+body[data-mode="assistant"] .peer-badge,
 body[data-mode="assistant"] .peer-sub {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 10.5px;
-  color: var(--muted);
-  letter-spacing: 0.01em;
+  display: none !important;
 }
 body[data-mode="assistant"] .peer-status {
   display: none !important;
 }
 
-/* ---- 7.2 每条消息的小标 + 时间 ---- */
-body[data-mode="assistant"] .as-meta {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin: 0 2px 7px;
-  color: var(--muted);
-  font-size: 11px;
-  letter-spacing: 0.02em;
-}
-body[data-mode="assistant"] .as-meta.is-user {
-  justify-content: flex-end;
-  margin: 0 2px 6px;
-}
-body[data-mode="assistant"] .as-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #2f6bff, #7b5cff);
-  box-shadow: 0 0 0 3px color-mix(in srgb, #2f6bff 10%, transparent);
-}
-body[data-mode="assistant"] .as-meta time {
-  font-variant-numeric: tabular-nums;
-  opacity: 0.68;
-}
-body[data-mode="assistant"] .as-meta.is-user .as-who {
-  color: color-mix(in srgb, var(--muted) 85%, var(--text));
-}
-
-/* ---- 7.3 答案操作条 ---- */
-body[data-mode="assistant"] .as-actions {
-  display: flex;
-  gap: 6px;
-  margin-top: 9px;
-}
-body[data-mode="assistant"] .as-action {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-height: 28px;
-  padding: 0 9px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--surface) 82%, transparent);
-  color: var(--muted);
-  font-size: 11.5px;
-  line-height: 1;
-  transition: color var(--t-fast), border-color var(--t-fast), background var(--t-fast);
-}
-body[data-mode="assistant"] .as-action .icon {
-  width: 13px;
-  height: 13px;
-}
-body[data-mode="assistant"] .as-action:active {
-  color: var(--accent-strong, #2f6bff);
-  border-color: color-mix(in srgb, #2f6bff 30%, var(--line));
-  background: color-mix(in srgb, #2f6bff 7%, var(--surface));
-}
-
-/* ---- 7.4 欢迎卡与快捷提问 ---- */
-.as-welcome {
-  margin: 4px 0 14px;
-  padding: 16px 15px 15px;
-  border: 1px solid color-mix(in srgb, #2f6bff 15%, var(--line));
-  border-radius: 18px;
-  background:
-    radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, #2f6bff 9%, transparent), transparent 62%),
-    color-mix(in srgb, #2f6bff 3%, var(--surface));
-}
-.as-welcome-head {
-  display: flex;
-  align-items: flex-start;
-  gap: 11px;
-  margin-bottom: 13px;
-}
-.as-orb {
-  position: relative;
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 44px;
-  height: 44px;
-  border: 1px solid transparent;
-  border-radius: 14px;
-  background:
-    radial-gradient(120% 120% at 26% 0%, var(--mark-glow, rgba(126, 158, 255, 0.2)), transparent 62%) padding-box,
-    linear-gradient(158deg, #272c3a 0%, #171b25 48%, #0b0e15 100%) padding-box,
-    linear-gradient(142deg, var(--mark-a, rgba(150, 172, 255, 0.6)), rgba(255, 255, 255, 0.09) 44%, var(--mark-b, rgba(190, 165, 255, 0.45))) border-box;
-  color: #f4f7fd;
-  font-family: Georgia, "Songti SC", "Noto Serif SC", serif;
-  font-size: 21px;
-  font-weight: 500;
-  line-height: 1;
-  letter-spacing: 0;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    inset 0 -8px 12px -10px rgba(0, 0, 0, 0.7),
-    0 10px 20px -14px rgba(10, 20, 40, 0.65);
-}
-.as-orb[data-provider="custom"] {
-  font-size: 17px;
-  font-weight: 500;
-}
-.as-welcome-copy b {
-  display: block;
-  font-size: 15px;
-  line-height: 1.35;
+/* ---- 7.2 招呼：打开就是一句话，没有欢迎卡 ---- */
+body[data-mode="assistant"] .as-hello {
+  margin: clamp(48px, 16vh, 150px) 0 0;
+  padding: 0 2px;
   color: var(--text);
-}
-.as-welcome-copy small {
-  display: block;
-  margin-top: 3px;
-  font-size: 11.5px;
+  font-size: 22px;
+  font-weight: 500;
   line-height: 1.55;
-  color: var(--muted);
-}
-.as-welcome-copy .as-welcome-meta {
-  margin-top: 6px;
-  font-size: 10.5px;
-  letter-spacing: 0.015em;
-  color: color-mix(in srgb, #2f6bff 58%, var(--muted));
-}
-.as-welcome-copy .as-welcome-meta::before {
-  content: "";
-  display: inline-block;
-  width: 3px;
-  height: 3px;
-  margin-right: 6px;
-  border-radius: 50%;
-  background: currentColor;
-  vertical-align: 2px;
-  opacity: 0.65;
-}
-.as-prompts {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 7px;
-}
-.as-prompt {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  min-height: 40px;
-  padding: 8px 11px;
-  border: 1px solid var(--line);
-  border-radius: 11px;
-  background: var(--surface);
-  color: var(--text);
-  font-size: 12px;
-  text-align: left;
-  transition: border-color var(--t-fast), transform var(--t-fast);
-}
-.as-prompt i {
-  font-style: normal;
-  color: color-mix(in srgb, #2f6bff 80%, var(--muted));
-  opacity: 0.7;
-}
-.as-prompt:active {
-  transform: scale(0.985);
-  border-color: color-mix(in srgb, #2f6bff 30%, var(--line));
+  letter-spacing: -0.005em;
 }
 
 /* ---- 7.5 等待与流式 ---- */
@@ -853,12 +676,12 @@ body[data-mode="assistant"] .as-line em {
   font-style: italic;
 }
 
-/* ---- 7.8 联网 / 深度思考开关 ---- */
+/* ---- 7.8 联网 / 深度思考：一行轻文字，不做胶囊 ---- */
 .assistant-tools {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 1px 2px 7px;
+  gap: 16px;
+  padding: 1px 6px 8px;
 }
 #assistantTools[hidden] {
   display: none !important;
@@ -866,43 +689,40 @@ body[data-mode="assistant"] .as-line em {
 .assistant-tool {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   min-height: 28px;
-  padding: 0 10px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--surface);
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--muted);
   font-size: 11.5px;
   line-height: 1;
-  transition: color var(--t-fast), border-color var(--t-fast), background var(--t-fast);
+  transition: color var(--t-fast);
 }
 .assistant-tool .icon {
   width: 13px;
   height: 13px;
+  opacity: 0.75;
 }
 .assistant-tool[aria-pressed="true"] {
   color: #2f6bff;
-  border-color: color-mix(in srgb, #2f6bff 30%, var(--line));
-  background: color-mix(in srgb, #2f6bff 8%, var(--surface));
+  font-weight: 600;
 }
 .assistant-tool:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
 }
 
 /* ---- 7.9 思考过程 / 联网来源 ---- */
 .as-think {
-  margin: 2px 0 10px;
-  border: 1px solid color-mix(in srgb, #2f6bff 12%, var(--line));
-  border-radius: 12px;
-  background: color-mix(in srgb, #2f6bff 3%, var(--surface));
-  overflow: hidden;
+  margin: 0 0 10px;
+  border: 0;
+  background: transparent;
 }
 .as-think summary {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 8px 11px;
+  gap: 6px;
+  padding: 0 2px;
   color: var(--muted);
   font-size: 11.5px;
   cursor: pointer;
@@ -930,8 +750,7 @@ body[data-mode="assistant"] .as-line em {
   opacity: 0.7;
 }
 .as-think-body {
-  padding: 8px 12px 11px;
-  border-top: 1px dashed var(--line);
+  padding: 6px 2px 10px;
   color: var(--muted);
   font-size: 12px;
   line-height: 1.68;

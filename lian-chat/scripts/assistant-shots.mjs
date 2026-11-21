@@ -103,7 +103,7 @@ const settings = {
 };
 const chat = (messages) => ({
   id: "c3", mode: "assistant", kind: "module", name: "沈砚", keyId: "k1", avatar: "",
-  relationship: "", persona: "", greeting: "在。要处理什么？", messages, memories: [],
+  relationship: "", persona: "", greeting: "你好，需要什么帮助吗？", messages, memories: [],
   memoryMeta: { lastUserCount: 0, lastAttemptAt: 0, lastAt: 0 }, block: null, blockFollowUp: null,
   createdAt: now - 86400000, updatedAt: now,
 });
@@ -145,7 +145,7 @@ async function shot(name) {
 }
 
 /* ---- 1. welcome (greeting only) ---- */
-await boot(wrap([{ ...msg("g1", "assistant", "在。要处理什么？", now - 60000), greeting: true }]));
+await boot(wrap([{ ...msg("g1", "assistant", "你好，需要什么帮助吗？", now - 60000), greeting: true }]));
 await shot("assistant-welcome.png");
 console.log("welcome:", await evaluate(`({ welcome: !!document.querySelector("#asWelcome"), prompts: document.querySelectorAll(".as-prompt").length, mark: document.querySelector("#peerMark")?.textContent, sub: document.querySelector("#peerSub")?.textContent })`));
 
@@ -157,7 +157,7 @@ const deepseekSettings = {
   model: "deepseek-flash",
 };
 const deepseekKey = { id: "k1", name: "DeepSeek", provider: "deepseek", apiKey: "seed", baseUrl: "https://api.deepseek.com/v1", model: "deepseek-flash", createdAt: now };
-await boot(wrap([{ ...msg("g1", "assistant", "在。要处理什么？", now - 60000), greeting: true }], { settings: deepseekSettings, key: deepseekKey }));
+await boot(wrap([{ ...msg("g1", "assistant", "你好，需要什么帮助吗？", now - 60000), greeting: true }], { settings: deepseekSettings, key: deepseekKey }));
 await evaluate(`(() => {
   document.querySelector('[data-assistant-tool="web"]')?.click();
   document.querySelector('[data-assistant-tool="thinking"]')?.click();
@@ -227,7 +227,7 @@ console.log("inline:", await evaluate(`(() => {
 })()`));
 
 /* ---- 3. waiting for an answer (deep thinking on) ---- */
-await boot(wrap([{ ...msg("g1", "assistant", "在。要处理什么？", now - 60000), greeting: true }]));
+await boot(wrap([{ ...msg("g1", "assistant", "你好，需要什么帮助吗？", now - 60000), greeting: true }]));
 await evaluate(`document.querySelector('[data-assistant-tool="thinking"]')?.click()`);
 await sleep(200);
 await evaluate(`(() => {

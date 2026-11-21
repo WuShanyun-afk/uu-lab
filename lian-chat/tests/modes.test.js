@@ -272,19 +272,16 @@ test("module threads have copy in both languages", () => {
     assert.equal(hits, 2, `${key} needs a Chinese and an English line`);
     assert.notEqual(t(key), key, `${key} is missing from the dictionary`);
   }
-  assert.ok(t("module.assistantHello").includes("在"), "the assistant hello should be neutral");
+  assert.equal(t("module.assistantHello"), "你好，需要什么帮助吗？", "the assistant hello is one neutral line");
   assert.ok(!/宝贝/.test(t("module.assistantHello")), "the assistant hello must not use pet names");
 });
 
 test("assistant page design copy exists in both languages", () => {
   const i18n = read("js/i18n.js");
   const keys = [
-    "chat.placeholderAssistant", "assistant.label", "assistant.sessionSub", "assistant.metaUser",
-    "assistant.thinking", "assistant.codeLines", "assistant.welcomeTitle", "assistant.welcomeSub",
-    "assistant.prompt.code", "assistant.prompt.codeFill", "assistant.prompt.write", "assistant.prompt.writeFill",
-    "assistant.prompt.error", "assistant.prompt.errorFill", "assistant.prompt.notes", "assistant.prompt.notesFill",
+    "chat.placeholderAssistant", "assistant.thinking", "assistant.codeLines",
     "assistant.web", "assistant.thinkingLabel", "assistant.deepThinking", "assistant.webSearching",
-    "assistant.reasoning", "assistant.reasoningChars", "assistant.webSources",
+    "assistant.reasoning", "assistant.reasoningChars", "assistant.webSources", "assistant.monogramCustom",
     "assistant.capabilityUnsupported", "assistant.capabilityMimoOnly", "settings.assistantCapHint",
   ];
   for (const key of keys) {
@@ -292,6 +289,5 @@ test("assistant page design copy exists in both languages", () => {
     assert.equal(hits, 2, `${key} needs a Chinese and an English line`);
     assert.notEqual(t(key), key, `${key} is missing from the dictionary`);
   }
-  assert.ok(t("assistant.sessionSub", { n: 3 }).includes("3"), "the session count placeholder should be filled");
   assert.ok(t("assistant.codeLines", { n: 7 }).includes("7"), "the line count placeholder should be filled");
 });

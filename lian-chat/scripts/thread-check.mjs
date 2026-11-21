@@ -210,7 +210,7 @@ const sendText = async (text) => {
 /* ================= 1. a reply must stay in the chat that asked ================= */
 {
   const companion = [msg("m1", "assistant", "老位置。", now - 5000), msg("m2", "user", "今天有热的吗？", now - 4000)];
-  const assistant = [msg("a1", "assistant", "在。要处理什么？", now - 9000)];
+  const assistant = [msg("a1", "assistant", "你好，需要什么帮助吗？", now - 9000)];
   await boot(wrap(baseSettings("companion"), [
     chat("c1", "companion", "沈砚", companion),
     chat("c3", "assistant", "Lian", assistant, { updatedAt: now - 600000 }),
@@ -317,7 +317,7 @@ const sendText = async (text) => {
 
 /* ================= 5. assistant answers keep html/svg code as code ================= */
 {
-  const assistant = [msg("a1", "assistant", "在。要处理什么？", now - 9000)];
+  const assistant = [msg("a1", "assistant", "你好，需要什么帮助吗？", now - 9000)];
   await boot(wrap(baseSettings("assistant"), [
     chat("c1", "companion", "沈砚", [msg("m1", "assistant", "老位置。", now - 5000)]),
     chat("c3", "assistant", "Lian", assistant, { updatedAt: now }),
@@ -406,31 +406,35 @@ const sendText = async (text) => {
   check("the chat switched to gets no borrowed memories", (chatB?.memories || []).length === 0, JSON.stringify(chatB?.memories));
 }
 
-/* ================= 9. assistant welcome + quick prompts ================= */
+/* ================= 9. assistant: one-line hello, no chrome ================= */
 {
-  const greeting = { ...msg("g1", "assistant", "在。要处理什么？", now - 60000), greeting: true };
+  const greeting = { ...msg("g1", "assistant", "你好，需要什么帮助吗？", now - 60000), greeting: true };
   await boot(wrap(baseSettings("assistant"), [
     chat("c1", "companion", "沈砚", [msg("m1", "assistant", "老位置。", now - 5000)]),
     chat("c3", "assistant", "Lian", [greeting], { updatedAt: now }),
   ], "c3", [greeting], { companion: "c1", roleplay: "", assistant: "c3" }));
   await openChatById("c3");
-  const welcome = await evaluate(`({
-    present: !!document.querySelector("#asWelcome"),
+  const idle = await evaluate(`({
+    hello: document.querySelector(".as-hello")?.textContent || "",
+    welcome: !!document.querySelector("#asWelcome"),
     prompts: document.querySelectorAll(".as-prompt").length,
-    greetingActions: document.querySelectorAll('[data-message="g1"] .as-actions').length,
+    meta: document.querySelectorAll(".as-meta").length,
+    actions: document.querySelectorAll(".as-actions").length,
     header: document.querySelector("#peerName")?.textContent,
+    badgeHidden: document.querySelector("#peerBadge")?.hidden,
+    subHidden: document.querySelector("#peerSub")?.hidden,
     toolsHidden: document.querySelector("#assistantTools")?.hidden,
     webDisabled: document.querySelector('[data-assistant-tool="web"]')?.disabled,
     thinkingDisabled: document.querySelector('[data-assistant-tool="thinking"]')?.disabled,
+    toolStyle: (() => { const b = document.querySelector('.assistant-tool'); const cs = b ? getComputedStyle(b) : null; return cs ? { border: cs.borderTopWidth, background: cs.backgroundColor } : null; })(),
   })`);
-  check("the idle assistant page shows the welcome card", welcome.present && welcome.prompts === 4, JSON.stringify(welcome));
-  check("the greeting has no copy/regenerate actions", welcome.greetingActions === 0, String(welcome.greetingActions));
-  check("the assistant header shows the provider name", welcome.header === "自定义", String(welcome.header));
-  check("the capability bar is visible, but disabled off MiMo", welcome.toolsHidden === false && welcome.webDisabled === true && welcome.thinkingDisabled === true, JSON.stringify(welcome));
-  await evaluate(`document.querySelector(".as-prompt")?.click()`);
-  await sleep(160);
-  const filled = await evaluate(`document.querySelector("#messageInput").value`);
-  check("a quick prompt fills the composer", String(filled).startsWith("帮我解释这段代码"), filled.slice(0, 20));
+  check("opening the assistant page shows the one-line hello", idle.hello === "你好，需要什么帮助吗？", idle.hello);
+  check("the stored greeting is replaced by the canonical hello", !idle.hello.includes("要处理什么"), idle.hello);
+  check("there is no welcome card and no quick prompts", idle.welcome === false && idle.prompts === 0, JSON.stringify(idle));
+  check("the greeting has no meta line and no action row", idle.meta === 0 && idle.actions === 0, JSON.stringify(idle));
+  check("the header keeps only the provider name", idle.header === "自定义" && idle.badgeHidden === true && idle.subHidden === true, JSON.stringify(idle));
+  check("the capability bar is visible, but disabled off MiMo", idle.toolsHidden === false && idle.webDisabled === true && idle.thinkingDisabled === true, JSON.stringify(idle));
+  check("the capability toggles are quiet text, not pills", idle.toolStyle?.border === "0px" && /rgba\(0, 0, 0, 0\)|transparent/.test(idle.toolStyle?.background || ""), JSON.stringify(idle.toolStyle));
   await send("Emulation.setDeviceMetricsOverride", {
     width: 320, height: 568, deviceScaleFactor: 2, mobile: true, screenWidth: 320, screenHeight: 568,
   });
@@ -441,39 +445,49 @@ const sendText = async (text) => {
     return {
       overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       headerOverflow: header ? header.scrollWidth - header.clientWidth : 0,
-      actionMin: Math.min(99, ...heights(".as-action")),
-      promptMin: Math.min(99, ...heights(".as-prompt")),
+      toolMin: Math.min(99, ...heights(".assistant-tool")),
+      helloSize: parseFloat(getComputedStyle(document.querySelector(".as-hello")).fontSize),
     };
   })()`);
   check("the assistant header fits a 320px screen", narrow.overflow <= 0 && narrow.headerOverflow <= 0, JSON.stringify(narrow));
-  check("assistant quick prompts stay tappable", narrow.promptMin >= 24, JSON.stringify(narrow));
+  check("the capability toggles stay tappable", narrow.toolMin >= 24, JSON.stringify(narrow));
+  check("the hello stays readable on a narrow screen", narrow.helloSize >= 20, String(narrow.helloSize));
   await send("Emulation.setDeviceMetricsOverride", {
     width: 390, height: 844, deviceScaleFactor: 2, mobile: true, screenWidth: 390, screenHeight: 844,
   });
   await sleep(260);
   await mockReply("先看边界条件。", 900);
-  await evaluate(`(() => {
-    const input = document.querySelector("#messageInput");
-    input.value = "解释一下";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    document.querySelector("#btnSend").click();
-  })()`);
+  await sendText("解释一下");
   await sleep(2100);
   const after = await evaluate(`({
-    welcome: !!document.querySelector("#asWelcome"),
-    actions: document.querySelectorAll(".as-actions").length,
+    hello: !!document.querySelector(".as-hello"),
     meta: document.querySelectorAll(".as-meta").length,
+    actions: document.querySelectorAll(".as-actions").length,
     thinking: !!document.querySelector("#asThinking"),
+    messages: document.querySelectorAll(".msg").length,
   })`);
-  check("the welcome card disappears after the first question", after.welcome === false, String(after.welcome));
-  check("the answer offers copy / regenerate", after.actions >= 1, String(after.actions));
-  check("every assistant-page message has a meta line", after.meta >= 3, String(after.meta));
+  check("the hello disappears after the first question", after.hello === false, String(after.hello));
+  check("answers have no time label and no inline action row", after.meta === 0 && after.actions === 0, JSON.stringify(after));
   check("the thinking indicator is gone after the reply", after.thinking === false, String(after.thinking));
+  await evaluate(`(() => {
+    const node = document.querySelector(".msg.ai .bubble");
+    const r = node.getBoundingClientRect();
+    node.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, clientX: r.left + 16, clientY: r.top + 8, pointerType: "mouse", button: 0, isPrimary: true }));
+  })()`);
+  await sleep(700);
+  const menu = await evaluate(`({
+    copy: !!document.querySelector(".msg-menu [data-menu='copy']"),
+    regen: !!document.querySelector(".msg-menu [data-menu='regen']"),
+  })`);
+  check("copy and regenerate still live in the long-press menu", menu.copy && menu.regen, JSON.stringify(menu));
+  await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+  await send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+  await sleep(200);
 }
 
 /* ================= 10. MiMo: provider name, web search + deep thinking ================= */
 {
-  const greeting = { ...msg("g1", "assistant", "在。要处理什么？", now - 60000), greeting: true };
+  const greeting = { ...msg("g1", "assistant", "你好，需要什么帮助吗？", now - 60000), greeting: true };
   const mimoSettings = {
     ...baseSettings("assistant"),
     provider: "mimo",
@@ -532,7 +546,7 @@ const sendText = async (text) => {
 
 /* ================= 11. DeepSeek: monogram, native tools, nested citations ================= */
 {
-  const greeting = { ...msg("g1", "assistant", "在。要处理什么？", now - 60000), greeting: true };
+  const greeting = { ...msg("g1", "assistant", "你好，需要什么帮助吗？", now - 60000), greeting: true };
   const deepseekSettings = {
     ...baseSettings("assistant"),
     provider: "deepseek",
@@ -550,16 +564,14 @@ const sendText = async (text) => {
     header: document.querySelector("#peerName")?.textContent,
     mark: document.querySelector("#peerMark")?.textContent,
     provider: document.querySelector("#peerMark")?.dataset.provider,
-    orb: document.querySelector(".as-orb")?.textContent,
-    orbProvider: document.querySelector(".as-orb")?.dataset.provider,
-    meta: document.querySelector(".as-welcome-meta")?.textContent || "",
-    sub: document.querySelector("#peerSub")?.textContent || "",
+    hello: document.querySelector(".as-hello")?.textContent || "",
+    badgeHidden: document.querySelector("#peerBadge")?.hidden,
+    subHidden: document.querySelector("#peerSub")?.hidden,
   })`);
   check("a DeepSeek assistant is titled DeepSeek", marks.header === "DeepSeek", String(marks.header));
   check("the header mark becomes a D monogram", marks.mark === "D" && marks.provider === "deepseek", JSON.stringify(marks));
-  check("the welcome card carries the same monogram", marks.orb === "D" && marks.orbProvider === "deepseek", JSON.stringify(marks));
-  check("the welcome card names the model and its capabilities", marks.meta.includes("deepseek-flash") && marks.meta.includes("联网"), marks.meta);
-  check("the header sub line shows the model", marks.sub.includes("deepseek-flash"), marks.sub);
+  check("DeepSeek gets the same one-line hello", marks.hello === "你好，需要什么帮助吗？", marks.hello);
+  check("DeepSeek drops the header badge and sub line", marks.badgeHidden === true && marks.subHidden === true, JSON.stringify(marks));
   const caps = await evaluate(`({
     web: document.querySelector('[data-assistant-tool="web"]')?.disabled,
     thinking: document.querySelector('[data-assistant-tool="thinking"]')?.disabled,
@@ -598,11 +610,11 @@ const sendText = async (text) => {
   const rendered = await evaluate(`({
     think: document.querySelector(".as-think-body")?.textContent || "",
     sources: [...document.querySelectorAll(".as-sources a")].map((a) => a.getAttribute("href")),
-    meta: document.querySelector(".as-meta.is-ai .as-who")?.textContent || "",
+    meta: document.querySelectorAll(".as-meta").length,
   })`);
   check("DeepSeek reasoning is rendered", rendered.think.includes("官方文档"), rendered.think.slice(0, 24));
   check("a nested url_citation still renders one source", rendered.sources.length === 1 && rendered.sources[0].includes("api-docs.deepseek.com"), JSON.stringify(rendered.sources));
-  check("the per-message label is the provider, not a persona", rendered.meta === "DeepSeek", rendered.meta);
+  check("DeepSeek answers keep the clean layout", rendered.meta === 0, String(rendered.meta));
 }
 
 check("no console errors", consoleErrors.length === 0, consoleErrors.slice(0, 2).join(" | "));
