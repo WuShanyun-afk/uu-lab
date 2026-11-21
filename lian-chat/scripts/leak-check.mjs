@@ -180,7 +180,7 @@ const capture = async (name) => {
 };
 
 const now = Date.now();
-const seed = (drawings) => ({
+const seed = (drawings, extra = []) => ({
   onboarded: true,
   settings: {
     provider: "custom", apiKey: "seed", baseUrl: `http://127.0.0.1:${port}/mock/v1`, model: "m",
@@ -190,20 +190,20 @@ const seed = (drawings) => ({
   },
   chats: [{
     id: "c1", name: "Cat", relationship: "认识三年的恋人", keyId: "k1",
-    createdAt: now - 86400000, updatedAt: now, messages: [],
+    createdAt: now - 86400000, updatedAt: now, messages: extra,
   }],
   keys: [{ id: "k1", name: "Mock", provider: "custom", apiKey: "seed", baseUrl: `http://127.0.0.1:${port}/mock/v1`, model: "m", createdAt: now }],
   activeChatId: "c1", activeKeyId: "k1",
-  messages: [], memories: [], memoryMeta: { lastUserCount: 0, lastAttemptAt: 0, lastAt: 0 },
+  messages: extra, memories: [], memoryMeta: { lastUserCount: 0, lastAttemptAt: 0, lastAt: 0 },
 });
 
-async function boot(drawings) {
+async function boot(drawings, extra = []) {
   await send("Page.navigate", { url: base });
   await sleep(400);
   await evaluate(`(async () => {
     localStorage.clear();
     await new Promise((resolve) => { const req = indexedDB.deleteDatabase("lian-chat"); req.onsuccess = req.onerror = req.onblocked = () => resolve(); });
-    localStorage.setItem("lian.state.fallback.v1", ${JSON.stringify(JSON.stringify(seed(drawings)))});
+    localStorage.setItem("lian.state.fallback.v1", ${JSON.stringify(JSON.stringify(seed(drawings, extra)))});
     return true;
   })()`);
   await send("Page.reload");
@@ -290,7 +290,17 @@ const fencedArt = await evaluate(`document.querySelectorAll(".msg-art.is-svg").l
 check("a fenced svg also renders with drawings off", fencedArt >= 2, String(fencedArt));
 check("no fence markers reach a bubble", !state.texts.join(" ").includes("```") && !state.texts.join(" ").includes("<svg"), state.texts.join(" | ").slice(0, 90));
 
-/* ---------- 6. a report whose JSON never finished ---------- */
+/* ---------- 6. history saved before the fix is repaired on load ---------- */
+await boot(false, [{ id: "legacy1", role: "assistant", kind: "text", text: `给你画好啦🐱\n\n${SVG}`, ts: now - 120000 }]);
+const legacy = await evaluate(`(() => ({
+  arts: document.querySelectorAll(".msg-art.is-svg").length,
+  texts: Array.from(document.querySelectorAll(".msg .bubble")).map((node) => node.innerText.trim()),
+}))()`);
+check("an old raw-svg reply is repaired into a picture", legacy.arts >= 1, JSON.stringify(legacy).slice(0, 90));
+check("the repaired reply keeps its words", legacy.texts.some((text) => text.includes("给你画好啦")), legacy.texts.join(" | ").slice(0, 70));
+check("no svg source survives in history", !legacy.texts.join(" ").includes("<svg"), legacy.texts.join(" | ").slice(0, 70));
+
+/* ---------- 7. a report whose JSON never finished ---------- */
 await evaluate(`document.querySelector("#btnAttach").click()`);
 await sleep(200);
 await evaluate(`document.querySelector('[data-tray="report"]').click()`);

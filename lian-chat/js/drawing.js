@@ -199,6 +199,63 @@ export function drawingLabel(drawing) {
   return drawing.type === "html" ? "HTML" : "SVG";
 }
 
+/**
+ * Last line of defence for text that is about to be printed: remove any svg
+ * source, complete or cut off. Stored history from older versions and anything
+ * that slipped past extraction go through here.
+ */
+export function stripSvgSource(text) {
+  return String(text || "")
+    .replace(/<svg\b[\s\S]*?<\/svg\s*>/gi, "\n")
+    .replace(/<svg\b[\s\S]*$/i, "")
+    .replace(/```[ \t]*(?:svg|html)[ \t]*\n[\s\S]*?(?:```|$)/gi, "\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/**
+ * Older versions stored a drawing reply as plain text (fences and all), so the
+ * chat history still holds bubbles full of `<svg …>`. Rewrite those stored
+ * messages once: keep the words, put the picture next to them, and if the
+ * markup never completed, drop the source and leave the note.
+ *
+ * Pure and idempotent: a message that is not text, or that does not contain
+ * svg markup, is returned untouched.
+ */
+export function adoptStoredDrawings(messages, { note = "" } = {}) {
+  if (!Array.isArray(messages)) return { changed: false, messages };
+  let changed = false;
+  const out = [];
+  for (const message of messages) {
+    if (!message || message.kind !== "text" || typeof message.text !== "string" || !/<svg\b/i.test(message.text)) {
+      out.push(message);
+      continue;
+    }
+    const { text, drawings } = extractDrawings(message.text);
+    if (!drawings.length && text === message.text) {
+      out.push(message);
+      continue;
+    }
+    changed = true;
+    const words = text.trim();
+    const drawing = drawings[0] ? { ...drawings[0], createdAt: message.ts || Date.now() } : null;
+    if (!drawing) {
+      out.push({ ...message, text: words || note || "" });
+      continue;
+    }
+    if (words) out.push({ ...message, text: words });
+    out.push({
+      ...message,
+      id: words ? `${message.id}_art` : message.id,
+      kind: "drawing",
+      text: "",
+      drawing,
+    });
+  }
+  return { changed, messages: out };
+}
+
 /** Rough byte size, used by the settings hint and by the state-size guard. */
 export function drawingBytes(drawing) {
   return new Blob([String(drawing?.markup || "")]).size;

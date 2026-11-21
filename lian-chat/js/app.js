@@ -27,7 +27,7 @@ import {
   parseReply,
 } from "./prompt.js";
 import { buildMemoryMessages, mergeMemories, parseMemoryReply } from "./memory.js";
-import { buildHtmlDocument, buildSvgDataUri, drawingLabel } from "./drawing.js";
+import { adoptStoredDrawings, buildHtmlDocument, buildSvgDataUri, drawingLabel, stripSvgSource } from "./drawing.js";
 import { accentStrong, mineBubble, relativeLuminance } from "./palette.js";
 import { buildReportFromRaw, reportBlocksHtml, salvageReport, sanitizeReportHtml } from "./report.js";
 import { chatHaystack, matchMessageIndexes, matchSnippet, normaliseQuery, splitByMatches } from "./search.js";
@@ -777,7 +777,7 @@ function renderHome(force = false) {
         ${homeRow("about", "doc", t("settings.about"), t("settings.aboutHint"))}
       </div>
     </section>
-    <p class="home-foot">${escapeHtml(t("settings.version", { v: "1.9.14" }))} · ${escapeHtml(t("home.localOnly"))}</p>`;
+    <p class="home-foot">${escapeHtml(t("settings.version", { v: "1.9.15" }))} · ${escapeHtml(t("home.localOnly"))}</p>`;
 }
 
 /* =========================================================
@@ -819,6 +819,9 @@ async function init() {
     if (ensureChatState()) persist();
   }
   setLang(state.settings.uiLang);
+  /* Old saved replies may still be raw <svg> text from before 1.9.14; turn
+     them into pictures (or a note) once, so history stops looking broken. */
+  if (adoptDrawingHistory()) persist();
   if (!demoMode) {
     pullNativeMessages();
     reconcileNativeBlockFollowUp();
@@ -1491,7 +1494,9 @@ function messageMarkup(message, isNew, previous = null) {
   } else if (message.kind === "drawing") {
     content = drawingMarkup(message);
   } else {
-    const text = String(message.text || "");
+    let text = String(message.text || "");
+    /* a stray svg block must never be printed as text, whatever the source */
+    if (/<svg\b/i.test(text)) text = stripSvgSource(text) || t("chat.drawingBroken");
     const emoji = isEmojiOnly(text);
     extraClass = emoji ? "is-emoji" : "";
     content = `<div class="bubble ${extraClass}">${renderRichText(text)}</div>`;
@@ -1846,6 +1851,24 @@ function persist() {
   syncActiveChat();
   scheduleSave(state);
   scheduleNativeSnapshot();
+}
+
+/**
+ * One-time repair of replies saved as raw svg text (before 1.9.14). Returns
+ * true when something changed so the caller can save.
+ */
+function adoptDrawingHistory() {
+  if (!state) return false;
+  const note = t("chat.drawingBroken");
+  let changed = false;
+  const fix = (list) => {
+    const result = adoptStoredDrawings(list, { note });
+    if (result.changed) changed = true;
+    return result.messages;
+  };
+  state.messages = fix(state.messages);
+  for (const chat of state.chats || []) chat.messages = fix(chat.messages);
+  return changed;
 }
 
 function nativeSnapshot() {

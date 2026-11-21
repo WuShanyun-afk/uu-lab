@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   DRAWING_LIMITS,
+  adoptStoredDrawings,
   buildHtmlDocument,
   buildSvgDataUri,
   drawingBytes,
@@ -11,6 +12,7 @@ import {
   isHtmlDrawing,
   isSvgDrawing,
   stripActiveHtml,
+  stripSvgSource,
 } from "../js/drawing.js";
 import { defaultState } from "../js/config.js";
 import { buildSystemPrompt, parseReply } from "../js/prompt.js";
@@ -212,4 +214,62 @@ test("with drawings off, a complete picture is still drawn instead of printed", 
   assert.equal(parsed.drawings.length, 1);
   assert.ok(!parsed.text.includes("<svg"));
   assert.equal(parsed.drawingBroken, false);
+});
+
+test("the render guard strips svg source out of any text", () => {
+  assert.equal(stripSvgSource("画好了。\n<svg viewBox=\"0 0 10 10\"><rect/></svg>\n喜欢吗"), "画好了。\n\n喜欢吗");
+  assert.equal(stripSvgSource("在睡觉。\n<svg viewBox=\"0 0 10 10\"><ellipse"), "在睡觉。");
+  assert.equal(stripSvgSource("```svg\n<svg viewBox=\"0 0 10 10\"></svg>\n```"), "");
+  assert.equal(stripSvgSource("普通的一句话"), "普通的一句话");
+  assert.ok(!stripSvgSource("前言<svg viewBox=\"0 0 1 1\"/>后记").includes("<svg"));
+});
+
+test("a reply saved as raw svg is repaired into words plus a picture", () => {
+  /* history written before 1.9.14 still holds `text` messages full of markup */
+  const messages = [
+    { id: "m1", role: "assistant", kind: "text", text: `给你画好啦🐱\n\n${SVG}`, ts: 11 },
+    { id: "m2", role: "user", kind: "text", text: "谢谢", ts: 12 },
+  ];
+  const out = adoptStoredDrawings(messages, { note: "（没画完）" });
+  assert.equal(out.changed, true);
+  assert.equal(out.messages.length, 3);
+  assert.equal(out.messages[0].id, "m1");
+  assert.equal(out.messages[0].kind, "text");
+  assert.equal(out.messages[0].text, "给你画好啦🐱");
+  assert.equal(out.messages[1].kind, "drawing");
+  assert.equal(out.messages[1].drawing.type, "svg");
+  assert.equal(out.messages[1].id, "m1_art");
+  assert.equal(out.messages[2].id, "m2");
+});
+
+test("a repaired reply that was nothing but a picture keeps its id", () => {
+  const out = adoptStoredDrawings([{ id: "only", role: "assistant", kind: "text", text: SVG, ts: 1 }], { note: "x" });
+  assert.equal(out.messages.length, 1);
+  assert.equal(out.messages[0].id, "only");
+  assert.equal(out.messages[0].kind, "drawing");
+});
+
+test("a saved reply whose drawing never finished keeps only its words", () => {
+  const out = adoptStoredDrawings(
+    [{ id: "m1", role: "assistant", kind: "text", text: '在睡觉。\n<svg viewBox="0 0 320 320"><ellipse', ts: 1 }],
+    { note: "（没画完）" },
+  );
+  assert.equal(out.messages.length, 1);
+  assert.equal(out.messages[0].kind, "text");
+  assert.equal(out.messages[0].text, "在睡觉。");
+});
+
+test("adopting history is idempotent and ignores normal messages", () => {
+  const plain = [
+    { id: "m1", role: "assistant", kind: "text", text: "普通消息", ts: 1 },
+    { id: "m2", role: "user", kind: "sticker", stickerId: "mk_ok", ts: 2 },
+  ];
+  const untouched = adoptStoredDrawings(plain, { note: "x" });
+  assert.equal(untouched.changed, false);
+  assert.deepEqual(untouched.messages, plain);
+
+  const once = adoptStoredDrawings([{ id: "a", role: "assistant", kind: "text", text: `hi\n${SVG}`, ts: 1 }], { note: "x" });
+  const twice = adoptStoredDrawings(once.messages, { note: "x" });
+  assert.equal(twice.changed, false);
+  assert.equal(twice.messages.length, once.messages.length);
 });
