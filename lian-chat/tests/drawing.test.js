@@ -273,3 +273,19 @@ test("adopting history is idempotent and ignores normal messages", () => {
   assert.equal(twice.changed, false);
   assert.equal(twice.messages.length, once.messages.length);
 });
+
+test("adopting history can be limited to assistant drawings", () => {
+  /* 用户自己贴的 svg 源码不是模型的画，不能转成图片 */
+  const paste = { id: "u1", role: "user", kind: "text", text: `这段哪错了？\n${SVG}`, ts: 1 };
+  const out = adoptStoredDrawings([paste], { note: "x", roles: ["assistant"] });
+  assert.equal(out.changed, false);
+  assert.deepEqual(out.messages, [paste]);
+
+  const reply = { id: "a1", role: "assistant", kind: "text", text: `画好了\n${SVG}`, ts: 2 };
+  const fixed = adoptStoredDrawings([paste, reply], { note: "x", roles: ["assistant"] });
+  assert.equal(fixed.changed, true);
+  assert.equal(fixed.messages.length, 3);
+  assert.equal(fixed.messages[0].kind, "text");
+  assert.equal(fixed.messages[1].kind, "text");
+  assert.equal(fixed.messages[2].kind, "drawing");
+});

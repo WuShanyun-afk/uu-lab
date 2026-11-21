@@ -658,12 +658,20 @@ export function parseReply(raw, state, options = {}) {
   // ``` of a drawing block and leave it unparseable. This runs whether or not
   // the drawing switch is on: a model that draws anyway must not paint its
   // source code into the chat (that is exactly what happened on the phone).
-  const drawn = extractDrawings(text, { limit: DRAWING_LIMITS.maxPerReply });
+  //
+  // 助理页是反例：它的卖点就是代码块 + 复制按钮，```html / ```svg 正是要看的
+  // 代码。在那里不抽画，围栏原样留给 renderAssistantMarkup()。
+  const allowDrawings = options.drawings ?? chatMode !== "assistant";
+  const drawn = allowDrawings
+    ? extractDrawings(text, { limit: DRAWING_LIMITS.maxPerReply })
+    : { text, drawings: [], broken: 0 };
   text = drawn.text;
   const drawings = drawn.drawings;
   // a fence was there but no picture could be built (cut off / malformed)
   const drawingBroken = drawn.broken > 0 && !drawn.drawings.length;
-  text = text.replace(/^\s*```[a-z]*\s*/i, "").replace(/\s*```\s*$/i, "");
+  /* 助理页的整条回复可能就是一段代码：围栏必须留着给代码块渲染。
+     其它模式继续去掉包住整条回复的边缘围栏（防止 ```json 之类漏上屏）。 */
+  if (allowDrawings) text = text.replace(/^\s*```[a-z]*\s*/i, "").replace(/\s*```\s*$/i, "");
 
   let blockRequested = false;
   text = text.replace(/\[\[?\s*(?:block|屏蔽|拉黑|暂停)\s*(?:[:：]\s*\d{1,4})?\s*\]\]?/gi, () => {
@@ -692,7 +700,9 @@ export function parseReply(raw, state, options = {}) {
     if (auto) stickerIds.push(auto);
   }
 
-  const parts = splitSegments(text, Boolean(state.settings.optimize?.segments));
+  /* 分段发送是陪伴的「像连续发消息」；助理的一条回答里有代码块和空行，
+     分段会把代码拆散，所以助理永远只发一条。 */
+  const parts = splitSegments(text, chatMode !== "assistant" && Boolean(state.settings.optimize?.segments));
   return {
     parts,
     stickerIds,

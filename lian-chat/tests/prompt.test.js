@@ -340,3 +340,38 @@ test("block markers are parsed only as a request and removed from visible text",
   assert.equal(parsed.blockRequested, true);
   assert.equal(parsed.text, "我先不说了。");
 });
+
+/* ---------------- 1.9.19：助理页的代码块要留住 ---------------- */
+
+test("assistant answers keep html/svg code fences instead of turning them into drawings", () => {
+  const s = state({ mode: "assistant" });
+  const raw = "给你一个卡片：\n\n```html\n<div class=\"card\">你好</div>\n```";
+  const parsed = parseReply(raw, s);
+  assert.equal(parsed.drawings.length, 0);
+  assert.ok(parsed.text.includes("```html"), parsed.text);
+  assert.ok(parsed.text.includes('<div class="card">'), parsed.text);
+  assert.equal(parsed.parts.length, 1);
+
+  const svgRaw = "图标源码：\n\n```svg\n<svg viewBox=\"0 0 10 10\"><circle cx=\"5\" cy=\"5\" r=\"4\"/></svg>\n```";
+  const svgParsed = parseReply(svgRaw, s);
+  assert.equal(svgParsed.drawings.length, 0);
+  assert.ok(svgParsed.text.includes("<svg"), svgParsed.text);
+});
+
+test("assistant answers are never split into several bubbles", () => {
+  const s = state({ mode: "assistant" });
+  s.settings.optimize.segments = true;
+  const raw = "第一段\n\n```js\nconst a = 1;\n```\n\n第二段";
+  const parsed = parseReply(raw, s);
+  assert.equal(parsed.parts.length, 1);
+  assert.ok(parsed.parts[0].includes("```js"));
+});
+
+test("companion still turns an svg fence into a drawing", () => {
+  const s = state();
+  s.settings.optimize.drawings = true;
+  const raw = "看这个。\n\n```svg\n<svg viewBox=\"0 0 10 10\"></svg>\n```";
+  const parsed = parseReply(raw, s);
+  assert.equal(parsed.drawings.length, 1);
+  assert.ok(!parsed.text.includes("<svg"));
+});

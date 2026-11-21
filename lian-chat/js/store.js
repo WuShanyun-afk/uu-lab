@@ -256,6 +256,9 @@ export function normaliseState(raw) {
     typeof merged.settings.modeTheme === "string" && merged.settings.modeTheme
       ? merged.settings.modeTheme.slice(0, 30)
       : "paper";
+  /* 1.9.19：自定义色号（theme=custom）也要能原样带回来。 */
+  merged.settings.modeAccent =
+    typeof merged.settings.modeAccent === "string" ? merged.settings.modeAccent.slice(0, 30) : "";
   merged.settings.layout = ["line", "imessage", "letter", "bubble", "plain", "journal", "timeline", "comic"].includes(merged.settings.layout)
     ? merged.settings.layout
     : "line";

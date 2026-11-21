@@ -223,12 +223,18 @@ export function stripSvgSource(text) {
  * Pure and idempotent: a message that is not text, or that does not contain
  * svg markup, is returned untouched.
  */
-export function adoptStoredDrawings(messages, { note = "" } = {}) {
+export function adoptStoredDrawings(messages, { note = "", roles = null } = {}) {
   if (!Array.isArray(messages)) return { changed: false, messages };
+  const allowed = Array.isArray(roles) && roles.length ? new Set(roles) : null;
   let changed = false;
   const out = [];
   for (const message of messages) {
     if (!message || message.kind !== "text" || typeof message.text !== "string" || !/<svg\b/i.test(message.text)) {
+      out.push(message);
+      continue;
+    }
+    /* 用户自己贴的源码不是「模型画的画」：默认只修旧版本里 AI 的画。 */
+    if (allowed && !allowed.has(message.role)) {
       out.push(message);
       continue;
     }

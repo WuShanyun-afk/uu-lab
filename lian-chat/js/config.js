@@ -376,6 +376,7 @@ export function defaultState() {
       mode: "companion",
       /* 进助理模式前的那套配色，退出助理模式时换回来 */
       modeTheme: "paper",
+      modeAccent: "",
       greeting: DEFAULT_GREETING,
       theme: "line",
       accent: THEMES[0].accent,

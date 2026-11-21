@@ -29,7 +29,7 @@ import {
 import { buildMemoryMessages, mergeMemories, parseMemoryReply } from "./memory.js";
 import { adoptStoredDrawings, buildHtmlDocument, buildSvgDataUri, drawingLabel, stripSvgSource } from "./drawing.js";
 import { CHAT_MODES, MODE_THREADS, ROLEPLAY_PRESETS, chatModeOf, modeOfChat, parseNarration } from "./roleplay.js";
-import { accentStrong, mineBubble, relativeLuminance } from "./palette.js";
+import { accentStrong, mineBubble, normaliseAccent, relativeLuminance } from "./palette.js";
 import { buildReportFromRaw, reportBlocksHtml, salvageReport, sanitizeReportHtml } from "./report.js";
 import { chatHaystack, matchMessageIndexes, matchSnippet, normaliseQuery, splitByMatches } from "./search.js";
 import { chatStats, dailyQuestionIndex, greetingPeriod } from "./insights.js";
@@ -124,6 +124,41 @@ function currentChat() {
   return state?.chats?.find((chat) => chat.id === state.activeChatId) || null;
 }
 
+/** 按 id 找会话。异步任务回来时用它确认目标会话还在。 */
+function chatById(id) {
+  if (!id) return null;
+  return (state?.chats || []).find((chat) => chat.id === id) || null;
+}
+
+/** 异步任务出发时的快照：回来时如果 activeChatId 变了，结果要写回原会话。 */
+function threadContext() {
+  const chat = currentChat();
+  return { chat, chatId: chat?.id || "", mode: chatModeOf(state.settings) };
+}
+
+function threadStillActive(context) {
+  return Boolean(context?.chat) && state.activeChatId === context.chatId
+    && (state.chats || []).some((chat) => chat.id === context.chatId);
+}
+
+/** 这条会话现在还在冷战里吗（按会话查，不看当前页）。 */
+function threadBlocked(context) {
+  const block = threadStillActive(context) ? state.block : context?.chat?.block;
+  return Boolean(block && Number(block.until) > Date.now());
+}
+
+/**
+ * 把异步任务的产出写回它出发时的那条会话。
+ * 返回 true 表示用户还停在那条会话上（可以立即重画界面）。
+ */
+function pushToThread(context, message) {
+  const target = chatById(context?.chatId) || context?.chat || null;
+  if (!target || !Array.isArray(target.messages)) return false;
+  target.messages.push(message);
+  target.updatedAt = Number(message?.ts) || Date.now();
+  return threadStillActive(context);
+}
+
 /* =========================================================
    模块会话：陪伴 / 角色扮演 / AI 助理 各自一条线索
    会话存在 state.chats 里，用 chat.mode 标记归属，
@@ -201,18 +236,26 @@ function ensureModeThread(mode) {
   return chat;
 }
 
-/** 进助理页换「助理」配色，离开时换回进来之前那套。 */
+/** 进助理页换「助理」配色，离开时换回进来之前那套（主题 + 色号）。 */
 function applyModeTheme(previous, next) {
   const s = state.settings;
   if (previous === next) return;
   if (next === "assistant" && s.theme !== "assistant") {
-    s.modeTheme = s.theme;
+    s.modeTheme = s.theme || "line";
+    /* 色号单独记一份：自定义主题（theme=custom）不在 THEMES 里，
+       只存 id 回来时会掉进 THEMES[0]（LINE），用户的颜色就丢了。 */
+    s.modeAccent = s.accent || "";
     s.theme = "assistant";
     s.accent = "#2F6BFF";
   } else if (previous === "assistant" && s.theme === "assistant") {
-    const back = THEMES.find((theme) => theme.id === s.modeTheme) || THEMES[0];
-    s.theme = back.id;
-    s.accent = back.accent;
+    const back = THEMES.find((theme) => theme.id === s.modeTheme);
+    if (back) {
+      s.theme = back.id;
+      s.accent = back.accent;
+    } else {
+      s.theme = "custom";
+      s.accent = normaliseAccent(s.modeAccent) || THEMES[0].accent;
+    }
   }
 }
 
@@ -372,7 +415,7 @@ function syncActiveChat() {
   chat.avatar = s.aiAvatar || "";
   chat.relationship = s.relationship || "";
   chat.persona = s.persona || "";
-  chat.greeting = s.greeting || DEFAULT_GREETING;
+  chat.greeting = s.greeting || "";
   chat.keyId = state.activeKeyId || "";
   chat.proactiveLastAt = Number(s.proactive?.lastAt) || 0;
   chat.messages = state.messages;
@@ -395,7 +438,9 @@ function loadChatIntoActive(chat) {
   s.aiAvatar = chat.avatar || "";
   s.relationship = chat.relationship || "";
   s.persona = chat.persona || "";
-  s.greeting = chat.greeting || DEFAULT_GREETING;
+  /* 陪伴会话没有开场白时补一句默认的；助理 / 剧本要保留「有意留空」，
+     否则空的剧本会话会在下次启动被 addGreeting() 写成一句陪伴开场白。 */
+  s.greeting = chat.greeting || (nextMode === "companion" ? DEFAULT_GREETING : "");
   state.messages = Array.isArray(chat.messages) ? chat.messages : [];
   state.memories = Array.isArray(chat.memories) ? chat.memories : [];
   state.memoryMeta = chat.memoryMeta && typeof chat.memoryMeta === "object"
@@ -470,7 +515,15 @@ function createChat({ name, relationship = "", persona = "", greeting = "", keyI
     ? mode
     : chatModeOf(state.settings) === "roleplay" ? "roleplay" : "companion";
   const selectedKey = state.keys.find((item) => item.id === keyId) || state.keys.find((item) => item.id === state.activeKeyId);
-  const chat = {
+  /* 剧本模块第一次打开时建的空会话只是个占位：挑场景时直接用它，
+     否则它会永远留在列表里（现在还没有删除会话的入口）。 */
+  const placeholder = currentChat();
+  const reusePlaceholder = chatMode === "roleplay"
+    && placeholder
+    && modeOfChat(placeholder) === "roleplay"
+    && placeholder.kind === "module"
+    && !(placeholder.messages || []).length;
+  const chat = reusePlaceholder ? placeholder : {
     id: uid("chat"),
     mode: chatMode,
     kind: chatMode === "companion" ? "" : "module",
@@ -489,7 +542,21 @@ function createChat({ name, relationship = "", persona = "", greeting = "", keyI
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
-  state.chats.push(chat);
+  if (reusePlaceholder) {
+    Object.assign(chat, {
+      mode: chatMode,
+      kind: "module",
+      name: cleanName,
+      avatar: "",
+      relationship: String(relationship || "").slice(0, 300),
+      persona: String(persona || "").slice(0, 1200),
+      greeting: String(greeting || DEFAULT_GREETING).slice(0, 500),
+      keyId: selectedKey?.id || "",
+      updatedAt: Date.now(),
+    });
+  } else {
+    state.chats.push(chat);
+  }
   loadChatIntoActive(chat);
   if (chat.greeting) addGreeting();
   persist();
@@ -941,7 +1008,7 @@ function renderHome(force = false) {
         ${homeRow("about", "doc", t("settings.about"), t("settings.aboutHint"))}
       </div>
     </section>
-    <p class="home-foot">${escapeHtml(t("settings.version", { v: "1.9.18" }))} · ${escapeHtml(t("home.localOnly"))}</p>`;
+    <p class="home-foot">${escapeHtml(t("settings.version", { v: "1.9.19" }))} · ${escapeHtml(t("home.localOnly"))}</p>`;
 }
 
 /* =========================================================
@@ -1515,7 +1582,10 @@ function showSetup(step = 0) {
 }
 
 function addGreeting() {
-  const text = String(state.settings.greeting || DEFAULT_GREETING).trim();
+  /* 只有陪伴会「没有开场白也补一句」；助理 / 剧本的空会话要一直空着
+     （剧本先挑场景，助理的问候在建会话时就写好了）。 */
+  const fallback = chatModeOf(state.settings) === "companion" ? DEFAULT_GREETING : "";
+  const text = String(state.settings.greeting || fallback).trim();
   if (!text) return;
   state.messages.push({
     id: uid("m"),
@@ -1799,12 +1869,13 @@ function messageMarkup(message, isNew, previous = null) {
     content = drawingMarkup(message);
   } else {
     let text = String(message.text || "");
-    /* a stray svg block must never be printed as text, whatever the source */
-    if (/<svg\b/i.test(text)) text = stripSvgSource(text) || t("chat.drawingBroken");
-    const emoji = isEmojiOnly(text);
-    extraClass = emoji ? "is-emoji" : "";
     /* roleplay: 旁白、动作、台词各占一行；assistant: 段落 + 代码块 */
     const mode = chatModeOf(s);
+    /* a stray svg block must never be printed as text, whatever the source.
+       助理页例外：那里代码就是内容，问「这段 svg 哪错了」时必须看得见源码。 */
+    if (mode !== "assistant" && /<svg\b/i.test(text)) text = stripSvgSource(text) || t("chat.drawingBroken");
+    const emoji = isEmojiOnly(text);
+    extraClass = emoji ? "is-emoji" : "";
     const body = emoji
       ? renderRichText(text)
       : mode === "roleplay"
@@ -2070,17 +2141,27 @@ function startBlockTicker() {
   }, 1000);
 }
 
-function applyBlock(minutes) {
+function applyBlock(minutes, { chatId = "" } = {}) {
   const safeMinutes = Math.min(1440, Math.max(1, Number(minutes) || 30));
-  blockCycle += 1;
-  clearTimeout(blockFollowUpTimer);
-  blockFollowUpTimer = 0;
-  state.block = {
+  const block = {
     until: Date.now() + safeMinutes * 60_000,
     minutes: safeMinutes,
     createdAt: Date.now(),
     mode: state.settings.blocking?.mode === "reject" ? "reject" : "silent",
   };
+  /* 回复可能在用户切走之后才回来：冷战要落在发起那场对话里，不能改别人。 */
+  if (chatId && chatId !== state.activeChatId) {
+    const target = chatById(chatId);
+    if (!target) return;
+    target.block = block;
+    target.blockFollowUp = null;
+    persist();
+    return;
+  }
+  blockCycle += 1;
+  clearTimeout(blockFollowUpTimer);
+  blockFollowUpTimer = 0;
+  state.block = block;
   state.blockFollowUp = null;
   activeQuote = null;
   activeAttachment = null;
@@ -2184,12 +2265,18 @@ function adoptDrawingHistory() {
   const note = t("chat.drawingBroken");
   let changed = false;
   const fix = (list) => {
-    const result = adoptStoredDrawings(list, { note });
+    /* 只修「AI 以前把画存成文字」的情况；用户贴的代码原样保留。 */
+    const result = adoptStoredDrawings(list, { note, roles: ["assistant"] });
     if (result.changed) changed = true;
     return result.messages;
   };
-  state.messages = fix(state.messages);
-  for (const chat of state.chats || []) chat.messages = fix(chat.messages);
+  /* 助理页是要看代码的：把那里的历史转成画等于把源码删了。 */
+  for (const chat of state.chats || []) {
+    if (modeOfChat(chat) === "assistant") continue;
+    chat.messages = fix(chat.messages);
+  }
+  const active = currentChat();
+  state.messages = active ? active.messages : fix(state.messages);
   return changed;
 }
 
@@ -2206,6 +2293,8 @@ function nativeSnapshot() {
       model: s.model,
       aiName: s.aiName,
       userName: s.userName,
+      /* 后台主动消息只在陪伴模式发；原生层按这个字段判断。 */
+      mode: chatModeOf(s),
       relationship: s.relationship,
       persona: s.persona,
       greeting: s.greeting,
@@ -2673,7 +2762,10 @@ async function regenerateFrom(message) {
     requireApi();
     return;
   }
-  const all = state.messages;
+  const context = threadContext();
+  const originChat = context.chat;
+  const originSettings = { ...state.settings };
+  const all = originChat ? originChat.messages : state.messages;
   const index = all.findIndex((item) => item.id === message.id);
   if (index < 0) return;
   const target = all[index];
@@ -2699,26 +2791,21 @@ async function regenerateFrom(message) {
   updateSendButton();
   const controller = new AbortController();
   abortController = controller;
-  // History must stop at the message that prompted this reply: buildChatMessages
-  // reads state.messages, so the tail is swapped out for the duration of the call.
-  const original = state.messages;
+  /* 历史必须停在这条回答对应的提问：以前是临时把全局 state.messages 换成
+     截断数组，再在 finally 还原——这中间只要切了会话，switchChat 的
+     syncActiveChat() 就会把截断后的历史写进原会话，切回来的数组又会写进新会话。
+     现在只给请求构造一份浅副本，全局引用全程不动。 */
+  const requestState = { ...state, settings: originSettings, messages: all.slice(0, userIndex + 1) };
   try {
-    state.messages = all.slice(0, userIndex + 1);
-    let result;
-    try {
-      result = await chatCompletion({
-        settings: state.settings,
-        model: state.settings.model,
-        messages: buildChatMessages(state, userMessage, { note }),
-        maxTokens: wantedDrawing ? 900 : 720,
-        temperature: 0.9,
-        signal: controller.signal,
-      });
-    } finally {
-      // put the real history back before anything is persisted
-      state.messages = original;
-    }
-    const parsed = parseReply(result.content, state, { autoSticker: false });
+    const result = await chatCompletion({
+      settings: originSettings,
+      model: originSettings.model,
+      messages: buildChatMessages(requestState, userMessage, { note }),
+      maxTokens: wantedDrawing ? 900 : 720,
+      temperature: 0.9,
+      signal: controller.signal,
+    });
+    const parsed = parseReply(result.content, { ...requestState, messages: all }, { autoSticker: false });
     const parts = (parsed.parts || []).map((part) => String(part || "").trim()).filter(Boolean);
     const drawing = parsed.drawings?.[0] || null;
     if (wantedDrawing && !drawing) {
@@ -2743,13 +2830,14 @@ async function regenerateFrom(message) {
       return;
     }
     if (result.usage) target.usage = result.usage;
+    if (originChat) originChat.updatedAt = Date.now();
     persist();
-    renderChat({ force: true });
+    if (threadStillActive(context)) renderChat({ force: true });
     toast(wantedDrawing ? t("chat.redrawn") : t("chat.regenerated"));
   } catch (error) {
-    showError(t("chat.retry", { msg: errorText(error) }));
+    if (threadStillActive(context)) showError(t("chat.retry", { msg: errorText(error) }));
+    else toast(t("chat.retry", { msg: errorText(error) }));
   } finally {
-    state.messages = original;
     sending = false;
     abortController = null;
     updateSendButton();
@@ -3020,9 +3108,12 @@ function stripLiveMarkup(raw) {
   return text.replace(/[ \t]+\n/g, "\n").trim();
 }
 
-function beginLiveReply() {
+function beginLiveReply(chatId = "") {
   const list = $("#messageList");
   if (!list) return null;
+  /* 流式气泡只能出现在发起请求的那条会话里：用户在等第一个字的时候切走，
+     不能把半截回答画到别人的聊天页上。 */
+  if (chatId && chatId !== state.activeChatId) return null;
   endLiveReply();
   const holder = document.createElement("div");
   holder.innerHTML = messageMarkup({ id: "live_preview", role: "assistant", kind: "text", text: "", ts: Date.now() }, false);
@@ -3108,6 +3199,10 @@ async function requestAssistant(userMessage, { proactive = false, manual = false
     toast(t("toast.demo"));
     return;
   }
+  /* 请求可能跑十几秒：记住它属于哪条会话、用哪套设置，回来时不再假设
+     用户还停在原地。 */
+  const context = threadContext();
+  const originSettings = { ...state.settings };
   sending = true;
   segmentAbort = false;
   hideError();
@@ -3117,14 +3212,14 @@ async function requestAssistant(userMessage, { proactive = false, manual = false
   const controller = new AbortController();
   abortController = controller;
   try {
-    const useVision = userMessage?.kind === "image" && state.settings.visionModel?.trim();
-    const model = useVision ? state.settings.visionModel.trim() : state.settings.model;
+    const useVision = userMessage?.kind === "image" && originSettings.visionModel?.trim();
+    const model = useVision ? originSettings.visionModel.trim() : originSettings.model;
     const messages = buildChatMessages(state, userMessage, { proactive, afterBlock });
     const quoteCatalog = buildQuoteCatalog(state, userMessage?.id);
-    const streamable = !useVision && !proactive && !afterBlock && state.settings.optimize?.streaming !== false;
+    const streamable = !useVision && !proactive && !afterBlock && originSettings.optimize?.streaming !== false;
     let streamedAny = false;
     const result = await chatCompletion({
-      settings: state.settings,
+      settings: originSettings,
       messages,
       model,
       /* a drawing is a few hundred lines of markup: 720 tokens cut it in half,
@@ -3135,7 +3230,7 @@ async function requestAssistant(userMessage, { proactive = false, manual = false
         ? 260
         : proactive
           ? 220
-          : state.settings.optimize?.drawings || /(画|绘制|插画|svg|draw|illustrat)/i.test(String(userMessage?.text || ""))
+          : originSettings.optimize?.drawings || /(画|绘制|插画|svg|draw|illustrat)/i.test(String(userMessage?.text || ""))
             ? 2600
             : 720,
       temperature: afterBlock ? 0.82 : proactive ? 0.92 : 0.88,
@@ -3144,7 +3239,7 @@ async function requestAssistant(userMessage, { proactive = false, manual = false
         ? (full) => {
             if (!streamedAny) {
               streamedAny = true;
-              beginLiveReply();
+              beginLiveReply(context.chatId);
               showTyping(false);
             }
             updateLiveReply(full);
@@ -3153,7 +3248,7 @@ async function requestAssistant(userMessage, { proactive = false, manual = false
     });
     endLiveReply();
     recordUsage(result.usage);
-    const parsed = parseReply(result.content, state, { quoteCatalog });
+    const parsed = parseReply(result.content, { ...state, settings: originSettings }, { quoteCatalog });
     const allowedStickerIds = new Set(availableStickers(state).map((sticker) => sticker.id));
     let parts = (parsed.parts || []).filter((part) => String(part || "").trim());
     let stickers = parsed.stickerIds.filter((id) => allowedStickerIds.has(id));
@@ -3176,16 +3271,16 @@ async function requestAssistant(userMessage, { proactive = false, manual = false
     if (parsed.drawingBroken && !parts.length && !stickers.length && !drawings.length && !proactive) {
       parts = [t("chat.drawingBroken")];
     }
-    if (!parts.length && !stickers.length && !drawings.length && !(parsed.blockRequested && state.settings.blocking?.enabled)) {
+    if (!parts.length && !stickers.length && !drawings.length && !(parsed.blockRequested && originSettings.blocking?.enabled)) {
       throw new Error(t("error.empty"));
     }
     if (!parts.length && !stickers.length && !drawings.length) {
       if (proactive) throw new Error(t("error.empty"));
       // A cold-war marker with no visible words: keep the block, but never
       // create an empty message bubble.
-      if (parsed.blockRequested && state.settings.blocking?.enabled) {
+      if (parsed.blockRequested && originSettings.blocking?.enabled) {
         if (shouldBlockFromReply(userMessage, parsed)) {
-          applyBlock(state.settings.blocking.minutes);
+          applyBlock(originSettings.blocking.minutes, { chatId: context.chatId });
         }
         return;
       }
@@ -3194,7 +3289,7 @@ async function requestAssistant(userMessage, { proactive = false, manual = false
     // A new cold-war cycle may have started while this after-block request
     // was in flight. Discard the old follow-up rather than posting it into
     // the new cycle.
-    if (afterBlock && isBlocked()) return;
+    if (afterBlock && threadBlocked(context)) return;
 
     // The network call may already have taken longer than a human would.
     // Only top up the remaining time, never slow a slow model down further.
@@ -3251,17 +3346,19 @@ async function requestAssistant(userMessage, { proactive = false, manual = false
       created[0].quote = {
         id: parsed.quote.messageId,
         role: parsed.quote.role || "user",
-        name: parsed.quote.name || state.settings.userName || t("chat.you"),
+        name: parsed.quote.name || originSettings.userName || t("chat.you"),
         text: parsed.quote.text,
       };
     }
 
+    let stillActive = threadStillActive(context);
     for (let i = 0; i < created.length; i += 1) {
       if (segmentAbort) break;
       const message = created[i];
-      state.messages.push(message);
+      /* 写到发起请求的那条会话；用户已经切走时不要重画别人的界面。 */
+      stillActive = pushToThread(context, message);
       persist();
-      renderChat({ forceScroll: true, animateId: message.id });
+      if (stillActive) renderChat({ forceScroll: true, animateId: message.id });
       if (i < created.length - 1 && !streamedAny) {
         showTyping(true);
         const ok = await waitAbortable(segmentDelayMs(message));
@@ -3269,27 +3366,40 @@ async function requestAssistant(userMessage, { proactive = false, manual = false
         if (!ok) break;
       }
     }
-    if (document.body.dataset.screen !== "chat" && state.activeChatId) bumpUnread(state.activeChatId);
+    if (!stillActive && created.length && context.chatId) {
+      bumpUnread(context.chatId);
+      if (document.body.dataset.screen === "list") renderChatList();
+    } else if (stillActive && document.body.dataset.screen !== "chat" && state.activeChatId) {
+      bumpUnread(state.activeChatId);
+    }
     if (segmentAbort) toast(t("chat.stopped"));
     else {
       if (!proactive && shouldBlockFromReply(userMessage, parsed)) {
-        applyBlock(state.settings.blocking.minutes);
+        applyBlock(originSettings.blocking?.minutes, { chatId: context.chatId });
       }
-      if (proactive && created.length) {
+      if (proactive && created.length && stillActive) {
         notifyUser(created.filter((message) => notificationPreview(message)).at(-1));
       }
       if (proactive && manual && !afterBlock) toast(t("chat.proactiveDone", { tokens: result.usage.total || "?" }));
     }
-    lastFailed = null;
-    hideError();
+    if (threadStillActive(context)) {
+      lastFailed = null;
+      hideError();
+    }
   } catch (error) {
     const aborted = controller.signal.aborted || error?.code === "aborted";
     if (aborted) {
       toast(t("toast.aborted"));
     } else {
       const message = errorText(error, t);
-      showError(t("chat.retry", { msg: message }));
-      lastFailed = { userMessage, proactive, manual, afterBlock };
+      if (threadStillActive(context)) {
+        showError(t("chat.retry", { msg: message }));
+        lastFailed = { userMessage, proactive, manual, afterBlock };
+      } else {
+        /* 用户已经离开了这场对话：错误提示不能盖到别人的聊天页上，
+           原会话的提问还在，回去可以重新生成。 */
+        toast(t("chat.retry", { msg: message }));
+      }
       state.meta.lastError = message;
       persist();
     }
@@ -3300,9 +3410,12 @@ async function requestAssistant(userMessage, { proactive = false, manual = false
     abortController = null;
     showTyping(false);
     updateSendButton();
-    if (proactive && !afterBlock) state.settings.proactive.lastAt = Date.now();
+    if (proactive && !afterBlock) {
+      if (threadStillActive(context)) state.settings.proactive.lastAt = Date.now();
+      else if (context.chat) context.chat.proactiveLastAt = Date.now();
+    }
     persist();
-    if (!proactive) maybeAutoMemory();
+    if (!proactive && threadStillActive(context)) maybeAutoMemory();
   }
 }
 
@@ -3334,27 +3447,40 @@ async function organizeMemories({ button = null, silent = false } = {}) {
     if (!silent) toast(t("chat.busy"));
     return;
   }
+  const context = threadContext();
+  const originSettings = { ...state.settings };
   memoryBusy = true;
   const countAtStart = userMessageCount();
   if (button) setLoading(button, true, t("settings.memoryOrganizing"));
   try {
     const result = await chatCompletion({
-      settings: state.settings,
-      messages: buildMemoryMessages(state),
-      model: state.settings.model,
+      settings: originSettings,
+      messages: buildMemoryMessages({ ...state, settings: originSettings }),
+      model: originSettings.model,
       maxTokens: 800,
       temperature: 0.25,
       json: true,
     });
     recordUsage(result.usage);
     const candidates = parseMemoryReply(result.content);
-    const merged = mergeMemories(state.memories, candidates);
-    state.memories = merged.memories;
-    state.memoryMeta.lastAt = Date.now();
-    state.memoryMeta.lastAttemptAt = Date.now();
-    state.memoryMeta.lastUserCount = countAtStart;
+    /* 记忆属于发起整理的那条会话：等模型回答时用户可能已经切走了。 */
+    const target = chatById(context.chatId) || context.chat;
+    if (!target) return;
+    const merged = mergeMemories(target.memories || [], candidates);
+    const now = Date.now();
+    target.memories = merged.memories;
+    target.memoryMeta = {
+      ...(target.memoryMeta && typeof target.memoryMeta === "object" ? target.memoryMeta : {}),
+      lastAt: now,
+      lastAttemptAt: now,
+      lastUserCount: countAtStart,
+    };
+    if (threadStillActive(context)) {
+      state.memories = target.memories;
+      state.memoryMeta = target.memoryMeta;
+      if (document.body.dataset.screen === "settings") renderSettings(settingsCallbacks());
+    }
     persist();
-    if (document.body.dataset.screen === "settings") renderSettings(settingsCallbacks());
     if (!silent) {
       toast(
         merged.added
@@ -3363,8 +3489,15 @@ async function organizeMemories({ button = null, silent = false } = {}) {
       );
     }
   } catch (error) {
-    state.memoryMeta.lastAttemptAt = Date.now();
-    if (silent) state.memoryMeta.lastUserCount = countAtStart;
+    const target = chatById(context.chatId) || context.chat;
+    if (target) {
+      target.memoryMeta = {
+        ...(target.memoryMeta && typeof target.memoryMeta === "object" ? target.memoryMeta : {}),
+        lastAttemptAt: Date.now(),
+        ...(silent ? { lastUserCount: countAtStart } : {}),
+      };
+      if (threadStillActive(context)) state.memoryMeta = target.memoryMeta;
+    }
     persist();
     if (!silent) {
       toast(t("settings.memoryOrganizeFail", { msg: errorText(error, t) }), { timeout: 5000 });
@@ -3955,15 +4088,17 @@ async function generateReport(button) {
     toast(t("chat.busy"));
     return;
   }
+  const context = threadContext();
+  const originSettings = { ...state.settings };
   reporting = true;
   const error = $("#reportError");
   if (error) error.hidden = true;
   setLoading(button, true, t("common.generating"));
   try {
     const result = await chatCompletion({
-      settings: state.settings,
-      messages: buildReportMessages(state),
-      model: state.settings.model,
+      settings: originSettings,
+      messages: buildReportMessages({ ...state, settings: originSettings }),
+      model: originSettings.model,
       maxTokens: 2400,
       temperature: 0.86,
       json: true,
@@ -3973,10 +4108,11 @@ async function generateReport(button) {
        the JSON did not parse — on a phone that looked like `{"title":"…`.
        Salvage the readable fields instead, and never render the source. */
     let report = null;
+    const reportState = { ...state, settings: originSettings };
     try {
-      report = buildReportFromRaw(parseJsonReply(result.content), state);
+      report = buildReportFromRaw(parseJsonReply(result.content), reportState);
     } catch {
-      report = buildReportFromRaw(salvageReport(result.content), state);
+      report = buildReportFromRaw(salvageReport(result.content), reportState);
     }
     const createdAt = Date.now();
     const message = {
@@ -3988,16 +4124,24 @@ async function generateReport(button) {
       report: { ...report, createdAt },
       usage: result.usage,
     };
-    state.messages.push(message);
+    /* 报备属于发起生成的那条会话，切走了也不要塞进当前会话。 */
+    const active = pushToThread(context, message);
     persist();
-    closeSheet();
-    renderChat({ forceScroll: true, animateId: message.id });
+    if (active) {
+      closeSheet();
+      renderChat({ forceScroll: true, animateId: message.id });
+      openReportViewer(message);
+    } else {
+      if (context.chatId) bumpUnread(context.chatId);
+      if (document.body.dataset.screen === "list") renderChatList();
+    }
     toast(t("chat.reportDone", { tokens: result.usage.total || "?" }));
-    openReportViewer(message);
   } catch (err) {
-    if (error) {
+    if (error && threadStillActive(context)) {
       error.hidden = false;
       error.textContent = t("report.failed", { msg: errorText(err, t) });
+    } else {
+      toast(t("report.failed", { msg: errorText(err, t) }), { timeout: 5000 });
     }
   } finally {
     reporting = false;

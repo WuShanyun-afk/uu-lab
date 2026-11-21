@@ -43,3 +43,15 @@ test("normaliseState keeps studio type and direction, and repairs unknown types"
   assert.equal(repaired.stickerStudio.style, "auto");
   assert.equal(repaired.stickerStudio.direction, "");
 });
+
+test("normaliseState keeps the pre-assistant theme and accent", () => {
+  /* 1.9.19: theme=custom is not in THEMES, so the accent has to survive on its own */
+  const state = normaliseState({ settings: { modeTheme: "custom", modeAccent: "#FF00AA" } });
+  assert.equal(state.settings.modeTheme, "custom");
+  assert.equal(state.settings.modeAccent, "#FF00AA");
+
+  const empty = normaliseState({ settings: { modeTheme: "paper" } });
+  assert.equal(empty.settings.modeAccent, "");
+  const bad = normaliseState({ settings: { modeAccent: 42 } });
+  assert.equal(bad.settings.modeAccent, "");
+});
